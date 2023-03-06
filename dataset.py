@@ -52,20 +52,72 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 			features: vector of length len(properties_dim) that fixes the attributes to specific feature values
 		"""		
 		fixed_vectors = self.get_fixed_vectors(self.properties_dim)		
-		print(fixed_vectors)
+		#print(fixed_vectors)
 		# features are just all possible objects
-		features_vectors = self._get_all_possible_objects(self.properties_dim)
+		feature_vectors = self._get_all_possible_objects(self.properties_dim)
 		#print(features_vectors)
 		# match fixed and features vectors (and sort according to level of abstraction?)
-		concepts = list(itertools.product(fixed_vectors, features_vectors))
+		concepts = list(itertools.product(fixed_vectors, feature_vectors)) # gives me all possible objects
 		#print(concepts)
 		# distractor concepts: number and position of fixed attributes match target concept
 		# the more fixed attributes are shared, the finer the context
 		
 		#print(sum(fixed_vectors[2])) # easy way to check the level of abstraction (1 is most generic, n is most specific)
 		# maybe first build concept-context pairs and then match fixed and feature vectors 
-		generic_concepts = list(itertools.product(fixed_vector for fixed_vector in fixed_vectors if sum(fixed_vector) == 1))
-		print(generic_concepts) 
+		#generic_concepts = list(itertools.product((fixed_vector for fixed_vector in fixed_vectors if sum(fixed_vector) == 1), feature_vectors))
+		#print(generic_concepts) 
+
+		# pseudocode
+		target_concepts = list()
+		# go through all concepts (i.e. fixed, features pairs)
+		for concept in concepts:
+			# treat each concept as a target concept once (maybe store it in a list to keep track because of doubles)
+			# e.g. target concept (_, _, 0) (i.e. fixed = (0,0,1) and features e.g. (0,0,0))
+			#if target_concept not in target_concepts: 
+			#	target_concepts.append(target_concept)
+				# fixed vector is the same for target and distractor concepts (needs to be stored only once) - this is the level of specificity/genericity (abstraction)
+				fixed = concept[0]
+				# go through all objects and check whether they satisfy the target concept (in this example have 0 as 3rd attribute)
+				target_objects = list()
+				for object in feature_vectors:
+					# if target:
+					if self.satisfies(object, concept):
+						# append to list of target objects
+						if object not in target_objects:
+							target_objects.append(object)
+					# else:
+						# append to list of distractor objects
+						# check for context:
+						# for number of attributes:
+							# if number of attributes are shared with target:
+								# append to list of distractor objects for this context
+								# do i need context integers? e.g. 0 for coarse and n for fine (n is up to the number of fixed attributes)
+				if (fixed, target_objects) not in target_concepts:
+					target_concepts.append((fixed, target_objects))
+		print(target_concepts)
+		# each concept-context pair consists of: (fixed, target_objects), (context, distractor_objects)
+		
+		
+	@staticmethod
+	def satisfies(object, concept):
+		"""
+		Checks whether an object satisfies a target concept, returns a boolean value.
+		"""
+		satisfied = False
+		same_counter = 0
+		fixed, concept_object = concept
+		# an object satisfies if fixed attributes are the same
+		# go through attributes an check whether they are fixed
+		for i, attr in enumerate(fixed):
+			# if an attribute is fixed
+			if attr == 1:
+				# compare object with concept object
+				if object[i] == concept_object[i]:
+					same_counter = same_counter +1
+		# the number of shared attributes should match the number of fixed attributes
+		if same_counter == sum(fixed):
+			satisfied = True
+		return satisfied
 		
 		
 	@staticmethod
