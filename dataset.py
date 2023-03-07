@@ -3,7 +3,7 @@
 import torch
 import pandas as pd
 import itertools
-
+import random
 
 class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to use the torch dataset?
 	""" 
@@ -17,28 +17,103 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		super().__init__()
 		
 		self.properties_dim = properties_dim
+		self.game_size = game_size
 		
-		# get all possible concept-context pairs (depends on dataset size) - full sets of objects, later sample from these
-		self.concept_context_pairs = self.get_concept_context_pairs(self)
+		# get all concepts
+		self.concepts = self.get_all_concepts(self)
+		#print(self.concepts)
 		
+		# distractors can be sampled from all possible concepts by matching the fixed vectors and then creating the context with the number of shared attributes
+		# fixed vector is the same for target and distractor concepts (needs to be stored only once) - this is the level of specificity/genericity (abstraction)
+		# distractor concepts: number and position of fixed attributes match target concept
+		# the more fixed attributes are shared, the finer the context
+		#print(sum(fixed_vectors[2])) # easy way to check the level of abstraction (1 is most generic, n is most specific)
 		
-		# define pairs of targets and distractors
+		# create target-distractor pairs 
+		# all and sample later or directly with the prespecified game size?
+		#self.concept_context_pairs = self.create_concept_context_pairs(self)
+
+		# hierarchical reference game:
+		#get_sample(self, sender_object_idx, relevance) returns sender_object=sender_input, target, distractors -> creates distractors based on relevance vectors and sender object and game size!
+		#get_item(self, object_idx, relevance, encoding_func) returns (sender_input, relevance), label, receiver_input=distractors+target
+		#get_datasets(self, split_ratio) uses get_item to create datasets
 		
-		# retrieve all possible objects
-		#self.objects = self._get_all_possible_objects(properties_dim)
-		#print(self.objects)
-		
-		# create all possible games (i.e., target-distractor-combinations)
-		# define concepts
-		#self.concepts = self.define_targets(properties_dim)
-		# define contexts
-		#self.contexts = self.define_distractors(self.properties_dim, self.objects, self.concepts)
-		
+		sample = self.get_sample(self, 0)
+		print(sample)
 		
 		fixed = [0,0,1]
 		features = [2,0,1]
 		objects_for_a_concept = self.get_all_objects_for_a_concept(self.properties_dim, fixed, features)
 		#print(objects_for_a_concept)
+		
+		
+	@staticmethod
+	def get_sample(self, concept_idx):
+		"""
+		Returns a full sample consisting of a set of target objects (target concept) and a set of distractor objects (context) for a given concept.
+		"""
+		all_target_objects = self.concepts[concept_idx][1]
+		print(all_target_objects)
+		# sample target objects for given game size
+		try:
+			target_objects = random.sample(all_target_objects, self.game_size)
+		# How should this case be handled? Cannot specify game size larger than 9 for 3x3x3 dataset? 
+		# Or repeat objects?
+		except ValueError:
+			print("game size too large")
+			target_objects = random.sample(all_target_objects, len(all_target_objects))
+		print(target_objects)
+		distractors = self.get_distractors(self, concept_idx)
+		
+		
+	@staticmethod
+	def get_distractors(self, concept_idx):
+		"""
+		Returns distractor objects for each context based on a given target concept and game size (i.e. number of targets and distractors).
+		return (context, distractor_objects) tuples
+		"""
+		fixed = self.concepts[concept_idx][0]
+		print(fixed)
+		# go through number of fixed attributes
+		for i in range(sum(fixed)):
+			break
+		
+		
+		
+	@staticmethod
+	def get_all_concepts(self):
+		"""
+		Returns all possible concepts for a given dataset size.
+		Concepts consist of (fixed, objects) tuples
+			fixed: a tuple that denotes how many and which attributes are fixed
+			objects: a list with all object-tuples that satisfy the concept
+		"""
+		fixed_vectors = self.get_fixed_vectors(self.properties_dim)		
+		#print(fixed_vectors)
+		all_objects = self._get_all_possible_objects(self.properties_dim)
+		#print(all_objects)
+		# create all possible concepts
+		all_fixed_object_pairs = list(itertools.product(fixed_vectors, all_objects))
+		#print(all_fixed_object_pairs)
+		
+		concepts = list()
+		# go through all concepts (i.e. fixed, objects pairs)
+		for concept in all_fixed_object_pairs:
+			# treat each fixed_object pair as a target concept once
+			# e.g. target concept (_, _, 0) (i.e. fixed = (0,0,1) and objects e.g. (0,0,0), (1,0,0))
+			fixed = concept[0]
+			# go through all objects and check whether they satisfy the target concept (in this example have 0 as 3rd attribute)
+			target_objects = list()
+			for object in all_objects:
+				if self.satisfies(object, concept):
+					if object not in target_objects:
+						target_objects.append(object)
+			# concepts are tuples of fixed attributes and all target objects that satisfy the concept
+			if (fixed, target_objects) not in concepts:
+				concepts.append((fixed, target_objects))
+		
+		return concepts
+
 	
 		
 	@staticmethod
@@ -94,6 +169,8 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 								# do i need context integers? e.g. 0 for coarse and n for fine (n is up to the number of fixed attributes)
 				if (fixed, target_objects) not in target_concepts:
 					target_concepts.append((fixed, target_objects))
+		# target concepts are all possible concepts
+		# distractors can be sampled from all possible concepts by matching the fixed vectors and then creating the context with the number of shared attributes
 		print(target_concepts)
 		# each concept-context pair consists of: (fixed, target_objects), (context, distractor_objects)
 		
