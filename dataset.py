@@ -23,28 +23,15 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		self.concepts = self.get_all_concepts(self)
 		#print(self.concepts)
 		
-		# distractors can be sampled from all possible concepts by matching the fixed vectors and then creating the context with the number of shared attributes
-		# fixed vector is the same for target and distractor concepts (needs to be stored only once) - this is the level of specificity/genericity (abstraction)
-		# distractor concepts: number and position of fixed attributes match target concept
-		# the more fixed attributes are shared, the finer the context
-		#print(sum(fixed_vectors[2])) # easy way to check the level of abstraction (1 is most generic, n is most specific)
-		
-		# create target-distractor pairs 
-		# all and sample later or directly with the prespecified game size?
-		#self.concept_context_pairs = self.create_concept_context_pairs(self)
-
 		# hierarchical reference game:
 		#get_sample(self, sender_object_idx, relevance) returns sender_object=sender_input, target, distractors -> creates distractors based on relevance vectors and sender object and game size!
 		#get_item(self, object_idx, relevance, encoding_func) returns (sender_input, relevance), label, receiver_input=distractors+target
 		#get_datasets(self, split_ratio) uses get_item to create datasets
 		
-		sample = self.get_sample(self, 0)
+		# Where do I specify the context condition?
+		sample = self.get_sample(self, 20)
 		print(sample)
 		
-		fixed = [0,0,1]
-		features = [2,0,1]
-		objects_for_a_concept = self.get_all_objects_for_a_concept(self.properties_dim, fixed, features)
-		#print(objects_for_a_concept)
 		
 		
 	@staticmethod
@@ -52,18 +39,19 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		"""
 		Returns a full sample consisting of a set of target objects (target concept) and a set of distractor objects (context) for a given concept.
 		"""
-		all_target_objects = self.concepts[concept_idx][1]
+		print(self.concepts[concept_idx])
+		all_target_objects = self.concepts[concept_idx][0]
 		print(all_target_objects)
-		# sample target objects for given game size
+		# sample target objects for given game size (if possible, get unique choices)
 		try:
 			target_objects = random.sample(all_target_objects, self.game_size)
-		# How should this case be handled? Cannot specify game size larger than 9 for 3x3x3 dataset? 
-		# Or repeat objects?
 		except ValueError:
-			print("game size too large")
-			target_objects = random.sample(all_target_objects, len(all_target_objects))
-		print(target_objects)
+			target_objects = random.choices(all_target_objects, k=self.game_size)
+		print("sampled target objects", target_objects)
 		distractors = self.get_distractors(self, concept_idx)
+		print("distractors", distractors)
+		# sample distractor objects for given game size and given context condition
+		
 		
 		
 	@staticmethod
@@ -72,11 +60,73 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		Returns distractor objects for each context based on a given target concept and game size (i.e. number of targets and distractors).
 		return (context, distractor_objects) tuples
 		"""
-		fixed = self.concepts[concept_idx][0]
-		print(fixed)
-		# go through number of fixed attributes
-		for i in range(sum(fixed)):
-			break
+		
+		def change_one_attribute(input_object, fixed):
+			"""
+			Returns a concept where one attribute is changed.
+			Input: A concept consisting of an (example) object and a fixed vector indicating which attributes are fixed in the concept. 
+			Output: A list of concepts consisting of an (example) object that differs in one attribute from the input object and a new fixed vector.
+			"""
+			changed_concepts = list()
+			# go through target object and fixed
+			for i, attribute in enumerate(input_object):
+				# check whether attribute in target object is fixed
+				if fixed[i] == 1:
+					# change one attribute to all possible attributes that don't match the target_object
+					for poss_attribute in range(self.properties_dim[i]):
+						new_fixed = fixed.copy()
+						if poss_attribute != attribute:
+							new_fixed[i] = 0
+							changed = list(input_object)
+							changed[i] = poss_attribute
+							# the new fixed values specify where the change took place: (1,1,0) means the change took place in 3rd attribute
+							changed_concepts.append((changed, new_fixed))
+			return changed_concepts
+		
+		def change_n_attributes(input_object, fixed, n_attributes):
+			"""
+			Changes a given number of attributes from a target object 
+				given a fixed vector (specifiying the attributes that can and should be changed)
+				and a target object
+				and a number of how many attributes should be changed.
+			"""
+			changed_concepts = list()
+			while(n_attributes > 0):
+				# if changed_concepts is empty, I consider the target_object
+				if not changed_concepts:
+					changed_concepts = [change_one_attribute(input_object, fixed)]
+					n_attributes = n_attributes -1
+				# otherwise consider the changed concepts and change them again	 until n_attributes = 0
+				else:
+					old_changed_concepts = changed_concepts.copy()
+					for sublist in changed_concepts:
+						for (changed_concept, fixed) in sublist:
+							new_changed_concepts = change_one_attribute(changed_concept, fixed)
+							if new_changed_concepts not in old_changed_concepts:
+								old_changed_concepts.append(new_changed_concepts)
+					# copy and store for next iteration
+					changed_concepts = old_changed_concepts.copy()
+					n_attributes = n_attributes -1
+			# flatten list
+			changed_concepts_flattened = [changed_concept for sublist in changed_concepts for changed_concept in sublist]
+			# remove doubles
+			changed_concepts_final = []
+			[changed_concepts_final.append(x) for x in changed_concepts_flattened if x not in changed_concepts_final]
+			return changed_concepts_final
+			
+		target_objects, fixed = self.concepts[concept_idx]
+		fixed = list(fixed)
+		# distractors: number and position of fixed attributes match target concept
+		# the more fixed attributes are shared, the finer the context
+		distractor_concepts = change_n_attributes(target_objects[0], fixed, sum(fixed))
+		# the fixed vectors in the distractor_concepts indicate the number of shared features: (1,0,0) means only first attribute is shared
+		# thus sum(fixed) indicates the context condition: from 0 = coarse to n_attributes = fine
+		# for the dataset I need objects instead of concepts
+		distractor_objects = list()
+		for dist_concept in distractor_concepts:
+			# same fixed vector as for the target concept
+			distractor_objects.extend([self.get_all_objects_for_a_concept(self.properties_dim, dist_concept[0], fixed), dist_concept[1]])
+		return distractor_objects
 		
 		
 		
@@ -84,16 +134,16 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 	def get_all_concepts(self):
 		"""
 		Returns all possible concepts for a given dataset size.
-		Concepts consist of (fixed, objects) tuples
-			fixed: a tuple that denotes how many and which attributes are fixed
+		Concepts consist of (objects, fixed) tuples
 			objects: a list with all object-tuples that satisfy the concept
+			fixed: a tuple that denotes how many and which attributes are fixed
 		"""
 		fixed_vectors = self.get_fixed_vectors(self.properties_dim)		
 		#print(fixed_vectors)
 		all_objects = self._get_all_possible_objects(self.properties_dim)
 		#print(all_objects)
 		# create all possible concepts
-		all_fixed_object_pairs = list(itertools.product(fixed_vectors, all_objects))
+		all_fixed_object_pairs = list(itertools.product(all_objects, fixed_vectors))
 		#print(all_fixed_object_pairs)
 		
 		concepts = list()
@@ -101,7 +151,7 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		for concept in all_fixed_object_pairs:
 			# treat each fixed_object pair as a target concept once
 			# e.g. target concept (_, _, 0) (i.e. fixed = (0,0,1) and objects e.g. (0,0,0), (1,0,0))
-			fixed = concept[0]
+			fixed = concept[1]
 			# go through all objects and check whether they satisfy the target concept (in this example have 0 as 3rd attribute)
 			target_objects = list()
 			for object in all_objects:
@@ -109,70 +159,9 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 					if object not in target_objects:
 						target_objects.append(object)
 			# concepts are tuples of fixed attributes and all target objects that satisfy the concept
-			if (fixed, target_objects) not in concepts:
-				concepts.append((fixed, target_objects))
-		
+			if (target_objects, fixed) not in concepts:
+				concepts.append((target_objects, fixed))
 		return concepts
-
-	
-		
-	@staticmethod
-	def get_concept_context_pairs(self):
-		"""
-		Returns all possible concept-context pairs for a given dataset size in the form of fixed and features vectors.
-		Input: properties_dim
-		Output: 
-		Concepts (contexts are also treated as concepts) consist of fixed-features tuples: 
-			fixed: vector of length len(properties_dim), 1 denotes that the attribute is fixed, 0 denotes unfixed attribute
-			features: vector of length len(properties_dim) that fixes the attributes to specific feature values
-		"""		
-		fixed_vectors = self.get_fixed_vectors(self.properties_dim)		
-		#print(fixed_vectors)
-		# features are just all possible objects
-		feature_vectors = self._get_all_possible_objects(self.properties_dim)
-		#print(features_vectors)
-		# match fixed and features vectors (and sort according to level of abstraction?)
-		concepts = list(itertools.product(fixed_vectors, feature_vectors)) # gives me all possible objects
-		#print(concepts)
-		# distractor concepts: number and position of fixed attributes match target concept
-		# the more fixed attributes are shared, the finer the context
-		
-		#print(sum(fixed_vectors[2])) # easy way to check the level of abstraction (1 is most generic, n is most specific)
-		# maybe first build concept-context pairs and then match fixed and feature vectors 
-		#generic_concepts = list(itertools.product((fixed_vector for fixed_vector in fixed_vectors if sum(fixed_vector) == 1), feature_vectors))
-		#print(generic_concepts) 
-
-		# pseudocode
-		target_concepts = list()
-		# go through all concepts (i.e. fixed, features pairs)
-		for concept in concepts:
-			# treat each concept as a target concept once (maybe store it in a list to keep track because of doubles)
-			# e.g. target concept (_, _, 0) (i.e. fixed = (0,0,1) and features e.g. (0,0,0))
-			#if target_concept not in target_concepts: 
-			#	target_concepts.append(target_concept)
-				# fixed vector is the same for target and distractor concepts (needs to be stored only once) - this is the level of specificity/genericity (abstraction)
-				fixed = concept[0]
-				# go through all objects and check whether they satisfy the target concept (in this example have 0 as 3rd attribute)
-				target_objects = list()
-				for object in feature_vectors:
-					# if target:
-					if self.satisfies(object, concept):
-						# append to list of target objects
-						if object not in target_objects:
-							target_objects.append(object)
-					# else:
-						# append to list of distractor objects
-						# check for context:
-						# for number of attributes:
-							# if number of attributes are shared with target:
-								# append to list of distractor objects for this context
-								# do i need context integers? e.g. 0 for coarse and n for fine (n is up to the number of fixed attributes)
-				if (fixed, target_objects) not in target_concepts:
-					target_concepts.append((fixed, target_objects))
-		# target concepts are all possible concepts
-		# distractors can be sampled from all possible concepts by matching the fixed vectors and then creating the context with the number of shared attributes
-		print(target_concepts)
-		# each concept-context pair consists of: (fixed, target_objects), (context, distractor_objects)
 		
 		
 	@staticmethod
@@ -182,8 +171,8 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		"""
 		satisfied = False
 		same_counter = 0
-		fixed, concept_object = concept
-		# an object satisfies if fixed attributes are the same
+		concept_object, fixed = concept
+		# an object satisfies a concept if fixed attributes are the same
 		# go through attributes an check whether they are fixed
 		for i, attr in enumerate(fixed):
 			# if an attribute is fixed
@@ -218,11 +207,11 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 				
 		
 	@staticmethod
-	def get_all_objects_for_a_concept(properties_dim, fixed, features):
+	def get_all_objects_for_a_concept(properties_dim, features, fixed):
 		"""
 		Returns all possible objects for a concept at a given level of abstraction
-		fixed: Defines how many and which attributes are fixed
 		features: Defines the features which are fixed
+		fixed: Defines how many and which attributes are fixed
 		"""
 		# retrieve all possible objects
 		list_of_dim = [range(0, dim) for dim in properties_dim]
@@ -237,7 +226,6 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		possible_concepts = dict()
 		for index in fixed_indices:
 			possible_concepts[index] = ([object for object in all_objects if object[index] == features[index]])
-		#print(possible_concepts)	
 	
 		# keep only those that also match with the other fixed features, i.e. that are possible concepts for all fixed indices
 		all = list(possible_concepts.values())
