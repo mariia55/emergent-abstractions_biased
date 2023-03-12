@@ -21,42 +21,118 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		# get all concepts
 		self.concepts = self.get_all_concepts(self)
 		#print(self.concepts)
+		# get all context conditions
+		self.all_context_conditions = list(range(0, len(self.properties_dim)-1))
+		#print(self.all_context_conditions)
 		
 		# hierarchical reference game:
-		#get_sample(self, sender_object_idx, relevance) returns sender_object=sender_input, target, distractors -> creates distractors based on relevance vectors and sender object and game size!
+		#get_sample(self, sender_object_idx, relevance) returns sender_object=sender_input, target, distractors 
+		# -> creates distractors based on relevance vectors and sender object and game size!
 		#get_item(self, object_idx, relevance, encoding_func) returns (sender_input, relevance), label, receiver_input=distractors+target
 		#get_datasets(self, split_ratio) uses get_item to create datasets
 		
 		# Where do I specify the context condition?
-		sample = self.get_sample(self, 20)
+		sample = self.get_sample(self, 1)
 		print(sample)
+
+
+	@staticmethod
+	def get_datasets(self, split_ratio):
+		if sum(split_ratio) != 1:
+			raise ValueError
+
+		train_ratio, val_ratio, test_ratio = split_ratio
+
+        # Shuffle sender indices
+		concept_indices = torch.randperm(len(self.concepts)).tolist()
+		ratio = int(len(self.concepts)*(train_ratio + val_ratio))
+
+		train_and_val = []
+		print("Creating train_ds and val_ds...")
+		for concept_idx in tqdm(concept_indices[:ratio]):
+			for _ in range(self.game_size):
+				for context_condition in self.all_context_conditions:
+					train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding))
+		return train, val, test
+
+
+
+	@staticmethod
+	def get_item(self, concept_idx, context_condition, encoding_func):
+		"""
+		Receives concept-context pairs (or gets them by calling get_concept_context_pairs())
+		Returns encoded (sender_input, label, receiver_input).
+		"""
+		pass
+
+
+
+	@staticmethod
+	def get_concept_context_pairs():
+		"""
+		Receives a concept (index), and distractor objects from a given context condition.
+		Returns the concept (objects + level of abstraction), label (indices of target objects) 
+			and context (distractor objects + context condition).
+		(still need to shuffle concept and context afterwards and split sender and receiver input)
+		"""
+		pass
 		
+
 		
 		
 	@staticmethod
 	def get_sample(self, concept_idx):
 		"""
-		Returns a full sample consisting of a set of target objects (target concept) and a set of distractor objects (context) for a given concept.
+		Returns a full sample consisting of a set of target objects (target concept) 
+		and a set of distractor objects (context) for a given concept and context condition.
 		"""
 		print(self.concepts[concept_idx])
-		all_target_objects = self.concepts[concept_idx][0]
+		all_target_objects, fixed = self.concepts[concept_idx]
 		print(all_target_objects)
+		print(fixed)
 		# sample target objects for given game size (if possible, get unique choices)
 		try:
 			target_objects = random.sample(all_target_objects, self.game_size)
 		except ValueError:
 			target_objects = random.choices(all_target_objects, k=self.game_size)
 		print("sampled target objects", target_objects)
+		# get all possible distractors for a given concept (for all context conditions)
 		distractors = self.get_distractors(self, concept_idx)
 		print("distractors", distractors)
-		# sample distractor objects for given game size and given context condition
+		# sample distractor objects for given game size and each context condition (constrained by level of abstraction)
+		context = list()
+		context_candidates = list()
+		for i in range(sum(fixed)):
+			for dist_objects, context_condition in distractors:
+				# check for context condition
+				# sum(context_condition) gives the number of shared attributes
+				if sum(context_condition) == i:
+					for dist_object in dist_objects:
+						print(dist_object, i)
+						context_candidates.append(dist_object)
+		print("context candidates", context_candidates)
+		print(len(context_candidates))
+		# 8, 12, 6 = 26 for concrete concepts, three context conditions
+		# 12, 12 = 24 for intermediate concepts
+		# 18 for generic concepts, coarse condition (only)
+		# one way would be to compute how many candidate concepts exist for each context condition and then use 
+		# random.sample on a sublist with the appropriate length
+		# need to sample from all candidates for the same context
+		#try:
+		#	context.append((random.sample(dist_objects, self.game_size), i))
+		#except ValueError:
+		#	context.append((random.choices(dist_objects, k=self.game_size), i))
+		#print("sampled context", context)
+
+		# return target concept, context (distractor objects + context) for each context
 		
 		
 		
 	@staticmethod
 	def get_distractors(self, concept_idx):
 		"""
-		Returns distractor objects for each context based on a given target concept and game size (i.e. number of targets and distractors).
+		Returns distractor objects for each context based on a given target concept and game size 
+			(i.e. number of targets and distractors).
 		return (context, distractor_objects) tuples
 		"""
 		
@@ -124,7 +200,7 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		distractor_objects = list()
 		for dist_concept in distractor_concepts:
 			# same fixed vector as for the target concept
-			distractor_objects.extend([self.get_all_objects_for_a_concept(self.properties_dim, dist_concept[0], fixed), dist_concept[1]])
+			distractor_objects.extend([(self.get_all_objects_for_a_concept(self.properties_dim, dist_concept[0], fixed), tuple(dist_concept[1]))])
 		return distractor_objects
 		
 		
