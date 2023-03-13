@@ -8,7 +8,7 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 	""" 
 	This class provides the torch.Dataloader-loadable dataset.
 	"""
-	def __init__(self, properties_dim=[3,3,3], game_size=3):
+	def __init__(self, properties_dim=[2,2,2,2], game_size=3):
 		"""
 		properties_dim: vector that defines how many attributes and features per attributes the dataset should contain, defaults to a 3x3x3 dataset
 		game_size: integer that defines how many targets and distractors a game consists of
@@ -32,7 +32,7 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		#get_datasets(self, split_ratio) uses get_item to create datasets
 		
 		# Where do I specify the context condition?
-		sample = self.get_sample(self, 1)
+		sample = self.get_sample(self, 30)
 		print(sample)
 
 
@@ -88,17 +88,17 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		"""
 		print(self.concepts[concept_idx])
 		all_target_objects, fixed = self.concepts[concept_idx]
-		print(all_target_objects)
+		#print(all_target_objects)
 		print(fixed)
 		# sample target objects for given game size (if possible, get unique choices)
 		try:
 			target_objects = random.sample(all_target_objects, self.game_size)
 		except ValueError:
 			target_objects = random.choices(all_target_objects, k=self.game_size)
-		print("sampled target objects", target_objects)
+		#print("sampled target objects", target_objects)
 		# get all possible distractors for a given concept (for all context conditions)
 		distractors = self.get_distractors(self, concept_idx)
-		print("distractors", distractors)
+		#print("distractors", distractors)
 		# sample distractor objects for given game size and each context condition (constrained by level of abstraction)
 		context = list()
 		context_candidates = list()
@@ -108,13 +108,59 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 				# sum(context_condition) gives the number of shared attributes
 				if sum(context_condition) == i:
 					for dist_object in dist_objects:
-						print(dist_object, i)
-						context_candidates.append(dist_object)
+						#print(dist_object, i)
+						context_candidates.append([dist_object, i])
 		print("context candidates", context_candidates)
-		print(len(context_candidates))
+		#print(len(context_candidates))
+		helper_i = 0
+		helper_list = list()
+		#for i in range(len(self.properties_dim)):
+		for dist_object, context_condition in context_candidates:
+			print(dist_object, context_condition)
+			if helper_i == context_condition:
+				print("if")
+				# gather all objects belonging to the same context condition
+				helper_list.append(dist_object)
+				print(helper_list)
+				if helper_i == len(self.properties_dim) -1:
+					try: 
+						context.append((random.sample(helper_list, self.game_size), helper_i))
+					except ValueError:
+						context.append((random.choices(helper_list, k=self.game_size), helper_i))
+			elif context_condition == len(self.properties_dim) -1:
+				print("elif")
+				try: 
+					context.append((random.sample(helper_list, self.game_size), helper_i))
+				except ValueError:
+					context.append((random.choices(helper_list, k=self.game_size), helper_i))
+				helper_i = helper_i + 1
+				helper_list = list()
+				helper_list.append(dist_object)
+				print(helper_list)
+			else:
+				print("else")
+				# sample from all objects belonging to the same context condition
+				try: 
+					context.append((random.sample(helper_list, self.game_size), helper_i))
+				except ValueError:
+					context.append((random.choices(helper_list, k=self.game_size), helper_i))
+				helper_i = helper_i + 1
+				helper_list = list()
+				helper_list.append(dist_object)
+		print("sampled context", context)
+		# [3,3,3]
 		# 8, 12, 6 = 26 for concrete concepts, three context conditions
 		# 12, 12 = 24 for intermediate concepts
-		# 18 for generic concepts, coarse condition (only)
+		# 18 for generic concepts, coarse condition (only) 3^2=9 
+		# [2,2,2]
+		# 0, 3, 3 = 7 for concrete
+		# 2, 4 = 6 for intermed.
+		# 4 for generic concepts, coarse condition 2^2=4
+		# [2,2,2,2]
+		# 1, 4, 6, 4 = 15 concrete (4 fixed)
+		# 2, 6, 6 = 14 (3 fixed)
+		# 4, 8 = 12 (2 fixed)
+		# 8 for generic (1 fixed) 2^3=8
 		# one way would be to compute how many candidate concepts exist for each context condition and then use 
 		# random.sample on a sublist with the appropriate length
 		# need to sample from all candidates for the same context
