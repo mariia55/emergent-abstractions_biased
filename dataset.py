@@ -8,7 +8,7 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 	""" 
 	This class provides the torch.Dataloader-loadable dataset.
 	"""
-	def __init__(self, properties_dim=[2,2,2,2], game_size=3):
+	def __init__(self, properties_dim=[3,3,3], game_size=3):
 		"""
 		properties_dim: vector that defines how many attributes and features per attributes the dataset should contain, defaults to a 3x3x3 dataset
 		game_size: integer that defines how many targets and distractors a game consists of
@@ -32,8 +32,8 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		#get_datasets(self, split_ratio) uses get_item to create datasets
 		
 		# Where do I specify the context condition?
-		sample = self.get_sample(self, 30)
-		print(sample)
+		sample = self.get_sample(self, 4)
+		print("sample", sample)
 
 
 	@staticmethod
@@ -95,10 +95,21 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 			target_objects = random.sample(all_target_objects, self.game_size)
 		except ValueError:
 			target_objects = random.choices(all_target_objects, k=self.game_size)
-		#print("sampled target objects", target_objects)
+		print("sampled target objects", target_objects)
 		# get all possible distractors for a given concept (for all context conditions)
 		distractors = self.get_distractors(self, concept_idx)
 		#print("distractors", distractors)
+		context = self.sample_distractors(self, distractors, fixed)
+		print(context)
+		# return target concept, context (distractor objects + context) for each context
+		return [target_objects, sum(fixed)], context 
+		
+	
+	@staticmethod
+	def sample_distractors(self, distractors, fixed):
+		"""
+		Function for sampling the distractors from all possible context conditions.
+		"""
 		# sample distractor objects for given game size and each context condition (constrained by level of abstraction)
 		context = list()
 		context_candidates = list()
@@ -110,48 +121,45 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 					for dist_object in dist_objects:
 						#print(dist_object, i)
 						context_candidates.append([dist_object, i])
-		print("context candidates", context_candidates)
+		#print("context candidates", context_candidates)
 		#print(len(context_candidates))
 		helper_i = 0
 		helper_list = list()
 		#for i in range(len(self.properties_dim)):
-		for dist_object, context_condition in context_candidates:
-			print(dist_object, context_condition)
+		for i, (dist_object, context_condition) in enumerate(context_candidates):
 			if helper_i == context_condition:
-				print("if")
 				# gather all objects belonging to the same context condition
 				helper_list.append(dist_object)
-				print(helper_list)
-				if helper_i == len(self.properties_dim) -1:
+				# final index: should be sampled
+				if i == len(context_candidates) -1:
 					try: 
-						context.append((random.sample(helper_list, self.game_size), helper_i))
+						context.append([random.sample(helper_list, self.game_size), helper_i])
 					except ValueError:
-						context.append((random.choices(helper_list, k=self.game_size), helper_i))
+						context.append([random.choices(helper_list, k=self.game_size), helper_i])
+			# catch the final context condition as well
 			elif context_condition == len(self.properties_dim) -1:
-				print("elif")
 				try: 
-					context.append((random.sample(helper_list, self.game_size), helper_i))
+					context.append([random.sample(helper_list, self.game_size), helper_i])
 				except ValueError:
-					context.append((random.choices(helper_list, k=self.game_size), helper_i))
+					context.append([random.choices(helper_list, k=self.game_size), helper_i])
 				helper_i = helper_i + 1
 				helper_list = list()
 				helper_list.append(dist_object)
-				print(helper_list)
+			# when moving to the next context condition, first sample from the old
 			else:
-				print("else")
 				# sample from all objects belonging to the same context condition
 				try: 
-					context.append((random.sample(helper_list, self.game_size), helper_i))
+					context.append([random.sample(helper_list, self.game_size), helper_i])
 				except ValueError:
-					context.append((random.choices(helper_list, k=self.game_size), helper_i))
+					context.append([random.choices(helper_list, k=self.game_size), helper_i])
 				helper_i = helper_i + 1
 				helper_list = list()
 				helper_list.append(dist_object)
-		print("sampled context", context)
+		#print("sampled context", context)
+		return context
 
-		# return target concept, context (distractor objects + context) for each context
-		
-		
+
+
 		
 	@staticmethod
 	def get_distractors(self, concept_idx):
