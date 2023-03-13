@@ -148,27 +148,6 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 				helper_list = list()
 				helper_list.append(dist_object)
 		print("sampled context", context)
-		# [3,3,3]
-		# 8, 12, 6 = 26 for concrete concepts, three context conditions
-		# 12, 12 = 24 for intermediate concepts
-		# 18 for generic concepts, coarse condition (only) 3^2=9 
-		# [2,2,2]
-		# 0, 3, 3 = 7 for concrete
-		# 2, 4 = 6 for intermed.
-		# 4 for generic concepts, coarse condition 2^2=4
-		# [2,2,2,2]
-		# 1, 4, 6, 4 = 15 concrete (4 fixed)
-		# 2, 6, 6 = 14 (3 fixed)
-		# 4, 8 = 12 (2 fixed)
-		# 8 for generic (1 fixed) 2^3=8
-		# one way would be to compute how many candidate concepts exist for each context condition and then use 
-		# random.sample on a sublist with the appropriate length
-		# need to sample from all candidates for the same context
-		#try:
-		#	context.append((random.sample(dist_objects, self.game_size), i))
-		#except ValueError:
-		#	context.append((random.choices(dist_objects, k=self.game_size), i))
-		#print("sampled context", context)
 
 		# return target concept, context (distractor objects + context) for each context
 		
