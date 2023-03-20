@@ -34,6 +34,7 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		# Where do I specify the context condition?
 		sample = self.get_sample(self, 4)
 		print("sample", sample)
+		item = self.get_item(self, 4, 0, torch.nn.functional.one_hot)
 
 
 	@staticmethod
@@ -52,7 +53,7 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		for concept_idx in tqdm(concept_indices[:ratio]):
 			for _ in range(self.game_size):
 				for context_condition in self.all_context_conditions:
-					train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding))
+					train_and_val.append(self.get_item(self, concept_idx, context_condition, torch.nn.functional.one_hot))
 		return train, val, test
 
 
@@ -61,8 +62,23 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 	def get_item(self, concept_idx, context_condition, encoding_func):
 		"""
 		Receives concept-context pairs (or gets them by calling get_concept_context_pairs())
-		Returns encoded (sender_input, label, receiver_input).
+		Returns encoded (sender_input, label_sender, receiver_input, label_receiver).
+			label: indices of target objects (for both sender and receiver separately)
 		"""
+		# use get_sample() to get sampled target and distractor objects 
+		concept, context = self.get_sample(self, concept_idx)
+		# initalize sender and receiver input
+		# append concept
+		# append context
+		# get context of relevant context condition
+		for distractor_objects, context_cond in context:
+			if context_cond == context_condition:
+				# add distractor objects for both sender and receiver
+				sender_input.append(distractor_objects)
+				receiver_input.append(distractor_objects)
+		# shuffle and create label
+		# What should be included in the label? Do the abstraction and context condition go into the label? 
+		# If not where is it stored? Does it need to be stored?
 		pass
 
 
