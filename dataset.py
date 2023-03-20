@@ -3,6 +3,7 @@
 import torch
 import itertools
 import random
+from tqdm import tqdm
 
 class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to use the torch dataset?
 	""" 
@@ -32,13 +33,21 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		#get_datasets(self, split_ratio) uses get_item to create datasets
 		
 		# Where do I specify the context condition?
-		sample = self.get_sample(self, 4)
-		print("sample", sample)
-		item = self.get_item(self, 4, 0, torch.nn.functional.one_hot)
+		#sample = self.get_sample(self, 4)
+		#print("sample", sample)
+		#item = self.get_item(self, 4, 0, self._many_hot_encoding)
+		#print("item", item)
+		#sender_input, label, receiver_input = item
+		#print(label)
+
+		# split ratio should be defined in train.py
+		#self.get_datasets(self, (0.6, 0.2, 0.2))
 
 
-	@staticmethod
 	def get_datasets(self, split_ratio):
+		"""
+		Creates the train, validation and test datasets based on the number of possible concepts.
+		"""
 		if sum(split_ratio) != 1:
 			raise ValueError
 
@@ -46,14 +55,31 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 
         # Shuffle sender indices
 		concept_indices = torch.randperm(len(self.concepts)).tolist()
+		# Split is based on how many distinct concepts there are (regardless context conditions)
 		ratio = int(len(self.concepts)*(train_ratio + val_ratio))
 
 		train_and_val = []
 		print("Creating train_ds and val_ds...")
 		for concept_idx in tqdm(concept_indices[:ratio]):
 			for _ in range(self.game_size):
+				# for each concept, we consider all context conditions (sanity check required)
 				for context_condition in self.all_context_conditions:
-					train_and_val.append(self.get_item(self, concept_idx, context_condition, torch.nn.functional.one_hot))
+					train_and_val.append(self.get_item(self, concept_idx, context_condition, self._many_hot_encoding))
+		
+		# Calculating how many train
+		train_samples = int(len(train_and_val)*(train_ratio/(train_ratio+val_ratio)))
+		val_samples = len(train_and_val) - train_samples
+		train, val = torch.utils.data.random_split(train_and_val, [train_samples, val_samples])
+		# Write important information about train dataset
+		train.dimensions = self.properties_dim
+
+		test = []
+		print("\nCreating test_ds...")
+		for concept_idx in tqdm(concept_indices[ratio:]):
+			for _ in range(self.game_size):
+				for context_condition in self.all_context_conditions:
+					test.append(self.get_item(self, concept_idx, context_condition, self._many_hot_encoding))
+
 		return train, val, test
 
 
@@ -62,39 +88,55 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 	def get_item(self, concept_idx, context_condition, encoding_func):
 		"""
 		Receives concept-context pairs (or gets them by calling get_concept_context_pairs())
-		Returns encoded (sender_input, label_sender, receiver_input, label_receiver).
-			label: indices of target objects (for both sender and receiver separately)
+		Returns encoded (sender_input, labels, receiver_input).
+			sender_input: (sender_input_objects, sender_labels)
+			labels: indices of target objects in the receiver_input
+			receiver_input: receiver_input_objects
+		The sender_input_objects and the receiver_input_objects are different objects sampled from the same concept and context condition.
 		"""
 		# use get_sample() to get sampled target and distractor objects 
-		concept, context = self.get_sample(self, concept_idx)
-		# initalize sender and receiver input
-		# append concept
-		# append context
+		# The concrete sampled objects can differ between sender and receiver.
+		sender_concept, sender_context = self.get_sample(self, concept_idx)
+		receiver_concept, receiver_context = self.get_sample(self, concept_idx)
+		# initalize sender and receiver input with target objects only
+		sender_targets = sender_concept[0]
+		receiver_targets = receiver_concept[0]
+		sender_input = [obj for obj in sender_targets]
+		receiver_input = [obj for obj in receiver_targets]
+		#print("sender input", sender_input)
+		# append context objects
 		# get context of relevant context condition
-		for distractor_objects, context_cond in context:
+		for distractor_objects, context_cond in sender_context:
 			if context_cond == context_condition:
-				# add distractor objects for both sender and receiver
-				sender_input.append(distractor_objects)
-				receiver_input.append(distractor_objects)
+				# add distractor objects for the sender
+				for obj in distractor_objects:
+					sender_input.append(obj)
+		for distractor_objects, context_cond in receiver_context:
+			if context_cond == context_condition:
+				# add distractor objects for the receiver
+				for obj in distractor_objects:
+					receiver_input.append(obj)
 		# shuffle and create label
-		# What should be included in the label? Do the abstraction and context condition go into the label? 
-		# If not where is it stored? Does it need to be stored?
-		pass
+		#print(sender_input)
+		random.shuffle(sender_input)
+		sender_label = [idx for idx, obj in enumerate(sender_input) if obj in sender_targets]
+		#print(sender_label)
+		random.shuffle(receiver_input)
+		receiver_label = [idx for idx, obj in enumerate(receiver_input) if obj in receiver_targets]
+		#print(sender_input)
+		#print(receiver_input)
+		# ENCODE and return as TENSOR
+		sender_input = torch.stack([encoding_func(elem) for elem in sender_input])
+		#print(sender_input)
+		# QUESTION: Do I need to encode the label?
+		sender_label = torch.tensor(sender_label, dtype=torch.float)
+		receiver_input = torch.stack([encoding_func(elem) for elem in receiver_input])
+		# QUESTION: Do I need to typecast the receiver_label list into a tensor?
+		#receiver_label = encoding_func(receiver_label)
+		# output needs to have the structure sender_input, labels, receiver_input
+		#return torch.cat([sender_input, sender_label]), receiver_label, receiver_input
+		return (sender_input, sender_label), receiver_label, receiver_input
 
-
-
-	@staticmethod
-	def get_concept_context_pairs():
-		"""
-		Receives a concept (index), and distractor objects from a given context condition.
-		Returns the concept (objects + level of abstraction), label (indices of target objects) 
-			and context (distractor objects + context condition).
-		(still need to shuffle concept and context afterwards and split sender and receiver input)
-		"""
-		pass
-		
-
-		
 		
 	@staticmethod
 	def get_sample(self, concept_idx):
@@ -102,21 +144,21 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		Returns a full sample consisting of a set of target objects (target concept) 
 		and a set of distractor objects (context) for a given concept and context condition.
 		"""
-		print(self.concepts[concept_idx])
+		#print(self.concepts[concept_idx])
 		all_target_objects, fixed = self.concepts[concept_idx]
 		#print(all_target_objects)
-		print(fixed)
+		#print(fixed)
 		# sample target objects for given game size (if possible, get unique choices)
 		try:
 			target_objects = random.sample(all_target_objects, self.game_size)
 		except ValueError:
 			target_objects = random.choices(all_target_objects, k=self.game_size)
-		print("sampled target objects", target_objects)
+		#print("sampled target objects", target_objects)
 		# get all possible distractors for a given concept (for all context conditions)
 		distractors = self.get_distractors(self, concept_idx)
 		#print("distractors", distractors)
 		context = self.sample_distractors(self, distractors, fixed)
-		print(context)
+		#print(context)
 		# return target concept, context (distractor objects + context) for each context
 		return [target_objects, sum(fixed)], context 
 		
@@ -369,28 +411,19 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		all_objects = list(itertools.product(*list_of_dim))
 		return all_objects#pd.DataFrame(all_objects)
 		
-		
-	@staticmethod
-	def define_targets(properties_dim):
+
+	def _many_hot_encoding(self, input_list):
 		"""
-		Defines all possible target concepts on different levels of specificity according to the properties dimension vector.
+		Outputs a binary one dim vector
 		"""
-				
-		
-		
-		
-	def define_distractors(properties_dim, objects, concepts):
-		"""
-		Defines the distractor concepts (context) for different context granularities (fine -> coarse).
-		"""
-		# distractor concepts fix the same attributes as target concepts but with a different feature value
-		# the more attributes
-		
-		
+		output = torch.zeros([sum(self.properties_dim)])
+		start = 0
 	
-	def get_item(self, object_idx):
-		"""
-		Overwrite get_item().
-		"""
-		return null
+		for elem, dim in zip(input_list, self.properties_dim):
+			output[start + elem] = 1
+			start += dim
+			
+		return output
+		
+		
      
