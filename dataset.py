@@ -23,9 +23,6 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		# get all concepts
 		self.concepts = self.get_all_concepts(self)
 		#print(self.concepts)
-		# get all context conditions
-		self.all_context_conditions = list(range(0, len(self.properties_dim)-1))
-		#print(self.all_context_conditions)
 		
 		# hierarchical reference game:
 		#get_sample(self, sender_object_idx, relevance) returns sender_object=sender_input, target, distractors 
@@ -63,8 +60,10 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		print("Creating train_ds and val_ds...")
 		for concept_idx in tqdm(concept_indices[:ratio]):
 			for _ in range(self.game_size):
-				# for each concept, we consider all context conditions (sanity check required)
-				for context_condition in self.all_context_conditions:
+				# for each concept, we consider all possible context conditions (sanity check required)
+				# i.e. 1 for generic concepts, and up to len(properties_dim) for specific concepts
+				nr_possible_contexts = sum(self.concepts[concept_idx][1])
+				for context_condition in range(nr_possible_contexts):
 					train_and_val.append(self.get_item(self, concept_idx, context_condition, self._many_hot_encoding))
 		
 		# Calculating how many train
@@ -78,7 +77,8 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		print("\nCreating test_ds...")
 		for concept_idx in tqdm(concept_indices[ratio:]):
 			for _ in range(self.game_size):
-				for context_condition in self.all_context_conditions:
+				nr_possible_contexts = sum(self.concepts[concept_idx][1])
+				for context_condition in range(nr_possible_contexts):
 					test.append(self.get_item(self, concept_idx, context_condition, self._many_hot_encoding))
 
 		return train, val, test
