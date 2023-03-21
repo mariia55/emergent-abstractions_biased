@@ -117,12 +117,13 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 				# add distractor objects for the receiver
 				for obj in distractor_objects:
 					receiver_input.append(obj)
-		# shuffle and create (many-hot encoded) label
-		random.shuffle(sender_input)
-		sender_label = [idx for idx, obj in enumerate(sender_input) if obj in sender_targets]
-		sender_label = torch.Tensor(sender_label).to(torch.int64)
-		sender_label = F.one_hot(sender_label, num_classes=self.game_size*2).sum(dim=0).float()
+		# sender input does not need to be shuffled - that way I don't need labels either
+		#random.shuffle(sender_input)
+		#sender_label = [idx for idx, obj in enumerate(sender_input) if obj in sender_targets]
+		#sender_label = torch.Tensor(sender_label).to(torch.int64)
+		#sender_label = F.one_hot(sender_label, num_classes=self.game_size*2).sum(dim=0).float()
 		#print(sender_label)
+		# shuffle receiver input and create (many-hot encoded) label
 		random.shuffle(receiver_input)
 		receiver_label = [idx for idx, obj in enumerate(receiver_input) if obj in receiver_targets]
 		receiver_label = torch.Tensor(receiver_label).to(torch.int64)
@@ -135,7 +136,7 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		#print(receiver_input)
 		# output needs to have the structure sender_input, labels, receiver_input
 		#return torch.cat([sender_input, sender_label]), receiver_label, receiver_input
-		return (sender_input, sender_label), receiver_label, receiver_input
+		return sender_input, receiver_label, receiver_input
 
 		
 	@staticmethod
