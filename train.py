@@ -13,7 +13,7 @@ import pickle
 
 import dataset
 # TBI: archs
-#from archs import Sender, Receiver
+from archs import Sender, Receiver
 
 
 SPLIT = (0.6, 0.2, 0.2)
@@ -89,7 +89,7 @@ def train(opts, datasets, verbose_callbacks=True):
     test = torch.utils.data.DataLoader(test, batch_size=opts.batch_size, shuffle=False)
 
     # initialize sender and receiver agents
-    sender = Sender(opts.hidden_size, sum(dimensions), len(dimensions))
+    sender = Sender(opts.hidden_size, sum(dimensions), opts.game_size)
     receiver = Receiver(opts.hidden_size, sum(dimensions))
 
     minimum_vocab_size = dimensions[0] + 1  # plus one for 'any'
