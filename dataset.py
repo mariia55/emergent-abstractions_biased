@@ -1,6 +1,7 @@
 # code inspired by https://github.com/XeniaOhmer/hierarchical_reference_game/blob/master/dataset.py
 
 import torch
+import torch.nn.functional as F
 import itertools
 import random
 from tqdm import tqdm
@@ -116,23 +117,22 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 				# add distractor objects for the receiver
 				for obj in distractor_objects:
 					receiver_input.append(obj)
-		# shuffle and create label
-		#print(sender_input)
+		# shuffle and create (many-hot encoded) label
 		random.shuffle(sender_input)
 		sender_label = [idx for idx, obj in enumerate(sender_input) if obj in sender_targets]
+		sender_label = torch.Tensor(sender_label).to(torch.int64)
+		sender_label = F.one_hot(sender_label, num_classes=self.game_size*2).sum(dim=0).float()
 		#print(sender_label)
 		random.shuffle(receiver_input)
 		receiver_label = [idx for idx, obj in enumerate(receiver_input) if obj in receiver_targets]
-		#print(sender_input)
-		#print(receiver_input)
+		receiver_label = torch.Tensor(receiver_label).to(torch.int64)
+		receiver_label = F.one_hot(receiver_label, num_classes=self.game_size*2).sum(dim=0).float()
+		#print(receiver_label)
 		# ENCODE and return as TENSOR
 		sender_input = torch.stack([encoding_func(elem) for elem in sender_input])
 		#print(sender_input)
-		# QUESTION: Do I need to encode the label?
-		sender_label = torch.tensor(sender_label, dtype=torch.float)
 		receiver_input = torch.stack([encoding_func(elem) for elem in receiver_input])
-		# QUESTION: Do I need to typecast the receiver_label list into a tensor?
-		#receiver_label = encoding_func(receiver_label)
+		#print(receiver_input)
 		# output needs to have the structure sender_input, labels, receiver_input
 		#return torch.cat([sender_input, sender_label]), receiver_label, receiver_input
 		return (sender_input, sender_label), receiver_label, receiver_input
