@@ -147,10 +147,16 @@ class MessageLengthHierarchical(Callback):
 
 
 def encode_input_for_topsim_hierarchical(sender_input, dimensions):
-    n_features = np.sum(dimensions)
-    n_attributes = len(dimensions)
-    relevance_vectors = sender_input[:, -n_attributes:]
-    sender_input_encoded = torch.zeros((len(sender_input), n_features + n_attributes))
+    print("sender input", sender_input.shape) # [854, 20, 9]
+    #n_features = np.sum(dimensions)
+    #n_attributes = len(dimensions)
+    #print("features, attributes", n_features, n_attributes)
+    #relevance_vectors = sender_input[:, -n_attributes:]
+    #sender_input_encoded = torch.zeros((len(sender_input), n_features + n_attributes))
+    n_objects = sender_input.shape[1]
+    n_features = sender_input.shape[2]
+    sender_input_encoded = torch.zeros((len(sender_input), n_objects, n_features))
+    print("empty encoded", sender_input_encoded.shape)
 
     base_count = 0
     for i, dim in enumerate(dimensions):
@@ -235,6 +241,11 @@ class TopographicSimilarityHierarchical(Callback):
         ), f"Cannot recognize {meaning_distance_fn} \
             or {message_distance_fn} distances"
 
+        # raise ValueError('A 2-dimensional array must be passed.')
+        print("meanings", meanings.shape) # [839, 20, 9]
+        print("meaning dist fn", meaning_distance_fn) # is a function
+        # from scipy.spatial.distance: 
+        # pdist(X[, metric, out]) Pairwise distances between observations in n-dimensional space.
         meaning_dist = distance.pdist(meanings, meaning_distance_fn)
         message_dist = distance.pdist(messages, message_distance_fn)
 
@@ -249,8 +260,11 @@ class TopographicSimilarityHierarchical(Callback):
         messages = [msg.tolist() for msg in messages]
         sender_input = logs.sender_input[0:1000]
 
-        encoded_sender_input = encode_input_for_topsim_hierarchical(sender_input, self.dimensions)
-        topsim = self.compute_topsim(encoded_sender_input, messages)
+        # NOTE: trying to leave out encoding of sender input (because I don't get it)
+        # TODO: I probably need to "encode" such that I end up with two dimensional arrays
+        #encoded_sender_input = encode_input_for_topsim_hierarchical(sender_input, self.dimensions)
+        #topsim = self.compute_topsim(encoded_sender_input, messages)
+        topsim = self.compute_topsim(sender_input, messages)
         output = json.dumps(dict(topsim=topsim, mode=mode, epoch=epoch))
 
         print(output, flush=True)
