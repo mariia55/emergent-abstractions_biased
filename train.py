@@ -107,7 +107,7 @@ def loss(_sender_input, _message, _receiver_input, receiver_output, labels, _aux
     return loss, {'acc': acc}
 
 
-def train(opts, datasets, verbose_callbacks=True):
+def train(opts, datasets, verbose_callbacks=False): # TODO: fix and set to True
     """
     Train function completely copied from hierarchical_reference_game.
     """
@@ -203,14 +203,16 @@ def train(opts, datasets, verbose_callbacks=True):
         messages = interaction.message[max_same_indices]
         messages = messages.argmax(dim=-1)
         messages = [msg.tolist() for msg in messages]
-        sender_input_hierarchical = encode_input_for_topsim_hierarchical(sender_input, dimensions)
-        topsim_hierarchical = TopographicSimilarity.compute_topsim(sender_input_hierarchical,
-                                                                   messages,
-                                                                   meaning_distance_fn="cosine",
-                                                                   message_distance_fn="edit")
+        #TODO: needs to be adapted before use
+        #sender_input_hierarchical = encode_input_for_topsim_hierarchical(sender_input, dimensions)
+        #topsim_hierarchical = TopographicSimilarity.compute_topsim(sender_input_hierarchical,
+                                                                   #messages,
+                                                                   #meaning_distance_fn="cosine",
+                                                                   #message_distance_fn="edit")
         max_nsame_dict = dict()
         max_nsame_dict['acc'] = acc
-        max_nsame_dict['topsim_hierarchical'] = topsim_hierarchical
+        # TODO: this probably needs to be adapted
+        #max_nsame_dict['topsim_hierarchical'] = topsim_hierarchical
         print("maximal #same eval", max_nsame_dict)
 
         if opts.save:
@@ -255,7 +257,7 @@ def main(params):
             opts.save_path = os.path.join(folder_name, 'standard')
             if not os.path.exists(opts.save_path) and opts.save:
                 os.makedirs(opts.save_path)
-            train(opts, data_set.get_datasets(split_ratio=SPLIT), verbose_callbacks=True)
+            train(opts, data_set.get_datasets(split_ratio=SPLIT), verbose_callbacks=False) # TODO: fix and set to True
 
 
 if __name__ == "__main__":
