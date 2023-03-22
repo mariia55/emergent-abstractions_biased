@@ -56,12 +56,54 @@ def get_params(params):
     return args
 
 
-def loss(_sender_input, message, _receiver_input, receiver_output, _labels, _aux_input):
+def loss(_sender_input, _message, _receiver_input, receiver_output, labels, _aux_input):
     """
     Loss needs to be defined for gumbel softmax relaxation.
+    For a discriminative game, accuracy is computed by comparing the index with highest score in Receiver
+    output (a distribution of unnormalized probabilities over target positions) and the corresponding 
+    label read from input, indicating the ground-truth position of the target.
+        receiver_output: Tensor of shape [batch_size, n_objects]
+        labels: Tensor of shape [batch_size, n_objects]
     """
-    acc = (receiver_output.argmax(dim=1) == _labels).detach().float()
-    loss = F.cross_entropy(receiver_output, _labels, reduction="none")
+    def _many_hot_encoding(n_objects, input_list):
+        """
+	    Outputs a binary one dim vector
+	    """
+        output = torch.zeros([n_objects])
+        for i in range(n_objects):
+            for index in input_list:
+                if i == index:
+                    output[i] = 1
+
+        return output
+    
+    batch_size = receiver_output.shape[0]
+    n_objects = receiver_output.shape[1]
+    # Can't simply use argmax because I've got 10 target labels (out of 20), not just 1.
+    # So I use topk and calculate the topk indices outputted by the receiver
+    _topk_values, topk_indices = receiver_output.topk(k=int(n_objects/2), dim=1)
+    # forming a many-hot-encoding of the (sorted) topk indices to match the shape of the ground-truth labels
+    sorted, _ = torch.sort(topk_indices)
+    receiver_pred = torch.cat([_many_hot_encoding(n_objects, label) for label in sorted]).reshape(batch_size,n_objects)
+    # comparing receiver predictions for all objects with ground-truth labels
+    acc_all_objects = (receiver_pred == labels).detach().float() # shape [batch_size, n_objects]
+    # NOTE: accuracy shape needs to be [32] to fit with egg code !!!
+    # This means that accuracy is 1 only when all objects are classified correctly 
+    # (which makes it a harder task than a simple referential game with one target only).
+    # re-calculating accuracy over all objects:
+    acc = list()
+    all_correct = torch.ones(n_objects)
+    for row in acc_all_objects:
+        if torch.equal(row, all_correct):
+            acc.append(1)
+        else:
+            acc.append(0)
+    acc = torch.Tensor(acc)
+
+    # from EGG: similarly, the loss computes cross-entropy between the Receiver-produced 
+    # target-position probability distribution and the labels
+    # TODO: sanity check the loss calculation
+    loss = F.cross_entropy(receiver_output, labels, reduction="none")
     return loss, {'acc': acc}
 
 
@@ -90,7 +132,7 @@ def train(opts, datasets, verbose_callbacks=True):
 
     # initialize sender and receiver agents
     sender = Sender(opts.hidden_size, sum(dimensions), opts.game_size)
-    receiver = Receiver(opts.hidden_size, sum(dimensions))
+    receiver = Receiver(sum(dimensions), opts.hidden_size)
 
     minimum_vocab_size = dimensions[0] + 1  # plus one for 'any'
     vocab_size = minimum_vocab_size * opts.vocab_size_factor + 1  # multiply by factor plus add one for eos-symbol
