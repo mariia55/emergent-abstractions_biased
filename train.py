@@ -84,7 +84,7 @@ def loss(_sender_input, _message, _receiver_input, receiver_output, labels, _aux
     _topk_values, topk_indices = receiver_output.topk(k=int(n_objects/2), dim=1)
     # forming a many-hot-encoding of the (sorted) topk indices to match the shape of the ground-truth labels
     sorted, _ = torch.sort(topk_indices)
-    receiver_pred = torch.cat([_many_hot_encoding(n_objects, label) for label in sorted]).reshape(batch_size,n_objects)
+    receiver_pred = torch.cat([_many_hot_encoding(n_objects, label) for label in sorted]).reshape(batch_size,n_objects).to(device='cuda')
     # comparing receiver predictions for all objects with ground-truth labels
     acc_all_objects = (receiver_pred == labels).detach().float() # shape [batch_size, n_objects]
     # NOTE: accuracy shape needs to be [32] to fit with egg code !!!
@@ -92,13 +92,13 @@ def loss(_sender_input, _message, _receiver_input, receiver_output, labels, _aux
     # (which makes it a harder task than a simple referential game with one target only).
     # re-calculating accuracy over all objects:
     acc = list()
-    all_correct = torch.ones(n_objects)
+    all_correct = torch.ones(n_objects).to(device='cuda')
     for row in acc_all_objects:
         if torch.equal(row, all_correct):
             acc.append(1)
         else:
             acc.append(0)
-    acc = torch.Tensor(acc)
+    acc = torch.Tensor(acc).to(device='cuda')
 
     # from EGG: similarly, the loss computes cross-entropy between the Receiver-produced 
     # target-position probability distribution and the labels
@@ -107,7 +107,7 @@ def loss(_sender_input, _message, _receiver_input, receiver_output, labels, _aux
     return loss, {'acc': acc}
 
 
-def train(opts, datasets, verbose_callbacks=False): # TODO: fix and set to True
+def train(opts, datasets, verbose_callbacks=True): # TODO: fix and set to True
     """
     Train function completely copied from hierarchical_reference_game.
     """
@@ -123,7 +123,7 @@ def train(opts, datasets, verbose_callbacks=False): # TODO: fix and set to True
         save_epoch = None
 
     train, val, test = datasets
-    print("train", train)
+    #print("train", train)
     dimensions = train.dimensions
 
     train = torch.utils.data.DataLoader(train, batch_size=opts.batch_size, shuffle=True)
@@ -257,7 +257,7 @@ def main(params):
             opts.save_path = os.path.join(folder_name, 'standard')
             if not os.path.exists(opts.save_path) and opts.save:
                 os.makedirs(opts.save_path)
-            train(opts, data_set.get_datasets(split_ratio=SPLIT), verbose_callbacks=False) # TODO: fix and set to True
+            train(opts, data_set.get_datasets(split_ratio=SPLIT), verbose_callbacks=True) # TODO: fix and set to True
 
 
 if __name__ == "__main__":

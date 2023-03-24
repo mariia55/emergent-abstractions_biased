@@ -126,7 +126,7 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		# shuffle receiver input and create (many-hot encoded) label
 		random.shuffle(receiver_input)
 		receiver_label = [idx for idx, obj in enumerate(receiver_input) if obj in receiver_targets]
-		receiver_label = torch.Tensor(receiver_label).to(torch.int64)
+		receiver_label = torch.Tensor(receiver_label).to(torch.int64).to(device='cuda')
 		receiver_label = F.one_hot(receiver_label, num_classes=self.game_size*2).sum(dim=0).float()
 		#print(receiver_label)
 		# ENCODE and return as TENSOR
@@ -417,7 +417,7 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		"""
 		Outputs a binary one dim vector
 		"""
-		output = torch.zeros([sum(self.properties_dim)])
+		output = torch.zeros([sum(self.properties_dim)]).to(device='cuda')
 		start = 0
 	
 		for elem, dim in zip(input_list, self.properties_dim):

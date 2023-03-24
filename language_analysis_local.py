@@ -242,11 +242,17 @@ class TopographicSimilarityHierarchical(Callback):
             or {message_distance_fn} distances"
 
         # raise ValueError('A 2-dimensional array must be passed.')
-        print("meanings", meanings.shape) # [839, 20, 9]
-        print("meaning dist fn", meaning_distance_fn) # is a function
+        #print("meanings", meanings.shape) # [n_obs, 20, 9]
+        # print("meaning dist fn", meaning_distance_fn) # is a function
+        # print("messages", len(messages), len(messages[0])) # list of n_obs lists (with each 4 numbers)
         # from scipy.spatial.distance: 
         # pdist(X[, metric, out]) Pairwise distances between observations in n-dimensional space.
-        meaning_dist = distance.pdist(meanings, meaning_distance_fn)
+        # reshape meanings such that it has the shape [839, 180] (same reshape as in sender architecture)
+        n_obs = meanings.shape[0]
+        n_objects = meanings.shape[1]
+        n_features = meanings.shape[2]
+        meanings_2dim = meanings.reshape(n_obs, n_objects * n_features)
+        meaning_dist = distance.pdist(meanings_2dim, meaning_distance_fn)
         message_dist = distance.pdist(messages, message_distance_fn)
 
         topsim = spearmanr(meaning_dist, message_dist, nan_policy="raise").correlation
