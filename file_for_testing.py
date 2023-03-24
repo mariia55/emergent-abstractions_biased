@@ -5,7 +5,7 @@ def main():
     n_dims = 4
     n_values = 4
     scores = information_scores(interaction, n_dims, n_values, normalizer="arithmetic")
-    pickle.dump(scores, open( + 'entropy_scores.pkl', 'wb'))
+    #pickle.dump(scores, open( + 'entropy_scores.pkl', 'wb'))
 
 
 if __name__ == "__main__":
