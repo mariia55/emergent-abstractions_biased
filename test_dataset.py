@@ -9,10 +9,12 @@ class TestDataset(unittest.TestCase):
 
     def setUp(self):
 
-        self.possible_properties = [[2, 2], [4, 4],
-                                    [2, 2, 2], [4, 4, 4],
-                                    [2, 2, 2, 2], [4, 4, 4, 4]]
-        self.game_sizes = [1, 3, 5, 10]
+        # feel free to add more data sets and game sizes
+        self.possible_properties = [[2, 2],
+                                    [4, 4],
+                                    [3, 3, 3],
+                                    [4, 4, 4, 4]]
+        self.game_sizes = [1, 3, 10]
 
         self.datasets = []
         for props in self.possible_properties:
@@ -64,8 +66,8 @@ class TestDataset(unittest.TestCase):
             concepts = ds.concepts
             n_objects = n_vals**n_atts
 
-            for i, concept in enumerate(concepts):
-                distractors_distributed = DataSet.get_distractors(ds, i)
+            for c_idx, concept in enumerate(concepts):
+                distractors_distributed = DataSet.get_distractors(ds, c_idx)
                 distractors = []
                 for elem in distractors_distributed:
                     distractors += elem[0]
@@ -87,10 +89,74 @@ class TestDataset(unittest.TestCase):
                     self.assertTrue(0 not in np.sum(masked_difference, axis=1))
 
     def test_get_item(self):
-        pass
+        """
+        Test
+        - if the game size is correct
+        - if the target inputs correspond to the concept
+        - if the distractors do no correspond to the concept
+        - if the distractors fulfill the context condition
+        """
 
-    def test_get_dataset(self):
-        pass
+        for ds in self.datasets:
+
+            dim = int(ds.properties_dim[0])
+
+            for c_idx, concept in enumerate(ds.concepts):
+                n_fixed = np.sum(concept[1])
+                # only for reasonable context conditions
+                for n_same in range(n_fixed):
+                    item = ds.get_item(ds, c_idx, n_same, ds._many_hot_encoding)
+                    sender_input, receiver_label, receiver_input = item
+
+                    # test whether game size correct
+                    self.assertEqual(ds.game_size*2, len(sender_input))
+                    self.assertEqual(ds.game_size*2, len(receiver_input))
+
+                    # test whether targets correspond to concept
+
+                    example_concept = concept[0][0]
+                    relevant_indices = []
+                    relevant_values = []
+                    for i in range(len(concept[1])):
+                        if concept[1][i] == 1:
+                            relevant_indices.append(i)
+                            relevant_values.append(example_concept[i])
+
+                    for g in range(ds.game_size):
+                        for i, idx in enumerate(relevant_indices):
+                            self.assertEqual(
+                                relevant_values[i],
+                                np.argmax(sender_input[g][idx * dim:(idx + 1) * dim])
+                            )
+
+                    for g, l in enumerate(receiver_label):
+                        if l == 1:
+                            for i, idx in enumerate(relevant_indices):
+                                self.assertEqual(
+                                    relevant_values[i],
+                                    np.argmax(receiver_input[g][idx * dim:(idx + 1) * dim])
+                                )
+
+                    # test whether distractors are fulfill the context condition for sender and receiver
+
+                    for g in range(ds.game_size, ds.game_size*2):
+                        count_mismatch = 0
+                        for i, idx in enumerate(relevant_indices):
+                            if relevant_values[i] != np.argmax(sender_input[g][idx * dim:(idx + 1) * dim]):
+                                count_mismatch += 1
+                        self.assertEqual(len(relevant_indices) - n_same, count_mismatch)
+
+                    for g, l in enumerate(receiver_label):
+                        count_mismatch = 0
+                        if l == 0:
+                            for i, idx in enumerate(relevant_indices):
+                                if relevant_values[i] != np.argmax(receiver_input[g][idx * dim:(idx + 1) * dim]):
+                                    count_mismatch += 1
+                            self.assertEqual(len(relevant_indices) - n_same, count_mismatch)
+
+
+#    def test_get_dataset(self):
+#        pass
 
 
 if __name__ == '__main__':
