@@ -6,11 +6,11 @@ import itertools
 import random
 from tqdm import tqdm
 
-class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to use the torch dataset?
+class DataSet(torch.utils.data.Dataset):
 	""" 
 	This class provides the torch.Dataloader-loadable dataset.
 	"""
-	def __init__(self, properties_dim=[3,3,3], game_size=3):
+	def __init__(self, properties_dim=[3,3,3], game_size=3, device='cuda'):
 		"""
 		properties_dim: vector that defines how many attributes and features per attributes the dataset should contain, defaults to a 3x3x3 dataset
 		game_size: integer that defines how many targets and distractors a game consists of
@@ -19,27 +19,10 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		
 		self.properties_dim = properties_dim
 		self.game_size = game_size
+		self.device = device
 		
 		# get all concepts
-		self.concepts = self.get_all_concepts(self)
-		#print(self.concepts)
-		
-		# hierarchical reference game:
-		#get_sample(self, sender_object_idx, relevance) returns sender_object=sender_input, target, distractors 
-		# -> creates distractors based on relevance vectors and sender object and game size!
-		#get_item(self, object_idx, relevance, encoding_func) returns (sender_input, relevance), label, receiver_input=distractors+target
-		#get_datasets(self, split_ratio) uses get_item to create datasets
-		
-		# Where do I specify the context condition?
-		#sample = self.get_sample(self, 4)
-		#print("sample", sample)
-		#item = self.get_item(self, 4, 0, self._many_hot_encoding)
-		#print("item", item)
-		#sender_input, label, receiver_input = item
-		#print(label)
-
-		# split ratio should be defined in train.py
-		#self.get_datasets(self, (0.6, 0.2, 0.2))
+		self.concepts = self.get_all_concepts()
 
 
 	def get_datasets(self, split_ratio):
@@ -60,17 +43,17 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		print("Creating train_ds and val_ds...")
 		for concept_idx in tqdm(concept_indices[:ratio]):
 			for _ in range(self.game_size):
-				# for each concept, we consider all possible context conditions (sanity check required)
-				# i.e. 1 for generic concepts, and up to len(properties_dim) for specific concepts
+				# for each concept, we consider all possible context conditions
+				# i.e. 1 for generic concepts, and up to len(properties_dim) for more specific concepts
 				nr_possible_contexts = sum(self.concepts[concept_idx][1])
 				for context_condition in range(nr_possible_contexts):
-					train_and_val.append(self.get_item(self, concept_idx, context_condition, self._many_hot_encoding))
+					train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding))
 		
 		# Calculating how many train
 		train_samples = int(len(train_and_val)*(train_ratio/(train_ratio+val_ratio)))
 		val_samples = len(train_and_val) - train_samples
 		train, val = torch.utils.data.random_split(train_and_val, [train_samples, val_samples])
-		# Write important information about train dataset
+		# Save information about train dataset
 		train.dimensions = self.properties_dim
 
 		test = []
@@ -79,32 +62,30 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 			for _ in range(self.game_size):
 				nr_possible_contexts = sum(self.concepts[concept_idx][1])
 				for context_condition in range(nr_possible_contexts):
-					test.append(self.get_item(self, concept_idx, context_condition, self._many_hot_encoding))
+					test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding))
 
 		return train, val, test
 
 
-
-	@staticmethod
 	def get_item(self, concept_idx, context_condition, encoding_func):
 		"""
-		Receives concept-context pairs (or gets them by calling get_concept_context_pairs())
+		Receives concept-context pairs and an encoding function.
 		Returns encoded (sender_input, labels, receiver_input).
 			sender_input: (sender_input_objects, sender_labels)
 			labels: indices of target objects in the receiver_input
 			receiver_input: receiver_input_objects
-		The sender_input_objects and the receiver_input_objects are different objects sampled from the same concept and context condition.
+		The sender_input_objects and the receiver_input_objects are different objects sampled from the same concept 
+		and context condition.
 		"""
 		# use get_sample() to get sampled target and distractor objects 
 		# The concrete sampled objects can differ between sender and receiver.
-		sender_concept, sender_context = self.get_sample(self, concept_idx)
-		receiver_concept, receiver_context = self.get_sample(self, concept_idx)
+		sender_concept, sender_context = self.get_sample(concept_idx)
+		receiver_concept, receiver_context = self.get_sample(concept_idx)
 		# initalize sender and receiver input with target objects only
 		sender_targets = sender_concept[0]
 		receiver_targets = receiver_concept[0]
 		sender_input = [obj for obj in sender_targets]
 		receiver_input = [obj for obj in receiver_targets]
-		#print("sender input", sender_input)
 		# append context objects
 		# get context of relevant context condition
 		for distractor_objects, context_cond in sender_context:
@@ -122,49 +103,37 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		#sender_label = [idx for idx, obj in enumerate(sender_input) if obj in sender_targets]
 		#sender_label = torch.Tensor(sender_label).to(torch.int64)
 		#sender_label = F.one_hot(sender_label, num_classes=self.game_size*2).sum(dim=0).float()
-		#print(sender_label)
 		# shuffle receiver input and create (many-hot encoded) label
 		random.shuffle(receiver_input)
 		receiver_label = [idx for idx, obj in enumerate(receiver_input) if obj in receiver_targets]
-		receiver_label = torch.Tensor(receiver_label).to(torch.int64).to(device='cuda')
+		receiver_label = torch.Tensor(receiver_label).to(torch.int64).to(device=self.device)
 		receiver_label = F.one_hot(receiver_label, num_classes=self.game_size*2).sum(dim=0).float()
-		#print(receiver_label)
 		# ENCODE and return as TENSOR
 		sender_input = torch.stack([encoding_func(elem) for elem in sender_input])
-		#print(sender_input)
 		receiver_input = torch.stack([encoding_func(elem) for elem in receiver_input])
-		#print(receiver_input)
 		# output needs to have the structure sender_input, labels, receiver_input
 		#return torch.cat([sender_input, sender_label]), receiver_label, receiver_input
 		return sender_input, receiver_label, receiver_input
 
 		
-	@staticmethod
 	def get_sample(self, concept_idx):
 		"""
 		Returns a full sample consisting of a set of target objects (target concept) 
-		and a set of distractor objects (context) for a given concept and context condition.
+		and a set of distractor objects (context) for a given concept condition.
 		"""
-		#print(self.concepts[concept_idx])
 		all_target_objects, fixed = self.concepts[concept_idx]
-		#print(all_target_objects)
-		#print(fixed)
 		# sample target objects for given game size (if possible, get unique choices)
 		try:
 			target_objects = random.sample(all_target_objects, self.game_size)
 		except ValueError:
 			target_objects = random.choices(all_target_objects, k=self.game_size)
-		#print("sampled target objects", target_objects)
 		# get all possible distractors for a given concept (for all context conditions)
-		distractors = self.get_distractors(self, concept_idx)
-		#print("distractors", distractors)
-		context = self.sample_distractors(self, distractors, fixed)
-		#print(context)
+		distractors = self.get_distractors(concept_idx)
+		context = self.sample_distractors(distractors, fixed)
 		# return target concept, context (distractor objects + context) for each context
 		return [target_objects, sum(fixed)], context 
 		
 	
-	@staticmethod
 	def sample_distractors(self, distractors, fixed):
 		"""
 		Function for sampling the distractors from all possible context conditions.
@@ -178,10 +147,7 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 				# sum(context_condition) gives the number of shared attributes
 				if sum(context_condition) == i:
 					for dist_object in dist_objects:
-						#print(dist_object, i)
 						context_candidates.append([dist_object, i])
-		#print("context candidates", context_candidates)
-		#print(len(context_candidates))
 		helper_i = 0
 		helper_list = list()
 		#for i in range(len(self.properties_dim)):
@@ -214,17 +180,12 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 				helper_i = helper_i + 1
 				helper_list = list()
 				helper_list.append(dist_object)
-		#print("sampled context", context)
 		return context
 
 
-
-		
-	@staticmethod
 	def get_distractors(self, concept_idx):
 		"""
-		Returns distractor objects for each context based on a given target concept and game size 
-			(i.e. number of targets and distractors).
+		Returns all possible distractor objects for each context based on a given target concept.
 		return (context, distractor_objects) tuples
 		"""
 		
@@ -296,8 +257,6 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		return distractor_objects
 		
 		
-		
-	@staticmethod
 	def get_all_concepts(self):
 		"""
 		Returns all possible concepts for a given dataset size.
@@ -306,12 +265,9 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 			fixed: a tuple that denotes how many and which attributes are fixed
 		"""
 		fixed_vectors = self.get_fixed_vectors(self.properties_dim)		
-		#print(fixed_vectors)
 		all_objects = self._get_all_possible_objects(self.properties_dim)
-		#print(all_objects)
 		# create all possible concepts
 		all_fixed_object_pairs = list(itertools.product(all_objects, fixed_vectors))
-		#print(all_fixed_object_pairs)
 		
 		concepts = list()
 		# go through all concepts (i.e. fixed, objects pairs)
@@ -417,7 +373,7 @@ class DataSet(torch.utils.data.Dataset): # question: Is there a reason not to us
 		"""
 		Outputs a binary one dim vector
 		"""
-		output = torch.zeros([sum(self.properties_dim)]).to(device='cuda')
+		output = torch.zeros([sum(self.properties_dim)]).to(device=self.device)
 		start = 0
 	
 		for elem, dim in zip(input_list, self.properties_dim):

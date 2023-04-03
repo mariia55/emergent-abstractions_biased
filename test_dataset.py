@@ -19,7 +19,7 @@ class TestDataset(unittest.TestCase):
         self.datasets = []
         for props in self.possible_properties:
             for size in self.game_sizes:
-                self.datasets.append(DataSet(props, size))
+                self.datasets.append(DataSet(props, size, 'cpu'))
 
     def test_get_all_concepts(self):
         """
@@ -105,7 +105,7 @@ class TestDataset(unittest.TestCase):
                 n_fixed = np.sum(concept[1])
                 # only for reasonable context conditions
                 for n_same in range(n_fixed):
-                    item = ds.get_item(ds, c_idx, n_same, ds._many_hot_encoding)
+                    item = ds.get_item(c_idx, n_same, ds._many_hot_encoding)
                     sender_input, receiver_label, receiver_input = item
 
                     # test whether game size correct

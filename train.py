@@ -2,11 +2,12 @@
 
 import argparse
 import torch
+#print(torch.__version__)
 #import torch.utils.data
 import torch.nn.functional as F
 import egg.core as core
 from egg.core.language_analysis import TopographicSimilarity
-# copy language_analysis_local from hierarchical_reference_game?
+# copy language_analysis_local from hierarchical_reference_game
 from language_analysis_local import *
 import os
 import pickle
@@ -50,6 +51,8 @@ def get_params(params):
     parser.add_argument('--num_of_runs', type=int, default=1, help="How often this simulation should be repeated")
     parser.add_argument('--zero_shot', type=bool, default=False,
                         help="If set then zero_shot dataset will be trained and tested")
+    parser.add_argument('--device', type=str, default='cuda',
+                        help="Specifies the device for tensor computations. Defaults to 'cuda'.")
     
     args = core.init(parser, params)
 
@@ -84,7 +87,8 @@ def loss(_sender_input, _message, _receiver_input, receiver_output, labels, _aux
     _topk_values, topk_indices = receiver_output.topk(k=int(n_objects/2), dim=1)
     # forming a many-hot-encoding of the (sorted) topk indices to match the shape of the ground-truth labels
     sorted, _ = torch.sort(topk_indices)
-    receiver_pred = torch.cat([_many_hot_encoding(n_objects, label) for label in sorted]).reshape(batch_size,n_objects).to(device='cuda')
+    receiver_pred = torch.cat([_many_hot_encoding(n_objects, label) for label in sorted]).reshape(batch_size,n_objects)#.to(device='cuda')
+    #print(receiver_pred.device)
     # comparing receiver predictions for all objects with ground-truth labels
     acc_all_objects = (receiver_pred == labels).detach().float() # shape [batch_size, n_objects]
     # NOTE: accuracy shape needs to be [32] to fit with egg code !!!
@@ -92,13 +96,15 @@ def loss(_sender_input, _message, _receiver_input, receiver_output, labels, _aux
     # (which makes it a harder task than a simple referential game with one target only).
     # re-calculating accuracy over all objects:
     acc = list()
-    all_correct = torch.ones(n_objects).to(device='cuda')
+    all_correct = torch.ones(n_objects)#.to(device='cuda')
+    #print(all_correct.device)
     for row in acc_all_objects:
         if torch.equal(row, all_correct):
             acc.append(1)
         else:
             acc.append(0)
-    acc = torch.Tensor(acc).to(device='cuda')
+    acc = torch.Tensor(acc)#.to(device='cuda')
+    #print(acc.device)
 
     # from EGG: similarly, the loss computes cross-entropy between the Receiver-produced 
     # target-position probability distribution and the labels
@@ -107,7 +113,7 @@ def loss(_sender_input, _message, _receiver_input, receiver_output, labels, _aux
     return loss, {'acc': acc}
 
 
-def train(opts, datasets, verbose_callbacks=True): # TODO: fix and set to True
+def train(opts, datasets, verbose_callbacks=False): # TODO: fix and set to True
     """
     Train function completely copied from hierarchical_reference_game.
     """
@@ -225,6 +231,12 @@ def main(params):
     """
     opts = get_params(params)
 
+    # TODO: Solve device problem (either with a flag or update pytorch version and check compatibility with egg)
+    # only available in later pytorch version:
+    #torch.set_default_device(opts.device)
+    #print(opts.device)
+    #torch.cuda.set_device(opts.device)
+
     # has to be executed in Project directory for consistency
     assert os.path.split(os.getcwd())[-1] == 'emergent-abstractions'
 
@@ -243,7 +255,8 @@ def main(params):
         # otherwise generate data set
         if not opts.load_dataset:
             data_set = dataset.DataSet(opts.dimensions,
-                                        game_size=opts.game_size)
+                                        game_size=opts.game_size,
+                                        device=opts.device)
         if opts.zero_shot:
             raise NotImplementedError
             ## create subfolder if necessary
@@ -257,7 +270,8 @@ def main(params):
             opts.save_path = os.path.join(folder_name, 'standard')
             if not os.path.exists(opts.save_path) and opts.save:
                 os.makedirs(opts.save_path)
-            train(opts, data_set.get_datasets(split_ratio=SPLIT), verbose_callbacks=True) # TODO: fix and set to True
+            #with torch.device('cuda'):
+            train(opts, data_set.get_datasets(split_ratio=SPLIT), verbose_callbacks=False) # TODO: fix and set to True
 
 
 if __name__ == "__main__":
