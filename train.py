@@ -114,8 +114,8 @@ def loss(_sender_input, _message, _receiver_input, receiver_output, labels, _aux
     # target-position probability distribution and the labels
     # loss = F.cross_entropy(receiver_output, labels, reduction="none")
     # after Mu & Goodman (2021):
-    criterion = nn.BCEWithLogitsLoss()
-    loss = criterion(receiver_output, labels)
+    loss_fn = nn.BCEWithLogitsLoss()
+    loss = loss_fn(receiver_output, labels)
     receiver_pred = (receiver_output > 0).float()
     per_game_acc = (receiver_pred == labels).float().mean(1).cpu().numpy()
     acc = per_game_acc.mean()
