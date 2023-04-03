@@ -1,9 +1,11 @@
-# code inspired by https://github.com/XeniaOhmer/hierarchical_reference_game/blob/master/dataset.py
+# code based on https://github.com/XeniaOhmer/hierarchical_reference_game/blob/master/train.py
+# and https://github.com/jayelm/emergent-generalization/blob/master/code/train.py
 
 import argparse
 import torch
 #print(torch.__version__)
 #import torch.utils.data
+import torch.nn as nn
 import torch.nn.functional as F
 import egg.core as core
 from egg.core.language_analysis import TopographicSimilarity
@@ -65,6 +67,7 @@ def loss(_sender_input, _message, _receiver_input, receiver_output, labels, _aux
     For a discriminative game, accuracy is computed by comparing the index with highest score in Receiver
     output (a distribution of unnormalized probabilities over target positions) and the corresponding 
     label read from input, indicating the ground-truth position of the target.
+    TODO: Adaptation to concept game with multiple targets
         receiver_output: Tensor of shape [batch_size, n_objects]
         labels: Tensor of shape [batch_size, n_objects]
     """
@@ -84,32 +87,38 @@ def loss(_sender_input, _message, _receiver_input, receiver_output, labels, _aux
     n_objects = receiver_output.shape[1]
     # Can't simply use argmax because I've got 10 target labels (out of 20), not just 1.
     # So I use topk and calculate the topk indices outputted by the receiver
-    _topk_values, topk_indices = receiver_output.topk(k=int(n_objects/2), dim=1)
+    #_topk_values, topk_indices = receiver_output.topk(k=int(n_objects/2), dim=1)
     # forming a many-hot-encoding of the (sorted) topk indices to match the shape of the ground-truth labels
-    sorted, _ = torch.sort(topk_indices)
-    receiver_pred = torch.cat([_many_hot_encoding(n_objects, label) for label in sorted]).reshape(batch_size,n_objects)#.to(device='cuda')
+    #sorted, _ = torch.sort(topk_indices)
+    #receiver_pred = torch.cat([_many_hot_encoding(n_objects, label) for label in sorted]).reshape(batch_size,n_objects).to(device=receiver_output.device)
     #print(receiver_pred.device)
     # comparing receiver predictions for all objects with ground-truth labels
-    acc_all_objects = (receiver_pred == labels).detach().float() # shape [batch_size, n_objects]
+    #acc_all_objects = (receiver_pred == labels).detach().float() # shape [batch_size, n_objects]
     # NOTE: accuracy shape needs to be [32] to fit with egg code !!!
     # This means that accuracy is 1 only when all objects are classified correctly 
     # (which makes it a harder task than a simple referential game with one target only).
     # re-calculating accuracy over all objects:
-    acc = list()
-    all_correct = torch.ones(n_objects)#.to(device='cuda')
+    #acc = list()
+    #all_correct = torch.ones(n_objects).to(device=receiver_pred.device)
     #print(all_correct.device)
-    for row in acc_all_objects:
-        if torch.equal(row, all_correct):
-            acc.append(1)
-        else:
-            acc.append(0)
-    acc = torch.Tensor(acc)#.to(device='cuda')
+    #for row in acc_all_objects:
+    #    if torch.equal(row, all_correct):
+    #        acc.append(1)
+    #    else:
+    #        acc.append(0)
+    #acc = torch.Tensor(acc).to(device=receiver_pred.device)
     #print(acc.device)
 
+    # TODO: sanity check the loss calculation
     # from EGG: similarly, the loss computes cross-entropy between the Receiver-produced 
     # target-position probability distribution and the labels
-    # TODO: sanity check the loss calculation
-    loss = F.cross_entropy(receiver_output, labels, reduction="none")
+    # loss = F.cross_entropy(receiver_output, labels, reduction="none")
+    # after Mu & Goodman (2021):
+    criterion = nn.BCEWithLogitsLoss()
+    loss = criterion(receiver_output, labels)
+    receiver_pred = (receiver_output > 0).float()
+    per_game_acc = (receiver_pred == labels).float().mean(1).cpu().numpy()
+    acc = per_game_acc.mean()
     return loss, {'acc': acc}
 
 
