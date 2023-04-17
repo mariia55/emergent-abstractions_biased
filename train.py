@@ -122,7 +122,7 @@ def loss(_sender_input, _message, _receiver_input, receiver_output, labels, _aux
     return loss, {'acc': acc}
 
 
-def train(opts, datasets, verbose_callbacks=False): # TODO: fix and set to True
+def train(opts, datasets, verbose_callbacks=True): # TODO: fix and set to True
     """
     Train function completely copied from hierarchical_reference_game.
     """
@@ -280,7 +280,7 @@ def main(params):
             if not os.path.exists(opts.save_path) and opts.save:
                 os.makedirs(opts.save_path)
             #with torch.device('cuda'):
-            train(opts, data_set.get_datasets(split_ratio=SPLIT), verbose_callbacks=False) # TODO: fix and set to True
+            train(opts, data_set.get_datasets(split_ratio=SPLIT), verbose_callbacks=True) # TODO: fix and set to True
 
 
 if __name__ == "__main__":

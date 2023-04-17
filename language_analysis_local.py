@@ -1,3 +1,6 @@
+# copied and adapted from https://github.com/XeniaOhmer/hierarchical_reference_game/blob/master/language_analysis_local.py
+# who based on https://github.com/facebookresearch/EGG/blob/main/egg/core/language_analysis.py
+
 import numpy as np
 import torch
 from egg.core.callbacks import Callback, ConsoleLogger
@@ -5,6 +8,7 @@ from egg.core.interaction import Interaction
 import json
 import editdistance
 from scipy.spatial import distance
+from hausdorff import hausdorff_distance
 from scipy.stats import spearmanr
 from typing import Union, Callable
 import pickle
@@ -63,7 +67,7 @@ class SavingConsoleLogger(ConsoleLogger):
 
 
 class MessageLengthHierarchical(Callback):
-    """ For every possible number of relevant attributes, take the messages for inputs with that number of relevant
+    """For every possible number of relevant attributes, take the messages for inputs with that number of relevant
     attributes and calculate the (absolute) difference between message length and number of relevant attributes."""
 
     def __init__(self, n_attributes, print_train: bool = True, print_test: bool = True, is_gumbel: bool = True,
@@ -120,7 +124,9 @@ class MessageLengthHierarchical(Callback):
     def print_difference_length_relevance(self, logs: Interaction, tag: str, epoch: int):
 
         message = logs.message.argmax(dim=-1) if self.is_gumbel else logs.message
+        print("message", message)
         relevance_vector = logs.sender_input[:, -self.n_attributes:]
+        print("relevance vector", relevance_vector)
 
         message_length_step = self.compute_message_length_hierarchical(message, relevance_vector)
 
@@ -173,7 +179,7 @@ class TopographicSimilarityHierarchical(Callback):
     def __init__(
             self,
             dimensions,
-            sender_input_distance_fn: Union[str, Callable] = "hamming",
+            sender_input_distance_fn: Union[str, Callable] = "hausdorff",
             message_distance_fn: Union[str, Callable] = "edit",
             compute_topsim_train_set: bool = True,
             compute_topsim_test_set: bool = True,
@@ -213,9 +219,15 @@ class TopographicSimilarityHierarchical(Callback):
     def compute_topsim(
             meanings: torch.Tensor,
             messages: torch.Tensor,
-            meaning_distance_fn: Union[str, Callable] = "hamming",
+            meaning_distance_fn: Union[str, Callable] = "hausdorff",
             message_distance_fn: Union[str, Callable] = "edit",
     ) -> float:
+        """
+        This function taken from EGG
+        https://github.com/facebookresearch/EGG/blob/ace483e30c99a5bc480d84141bcc6f4416e5ec2b/egg/core/language_analysis.py#L164-L199
+        (but modified by Mu & Goodman (2021) to allow pure python pdist with lists when a distance fn is
+        callable (rather than scipy coercing to 2d arrays))
+        """
 
         distances = {
             "edit": lambda x, y: editdistance.eval(x, y) / ((len(x) + len(y)) / 2),
@@ -223,6 +235,7 @@ class TopographicSimilarityHierarchical(Callback):
             "hamming": distance.hamming,
             "jaccard": distance.jaccard,
             "euclidean": distance.euclidean,
+            "hausdorff": hausdorff_distance
         }
 
         meaning_distance_fn = (
@@ -242,6 +255,11 @@ class TopographicSimilarityHierarchical(Callback):
             or {message_distance_fn} distances"
 
         # raise ValueError('A 2-dimensional array must be passed.')
+        # error raised by scipy pdist function
+        # Mu & Goodman implement a workaround, but I'm not sure yet whether it is useful for me
+        # first I need to see how I can compute the hausdorff distance
+
+        
         #print("meanings", meanings.shape) # [n_obs, 20, 9]
         # print("meaning dist fn", meaning_distance_fn) # is a function
         # print("messages", len(messages), len(messages[0])) # list of n_obs lists (with each 4 numbers)
@@ -251,8 +269,10 @@ class TopographicSimilarityHierarchical(Callback):
         n_obs = meanings.shape[0]
         n_objects = meanings.shape[1]
         n_features = meanings.shape[2]
-        meanings_2dim = meanings.reshape(n_obs, n_objects * n_features)
-        meaning_dist = distance.pdist(meanings_2dim, meaning_distance_fn)
+        print("meanings", meanings.shape)
+        #meanings_2dim = meanings.reshape(n_obs, n_objects * n_features)
+        #print("meanings 2dim", meanings_2dim.shape)
+        meaning_dist = distance.pdist(meanings, meaning_distance_fn)
         message_dist = distance.pdist(messages, message_distance_fn)
 
         topsim = spearmanr(meaning_dist, message_dist, nan_policy="raise").correlation
