@@ -187,11 +187,11 @@ def train(opts, datasets, verbose_callbacks=True): # TODO: fix and set to True
                           core.callbacks.CheckpointSaver(opts.save_path, checkpoint_freq=0)])
     if verbose_callbacks:
         callbacks.extend([
-            TopographicSimilarityHierarchical(dimensions, is_gumbel=True,
+            TopographicSimilarityConceptLevel(dimensions, is_gumbel=True,
                                               save_path=opts.save_path, save_epoch=save_epoch),
-            MessageLengthHierarchical(len(dimensions),
-                                      print_train=True, print_test=True, is_gumbel=True,
-                                      save_path=opts.save_path, save_epoch=save_epoch)
+            #MessageLengthHierarchical(len(dimensions),
+            #                          print_train=True, print_test=True, is_gumbel=True,
+            #                          save_path=opts.save_path, save_epoch=save_epoch)
         ])
 
     trainer = core.Trainer(game=game, optimizer=optimizer,
@@ -218,16 +218,15 @@ def train(opts, datasets, verbose_callbacks=True): # TODO: fix and set to True
         messages = interaction.message[max_same_indices]
         messages = messages.argmax(dim=-1)
         messages = [msg.tolist() for msg in messages]
-        #TODO: needs to be adapted before use
         #sender_input_hierarchical = encode_input_for_topsim_hierarchical(sender_input, dimensions)
-        #topsim_hierarchical = TopographicSimilarity.compute_topsim(sender_input_hierarchical,
-                                                                   #messages,
-                                                                   #meaning_distance_fn="cosine",
-                                                                   #message_distance_fn="edit")
+        #target_concepts = encode_target_concepts_for_topsim(sender_input)
+        #topsim = TopographicSimilarity.compute_topsim(target_concepts,
+        #                                                           messages,
+        #                                                           meaning_distance_fn="hausdorff",
+        #                                                           message_distance_fn="edit")
         max_nsame_dict = dict()
         max_nsame_dict['acc'] = acc
-        # TODO: this probably needs to be adapted
-        #max_nsame_dict['topsim_hierarchical'] = topsim_hierarchical
+        #max_nsame_dict['topsim'] = topsim
         print("maximal #same eval", max_nsame_dict)
 
         if opts.save:

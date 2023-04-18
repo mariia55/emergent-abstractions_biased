@@ -1,5 +1,6 @@
 # copied and adapted from https://github.com/XeniaOhmer/hierarchical_reference_game/blob/master/language_analysis_local.py
-# who based on https://github.com/facebookresearch/EGG/blob/main/egg/core/language_analysis.py
+# and https://github.com/jayelm/emergent-generalization/blob/master/code/emergence.py
+# who both based on https://github.com/facebookresearch/EGG/blob/main/egg/core/language_analysis.py
 
 import numpy as np
 import torch
@@ -8,7 +9,7 @@ from egg.core.interaction import Interaction
 import json
 import editdistance
 from scipy.spatial import distance
-from hausdorff import hausdorff_distance
+#from hausdorff import hausdorff_distance
 from scipy.stats import spearmanr
 from typing import Union, Callable
 import pickle
@@ -153,16 +154,10 @@ class MessageLengthHierarchical(Callback):
 
 
 def encode_input_for_topsim_hierarchical(sender_input, dimensions):
-    print("sender input", sender_input.shape) # [854, 20, 9]
-    #n_features = np.sum(dimensions)
-    #n_attributes = len(dimensions)
-    #print("features, attributes", n_features, n_attributes)
-    #relevance_vectors = sender_input[:, -n_attributes:]
-    #sender_input_encoded = torch.zeros((len(sender_input), n_features + n_attributes))
-    n_objects = sender_input.shape[1]
-    n_features = sender_input.shape[2]
-    sender_input_encoded = torch.zeros((len(sender_input), n_objects, n_features))
-    print("empty encoded", sender_input_encoded.shape)
+    n_features = np.sum(dimensions)
+    n_attributes = len(dimensions)
+    relevance_vectors = sender_input[:, -n_attributes:]
+    sender_input_encoded = torch.zeros((len(sender_input), n_features + n_attributes))
 
     base_count = 0
     for i, dim in enumerate(dimensions):
@@ -174,12 +169,61 @@ def encode_input_for_topsim_hierarchical(sender_input, dimensions):
     return sender_input_encoded
 
 
-class TopographicSimilarityHierarchical(Callback):
+def encode_target_concepts_for_topsim(sender_input):
+    """
+   NOTE: I should maybe encode fixed vectors like the relevance vectors in the hierarchical reference game
+    """
+    n_obs = sender_input.shape[0]
+    n_objects = sender_input.shape[1]
+    n_attributes = sender_input.shape[2]
+    n_targets = int(n_objects/2)
+
+    #print("sender_input", sender_input.shape)
+    # select targets
+    target_concepts = sender_input[:,:n_targets,:]
+    #print("target concepts", target_concepts.shape)
+
+    # maybe I should just calculate pairwise hausdorff distances here?
+
+    #encoded_target_concepts = list(target_concepts)
+
+    return target_concepts
+
+
+def python_pdist(X, metric, **kwargs):
+    """
+    Function from https://github.com/jayelm/emergent-generalization/blob/master/code/emergence.py 
+    who took it from https://github.com/scipy/scipy/blob/v1.6.0/scipy/spatial/distance.py#L2057-L2069
+    Implements a workaround for scipy because scipy.distance.pdist() only takes 2d-arrays.
+    """
+    # number of observations
+    m = len(X)
+    #print("m", m)
+    k = 0
+    dm = np.empty((m * (m - 1)) // 2, dtype=np.double)
+    #print("dm", dm.shape) # (365231,)
+    #print("metric", metric)
+    # go through all pairs of observations 
+    for i in range(0, m - 1):
+        for j in range(i + 1, m):
+            #print("Xi", X[i])
+            #print("Xj", X[j])
+            dm[k] = metric(X[i], X[j], **kwargs)[0] # index at zero because function returns more elements
+            #print("hd", metric(X[i], X[j])) 
+            k = k + 1
+    return dm
+
+
+class TopographicSimilarityConceptLevel(Callback):
+    """
+    Computes topographic similarity at the concept level.
+    The hausdorff distance is used to compute the distance between two sets of objects, i.e. concepts.
+    """
 
     def __init__(
             self,
             dimensions,
-            sender_input_distance_fn: Union[str, Callable] = "hausdorff",
+            sender_input_distance_fn: Union[str, Callable] = "directed_hausdorff",
             message_distance_fn: Union[str, Callable] = "edit",
             compute_topsim_train_set: bool = True,
             compute_topsim_test_set: bool = True,
@@ -223,7 +267,7 @@ class TopographicSimilarityHierarchical(Callback):
             message_distance_fn: Union[str, Callable] = "edit",
     ) -> float:
         """
-        This function taken from EGG
+        This function taken is from EGG
         https://github.com/facebookresearch/EGG/blob/ace483e30c99a5bc480d84141bcc6f4416e5ec2b/egg/core/language_analysis.py#L164-L199
         (but modified by Mu & Goodman (2021) to allow pure python pdist with lists when a distance fn is
         callable (rather than scipy coercing to 2d arrays))
@@ -234,47 +278,45 @@ class TopographicSimilarityHierarchical(Callback):
             "cosine": distance.cosine,
             "hamming": distance.hamming,
             "jaccard": distance.jaccard,
-            "euclidean": distance.euclidean,
-            "hausdorff": hausdorff_distance
+            "euclidean": distance.euclidean
         }
 
-        meaning_distance_fn = (
-            distances.get(meaning_distance_fn, None)
-            if isinstance(meaning_distance_fn, str)
-            else meaning_distance_fn
-        )
-        message_distance_fn = (
-            distances.get(message_distance_fn, None)
-            if isinstance(message_distance_fn, str)
-            else message_distance_fn
-        )
+        slow_meaning_fn = True
+        if meaning_distance_fn in distances:
+            meaning_distance_fn_callable = distances[meaning_distance_fn]
+            slow_meaning_fn = False
+        elif meaning_distance_fn == "hausdorff":
+            meaning_distance_fn_callable = distance.directed_hausdorff
+        else:
+            meaning_distance_fn_callable = meaning_distance_fn
+
+        slow_message_fn = True
+        if message_distance_fn in distances:
+            message_distance_fn_callable = distances[message_distance_fn]
+            slow_message_fn = False
+        else:
+            message_distance_fn_callable = message_distance_fn
+
 
         assert (
                 meaning_distance_fn and message_distance_fn
         ), f"Cannot recognize {meaning_distance_fn} \
             or {message_distance_fn} distances"
 
-        # raise ValueError('A 2-dimensional array must be passed.')
-        # error raised by scipy pdist function
-        # Mu & Goodman implement a workaround, but I'm not sure yet whether it is useful for me
-        # first I need to see how I can compute the hausdorff distance
+        # compute distances between concepts
+        if slow_meaning_fn:
+            # Mu & Goodman implement a workaround because scipy pdist() only accepts 2-dimensional arrays
+            meaning_dist = python_pdist(meanings, meaning_distance_fn_callable)
+        else:
+            meaning_dist = distance.pdist(meanings, meaning_distance_fn_callable)
 
-        
-        #print("meanings", meanings.shape) # [n_obs, 20, 9]
-        # print("meaning dist fn", meaning_distance_fn) # is a function
-        # print("messages", len(messages), len(messages[0])) # list of n_obs lists (with each 4 numbers)
-        # from scipy.spatial.distance: 
-        # pdist(X[, metric, out]) Pairwise distances between observations in n-dimensional space.
-        # reshape meanings such that it has the shape [839, 180] (same reshape as in sender architecture)
-        n_obs = meanings.shape[0]
-        n_objects = meanings.shape[1]
-        n_features = meanings.shape[2]
-        print("meanings", meanings.shape)
-        #meanings_2dim = meanings.reshape(n_obs, n_objects * n_features)
-        #print("meanings 2dim", meanings_2dim.shape)
-        meaning_dist = distance.pdist(meanings, meaning_distance_fn)
-        message_dist = distance.pdist(messages, message_distance_fn)
+        # compute distances between messages
+        if slow_message_fn:
+            message_dist = python_pdist(messages, message_distance_fn_callable)
+        else:
+            message_dist = distance.pdist(messages, message_distance_fn_callable)
 
+        # topsim = negative spearman correlation of these two spaces
         topsim = spearmanr(meaning_dist, message_dist, nan_policy="raise").correlation
 
         return topsim
@@ -286,11 +328,11 @@ class TopographicSimilarityHierarchical(Callback):
         messages = [msg.tolist() for msg in messages]
         sender_input = logs.sender_input[0:1000]
 
-        # NOTE: trying to leave out encoding of sender input (because I don't get it)
-        # TODO: I probably need to "encode" such that I end up with two dimensional arrays
+        # NOTE: encoding function from hierarchical reference game probably not needed if I can successfully use the hausdorff distance
+        # for computing distances between concepts ("relevance" should be included implicitly)
         #encoded_sender_input = encode_input_for_topsim_hierarchical(sender_input, self.dimensions)
-        #topsim = self.compute_topsim(encoded_sender_input, messages)
-        topsim = self.compute_topsim(sender_input, messages)
+        encoded_target_concepts = encode_target_concepts_for_topsim(sender_input)
+        topsim = self.compute_topsim(encoded_target_concepts, messages)
         output = json.dumps(dict(topsim=topsim, mode=mode, epoch=epoch))
 
         print(output, flush=True)
