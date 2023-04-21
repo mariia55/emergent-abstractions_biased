@@ -67,52 +67,10 @@ def loss(_sender_input, _message, _receiver_input, receiver_output, labels, _aux
     For a discriminative game, accuracy is computed by comparing the index with highest score in Receiver
     output (a distribution of unnormalized probabilities over target positions) and the corresponding 
     label read from input, indicating the ground-truth position of the target.
-    TODO: Adaptation to concept game with multiple targets
+    Adaptation to concept game with multiple targets after Mu & Goodman (2021) with BCEWithLogitsLoss
         receiver_output: Tensor of shape [batch_size, n_objects]
         labels: Tensor of shape [batch_size, n_objects]
     """
-    def _many_hot_encoding(n_objects, input_list):
-        """
-	    Outputs a binary one dim vector
-	    """
-        output = torch.zeros([n_objects])
-        for i in range(n_objects):
-            for index in input_list:
-                if i == index:
-                    output[i] = 1
-
-        return output
-    
-    batch_size = receiver_output.shape[0]
-    n_objects = receiver_output.shape[1]
-    # Can't simply use argmax because I've got 10 target labels (out of 20), not just 1.
-    # So I use topk and calculate the topk indices outputted by the receiver
-    #_topk_values, topk_indices = receiver_output.topk(k=int(n_objects/2), dim=1)
-    # forming a many-hot-encoding of the (sorted) topk indices to match the shape of the ground-truth labels
-    #sorted, _ = torch.sort(topk_indices)
-    #receiver_pred = torch.cat([_many_hot_encoding(n_objects, label) for label in sorted]).reshape(batch_size,n_objects).to(device=receiver_output.device)
-    #print(receiver_pred.device)
-    # comparing receiver predictions for all objects with ground-truth labels
-    #acc_all_objects = (receiver_pred == labels).detach().float() # shape [batch_size, n_objects]
-    # NOTE: accuracy shape needs to be [32] to fit with egg code !!!
-    # This means that accuracy is 1 only when all objects are classified correctly 
-    # (which makes it a harder task than a simple referential game with one target only).
-    # re-calculating accuracy over all objects:
-    #acc = list()
-    #all_correct = torch.ones(n_objects).to(device=receiver_pred.device)
-    #print(all_correct.device)
-    #for row in acc_all_objects:
-    #    if torch.equal(row, all_correct):
-    #        acc.append(1)
-    #    else:
-    #        acc.append(0)
-    #acc = torch.Tensor(acc).to(device=receiver_pred.device)
-    #print(acc.device)
-
-    # TODO: sanity check the loss calculation
-    # from EGG: similarly, the loss computes cross-entropy between the Receiver-produced 
-    # target-position probability distribution and the labels
-    # loss = F.cross_entropy(receiver_output, labels, reduction="none")
     # after Mu & Goodman (2021):
     loss_fn = nn.BCEWithLogitsLoss()
     loss = loss_fn(receiver_output, labels)
@@ -122,7 +80,7 @@ def loss(_sender_input, _message, _receiver_input, receiver_output, labels, _aux
     return loss, {'acc': acc}
 
 
-def train(opts, datasets, verbose_callbacks=True): # TODO: fix and set to True
+def train(opts, datasets, verbose_callbacks=False): 
     """
     Train function completely copied from hierarchical_reference_game.
     """
@@ -210,27 +168,29 @@ def train(opts, datasets, verbose_callbacks=True): # TODO: fix and set to True
             loss_and_metrics['final_test_acc'] = acc
             pickle.dump(loss_and_metrics, open(opts.save_path + '/loss_and_metrics.pkl', 'wb'))
 
-    if not opts.zero_shot:
+    #if not opts.zero_shot:
+        # NOTE: If I would like to implement something similar, I would need some way to find out the level of specificity of the concepts again
         # evaluate accuracy and topsim where all attributes are relevant
-        max_same_indices = torch.where(torch.sum(interaction.sender_input[:, -len(dimensions):], axis=1) == 0)[0]
-        acc = torch.mean(interaction.aux['acc'][max_same_indices]).item()
-        sender_input = interaction.sender_input[max_same_indices]
-        messages = interaction.message[max_same_indices]
-        messages = messages.argmax(dim=-1)
-        messages = [msg.tolist() for msg in messages]
+        #max_same_indices = torch.where(torch.sum(interaction.sender_input[:, -len(dimensions):], axis=1) == 0)[0]
+        #print("max", max_same_indices.shape)
+        #acc = torch.mean(interaction.aux['acc'][max_same_indices]).item()
+        #sender_input = interaction.sender_input[max_same_indices]
+        #messages = interaction.message[max_same_indices]
+        #messages = messages.argmax(dim=-1)
+        #messages = [msg.tolist() for msg in messages]
         #sender_input_hierarchical = encode_input_for_topsim_hierarchical(sender_input, dimensions)
         #target_concepts = encode_target_concepts_for_topsim(sender_input)
         #topsim = TopographicSimilarity.compute_topsim(target_concepts,
         #                                                           messages,
         #                                                           meaning_distance_fn="hausdorff",
         #                                                           message_distance_fn="edit")
-        max_nsame_dict = dict()
-        max_nsame_dict['acc'] = acc
+        #max_nsame_dict = dict()
+        #max_nsame_dict['acc'] = acc
         #max_nsame_dict['topsim'] = topsim
-        print("maximal #same eval", max_nsame_dict)
+        #print("maximal #same eval", max_nsame_dict)
 
-        if opts.save:
-            pickle.dump(max_nsame_dict, open(opts.save_path + '/max_nsame_eval.pkl', 'wb'))
+        #if opts.save:
+        #    pickle.dump(max_nsame_dict, open(opts.save_path + '/max_nsame_eval.pkl', 'wb'))
 
 
 def main(params):
@@ -239,11 +199,9 @@ def main(params):
     """
     opts = get_params(params)
 
-    # TODO: Solve device problem (either with a flag or update pytorch version and check compatibility with egg)
-    # only available in later pytorch version:
+    # NOTE: I checked and the default device seems to be cuda
+    # Otherwise there is an option in a later pytorch version (don't know about compatibility with egg):
     #torch.set_default_device(opts.device)
-    #print(opts.device)
-    #torch.cuda.set_device(opts.device)
 
     # has to be executed in Project directory for consistency
     assert os.path.split(os.getcwd())[-1] == 'emergent-abstractions'
@@ -279,7 +237,7 @@ def main(params):
             if not os.path.exists(opts.save_path) and opts.save:
                 os.makedirs(opts.save_path)
             #with torch.device('cuda'):
-            train(opts, data_set.get_datasets(split_ratio=SPLIT), verbose_callbacks=True) # TODO: fix and set to True
+            train(opts, data_set.get_datasets(split_ratio=SPLIT), verbose_callbacks=False)
 
 
 if __name__ == "__main__":
