@@ -17,6 +17,7 @@ import pickle
 import dataset
 # TBI: archs
 from archs import Sender, Receiver
+import itertools
 
 
 SPLIT = (0.6, 0.2, 0.2)
@@ -30,7 +31,9 @@ def get_params(params):
     parser.add_argument('--load_dataset', type=str, default=None,
                         help='If provided that data set is loaded. Datasets can be generated with pickle.ds'
                             'This makes sense if running several runs with the exact same dataset.')
-    parser.add_argument('--dimensions', nargs='+', type=int)
+    parser.add_argument('--dimensions', nargs='+', type=int, default= [3, 3, 3])
+    parser.add_argument('--attributes', type=int, default=3)
+    parser.add_argument('--values', type=int, default=4)
     parser.add_argument('--game_size', type=int, default=10)
     parser.add_argument('--vocab_size_factor', type=int, default=3,
                         help='Factor applied to minimum vocab size to calculate actual vocab size')
@@ -205,6 +208,9 @@ def main(params):
 
     # has to be executed in Project directory for consistency
     assert os.path.split(os.getcwd())[-1] == 'emergent-abstractions'
+
+    # dimensions calculated from attribute-value pairs:
+    opts.dimensions = list(itertools.repeat(opts.values, opts.attributes))
 
     data_set_name = '(' + str(len(opts.dimensions)) + ',' + str(opts.dimensions[0]) + ')'
     folder_name = (data_set_name + '_game_size_' + str(opts.game_size) 
