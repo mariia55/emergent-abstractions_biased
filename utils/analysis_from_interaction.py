@@ -1,19 +1,74 @@
+# copied and adapted from https://github.com/XeniaOhmer/hierarchical_reference_game/blob/master/utils/analysis_from_interaction.py
+
 from egg.core.language_analysis import calc_entropy, _hashable_tensor
 from sklearn.metrics import normalized_mutual_info_score
 from language_analysis_local import MessageLengthHierarchical
 import numpy as np
+import itertools
+import random
 import torch
 
 
 def k_hot_to_attributes(khots, dimsize):
+    """
+    Decodes many-hot-represented objects to an easy-to-interpret version.
+    E.g. [0, 0, 1, 1, 0, 0, 1, 0, 0] -> [2, 0, 0]
+    """
     base_count = 0
-    n_attributes = khots.shape[1] // dimsize
-    attributes = np.zeros((len(khots), n_attributes))
+    n_attributes = khots.shape[2] // dimsize
+    attributes = np.zeros((len(khots), len(khots[1]), n_attributes))
     for att in range(n_attributes):
-        attributes[:, att] = np.argmax(khots[:, base_count:base_count + dimsize], axis=1)
+        attributes[:, :, att] = np.argmax(khots[:, :, base_count:base_count + dimsize], axis=2)
         base_count = base_count + dimsize
     return attributes
 
+
+def retrieve_fixed_vectors(target_objects):
+    """
+    Reconstructs fixed vectors given a list of (decoded) target objects.
+    """
+    n_attributes = target_objects.shape[2]
+    # compare target objects to each other to find out whether and in which attribute they differ
+    fixed_vectors = []
+    for target_objs in target_objects:
+        fixed = np.ones(n_attributes) # (1, 1, 1) -> all fixed
+        for idx, target_object in enumerate(target_objs):
+            # take first target_object as baseline for comparison (NOTE: could also be random)
+            if idx == 0:
+                concept = target_object
+            else:
+                for i, attribute in enumerate(target_object):
+                    # if values mismatch, then the attribute is not fixed, i.e. 0 in fixed vector
+                    if attribute != concept[i]:
+                        fixed[i] = 0
+        fixed_vectors.append(fixed)
+    return fixed_vectors
+
+
+def convert_fixed_to_intentions(fixed_vectors):
+    """
+    NOTE: not needed right now
+    fixed vectors are 0: irrelevant, 1: relevant
+    intentions are 1: irrelevant, 0: relevant
+    """
+    intentions = []
+    for fixed in fixed_vectors:
+        intention = np.zeros(len(fixed))
+        for i, att in enumerate(fixed):
+            if att == 0:
+                intention[i] = 1
+        intentions.append(intention)
+    return np.asarray(intentions)
+
+
+def retrieve_concepts_sampling(target_objects):
+    """
+    Builds concept representations consisting of one sampled target object and a fixed vector.
+    """
+    fixed_vectors = retrieve_fixed_vectors(target_objects)
+    target_objects_sampled = [random.choice(target_object) for target_object in target_objects]
+    return (np.asarray(target_objects_sampled), np.asarray(fixed_vectors))
+            
 
 def joint_entropy(xs, ys):
     xys = []
@@ -34,37 +89,41 @@ def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
     :param normalizer: normalizer can be either "arithmetic" -H(M) + H(C)- or "joint" -H(M,C)-
     :return: NMI, NMI per level, effectiveness, effectiveness per level, consistency, consistency per level
     """
-
     # Get relevant attributes
     sender_input = interaction.sender_input
-    print("sender input", sender_input.shape) # [n_obs, n_objects, n_features]
     n_objects = sender_input.shape[1]
-    n_features = sender_input.shape[2]
-    #objects = sender_input[:, :-n_dims]
-    #intentions = sender_input[:, -n_dims:]
+    n_targets = int(n_objects/2)
+
+    # get target objects and fixed vectors to re-construct concepts
+    target_objects = sender_input[:, :n_targets]
+    target_objects = k_hot_to_attributes(target_objects, n_values)
+    # concepts are defined by a list of target objects (here one sampled target object) and a fixed vector
+    (objects, fixed) = retrieve_concepts_sampling(target_objects)
+    # add one such that zero becomes an empty attribute for the calculation (_)
+    objects = objects + 1
+    concepts = torch.from_numpy(objects * (np.array(fixed)))
+
+    # get messages from interaction
     messages = interaction.message.argmax(dim=-1)
-    print("messages", messages.shape) # [n_obs, message_length]
-    # reverse many hot encoding of objects
-    #objects = k_hot_to_attributes(objects, n_values)
-    # why?:
-    #objects = objects + 1
-    # retrieve concepts how?
-    #concepts = torch.from_numpy(objects * (1 - np.array(intentions)))
 
-    #n_relevant_idx = [np.where(np.sum(1 - np.array(intentions), axis=1) == i)[0] for i in range(1, n_dims + 1)]
-
+    # Entropies:
+    # H(m), H(c), H(m,c)
     m_entropy = calc_entropy(messages)
-    # m_entropy_hierarchical = [calc_entropy(messages[n_relevant]) for n_relevant in n_relevant_idx]
-    # c_entropy = calc_entropy(concepts)
-    # c_entropy_hierarchical = [calc_entropy(concepts[n_relevant]) for n_relevant in n_relevant_idx]
-    # joint_mc_entropy = joint_entropy(messages, concepts)
-    # joint_entropy_hierarchical = [joint_entropy(messages[n_relevant], concepts[n_relevant])
-    #                              for n_relevant in n_relevant_idx]
+    c_entropy = calc_entropy(concepts)
+    joint_mc_entropy = joint_entropy(messages, concepts)
 
-    # joint_entropy_hierarchical = np.array(joint_entropy_hierarchical)
-    # c_entropy_hierarchical = np.array(c_entropy_hierarchical)
-    # m_entropy_hierarchical = np.array(m_entropy_hierarchical)
+    # Hierarchical Entropies:
+    # sum of fixed vectors gives the specificity of the concept (all attributes fixed means
+    # specific concept, one attribute fixed means generic concept)
+    # n_relevant_idx stores the indices of the concepts on a specific level of abstraction
+    n_relevant_idx = [np.where(np.sum(np.array(fixed), axis=1) == i)[0] for i in range(1, n_dims + 1)]
+    # H(m), H(c), H(m,c) for each level of abstraction
+    m_entropy_hierarchical = np.array([calc_entropy(messages[n_relevant]) for n_relevant in n_relevant_idx])    
+    c_entropy_hierarchical = np.array([calc_entropy(concepts[n_relevant]) for n_relevant in n_relevant_idx])
+    joint_entropy_hierarchical = np.array([joint_entropy(messages[n_relevant], concepts[n_relevant])
+                                  for n_relevant in n_relevant_idx])
 
+    # Normalized scores: NMI, consistency, effectiveness
     if normalizer == "arithmetic":
         normalizer = 0.5 * (m_entropy + c_entropy)
         normalizer_hierarchical = 0.5 * (m_entropy_hierarchical + c_entropy_hierarchical)
@@ -74,17 +133,17 @@ def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
     else:
         raise AttributeError("Unknown normalizer")
 
-    # normalized mutual information
+    # normalized mutual information: H(m) - H(m|c) / normalizer, H(m|c)=H(m,c)-H(c)
     normalized_MI = (m_entropy + c_entropy - joint_mc_entropy) / normalizer
     normalized_MI_hierarchical = ((m_entropy_hierarchical + c_entropy_hierarchical - joint_entropy_hierarchical)
                                   / normalizer_hierarchical)
 
-    # normalized version of h(c|m)
+    # normalized version of h(c|m), i.e. h(c|m)/h(c)
     normalized_effectiveness = (joint_mc_entropy - m_entropy) / c_entropy
     normalized_effectiveness_hierarchical = ((joint_entropy_hierarchical - m_entropy_hierarchical) 
                                              / c_entropy_hierarchical)
 
-    # normalized version of h(m|c)
+    # normalized version of h(m|c), i.e. h(m|c)/h(m)
     normalized_consistency = (joint_mc_entropy - c_entropy) / m_entropy
     normalized_consistency_hierarchical = (joint_entropy_hierarchical - c_entropy_hierarchical) / m_entropy_hierarchical
 
@@ -93,8 +152,8 @@ def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
                   'effectiveness': 1 - normalized_effectiveness,
                   'effectiveness_hierarchical': 1 - normalized_effectiveness_hierarchical,
                   'consistency': 1 - normalized_consistency,
-                  'consistency_hierarchical': 1 - normalized_consistency_hierarchical}
-
+                  'consistency_hierarchical': 1 - normalized_consistency_hierarchical
+                  }
     return score_dict
 
 
@@ -124,10 +183,22 @@ def cooccurrence_per_hierarchy_level(interaction, n_attributes, n_values, vs_fac
 
 def message_length_per_hierarchy_level(interaction, n_attributes):
 
-    message = interaction.message.argmax(dim=-1)
-    relevance_vector = interaction.sender_input[:, -n_attributes:]
+    # Get relevant attributes
+    sender_input = interaction.sender_input
+    n_objects = sender_input.shape[1]
+    n_targets = int(n_objects/2)
+    n_values = int(sender_input.shape[2]/n_attributes)
+    print("values", n_values)
 
-    ml_hierarchical = MessageLengthHierarchical.compute_message_length_hierarchical(message, relevance_vector)
+    # get target objects and fixed vectors to re-construct concepts
+    target_objects = sender_input[:, :n_targets]
+    target_objects = k_hot_to_attributes(target_objects, n_values)
+    # concepts are defined by a list of target objects (here one sampled target object) and a fixed vector
+    (objects, fixed) = retrieve_concepts_sampling(target_objects)
+
+    message = interaction.message.argmax(dim=-1)
+
+    ml_hierarchical = MessageLengthHierarchical.compute_message_length_hierarchical(message, fixed)
     return ml_hierarchical
 
 
