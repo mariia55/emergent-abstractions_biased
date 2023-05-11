@@ -22,6 +22,7 @@ class DataSet(torch.utils.data.Dataset):
 		self.device = device
 		
 		# get all concepts
+		print("Computing all concepts...")
 		self.concepts = self.get_all_concepts()
 
 
@@ -88,11 +89,13 @@ class DataSet(torch.utils.data.Dataset):
 		receiver_input = [obj for obj in receiver_targets]
 		# append context objects
 		# get context of relevant context condition
+		print("get distractors for sender in get_item")
 		for distractor_objects, context_cond in sender_context:
 			if context_cond == context_condition:
 				# add distractor objects for the sender
 				for obj in distractor_objects:
 					sender_input.append(obj)
+		print("get distractors for receiver in get_item")
 		for distractor_objects, context_cond in receiver_context:
 			if context_cond == context_condition:
 				# add distractor objects for the receiver
@@ -141,6 +144,7 @@ class DataSet(torch.utils.data.Dataset):
 		# sample distractor objects for given game size and each context condition (constrained by level of abstraction)
 		context = list()
 		context_candidates = list()
+		print("sample distractor objects for game size and each context condition in sample_distractors")
 		for i in range(sum(fixed)):
 			for dist_objects, context_condition in distractors:
 				# check for context condition
@@ -197,6 +201,7 @@ class DataSet(torch.utils.data.Dataset):
 			"""
 			changed_concepts = list()
 			# go through target object and fixed
+			#print("change_one_attribute")
 			for i, attribute in enumerate(input_object):
 				# check whether attribute in target object is fixed
 				if fixed[i] == 1:
@@ -219,12 +224,15 @@ class DataSet(torch.utils.data.Dataset):
 				and a number of how many attributes should be changed.
 			"""
 			changed_concepts = list()
-			while(n_attributes > 0):
+			#print("while loop in change_n_attributes")
+			#while(n_attributes > 0):
+			print("Iterating through n attributes to change them...")
+			for _ in tqdm(range(n_attributes)):
 				# if changed_concepts is empty, I consider the target_object
 				if not changed_concepts:
 					changed_concepts = [change_one_attribute(input_object, fixed)]
 					n_attributes = n_attributes -1
-				# otherwise consider the changed concepts and change them again	 until n_attributes = 0
+				# otherwise consider the changed concepts and change them again until n_attributes = 0
 				else:
 					old_changed_concepts = changed_concepts.copy()
 					for sublist in changed_concepts:
@@ -234,7 +242,7 @@ class DataSet(torch.utils.data.Dataset):
 								old_changed_concepts.append(new_changed_concepts)
 					# copy and store for next iteration
 					changed_concepts = old_changed_concepts.copy()
-					n_attributes = n_attributes -1
+					#n_attributes = n_attributes -1
 			# flatten list
 			changed_concepts_flattened = [changed_concept for sublist in changed_concepts for changed_concept in sublist]
 			# remove doubles
@@ -271,7 +279,8 @@ class DataSet(torch.utils.data.Dataset):
 		
 		concepts = list()
 		# go through all concepts (i.e. fixed, objects pairs)
-		for concept in all_fixed_object_pairs:
+		print("get_all_concepts")
+		for concept in tqdm(all_fixed_object_pairs):
 			# treat each fixed_object pair as a target concept once
 			# e.g. target concept (_, _, 0) (i.e. fixed = (0,0,1) and objects e.g. (0,0,0), (1,0,0))
 			fixed = concept[1]
