@@ -137,7 +137,7 @@ class TestDataset(unittest.TestCase):
                                     np.argmax(receiver_input[g][idx * dim:(idx + 1) * dim])
                                 )
 
-                    # test whether distractors are fulfill the context condition for sender and receiver
+                    # test whether distractors fulfill the context condition for sender and receiver
 
                     for g in range(ds.game_size, ds.game_size*2):
                         count_mismatch = 0

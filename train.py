@@ -214,30 +214,32 @@ def main(params):
     # dimensions calculated from attribute-value pairs:
     opts.dimensions = list(itertools.repeat(opts.values, opts.attributes))
 
-    data_set_name = '(' + str(len(opts.dimensions)) + ',' + str(opts.dimensions[0]) + ')'
-    folder_name = (data_set_name + '_game_size_' + str(opts.game_size) 
-                    + '_vsf_' + str(opts.vocab_size_factor))
-    folder_name = os.path.join("results", folder_name)
+    if not opts.dimensions == [16, 16, 16, 16, 16]: # TODO: take out again, just for hyperparameter search
 
-    # if name of precreated data set is given, load dataset
-    if opts.load_dataset:
-        data_set = torch.load('data/' + opts.load_dataset)
-        print('data loaded from: ' + 'data/' + opts.load_dataset)
+        data_set_name = '(' + str(len(opts.dimensions)) + ',' + str(opts.dimensions[0]) + ')'
+        folder_name = (data_set_name + '_game_size_' + str(opts.game_size) 
+                        + '_vsf_' + str(opts.vocab_size_factor))
+        folder_name = os.path.join("results", folder_name)
 
-    for _ in range(opts.num_of_runs):
+        # if name of precreated data set is given, load dataset
+        if opts.load_dataset:
+            data_set = torch.load('data/' + opts.load_dataset)
+            print('data loaded from: ' + 'data/' + opts.load_dataset)
 
-        # otherwise generate data set
-        if not opts.load_dataset:
-            data_set = dataset.DataSet(opts.dimensions,
-                                        game_size=opts.game_size,
-                                        device=opts.device)
-        if opts.zero_shot:
-            raise NotImplementedError
-            ## create subfolder if necessary
-            #opts.save_path = os.path.join(folder_name, 'zero_shot')
-            #if not os.path.exists(opts.save_path) and opts.save:
-            #    os.makedirs(opts.save_path)
-            #train(opts, item_set.get_zero_shot_datasets(SPLIT_ZERO_SHOT), verbose_callbacks=False)
+        for _ in range(opts.num_of_runs):
+
+            # otherwise generate data set
+            if not opts.load_dataset:
+                data_set = dataset.DataSet(opts.dimensions,
+                                            game_size=opts.game_size,
+                                            device=opts.device)
+            if opts.zero_shot:
+                raise NotImplementedError
+                ## create subfolder if necessary
+                #opts.save_path = os.path.join(folder_name, 'zero_shot')
+                #if not os.path.exists(opts.save_path) and opts.save:
+                #    os.makedirs(opts.save_path)
+                #train(opts, item_set.get_zero_shot_datasets(SPLIT_ZERO_SHOT), verbose_callbacks=False)
 
         else:
             # create subfolder if necessary

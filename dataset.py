@@ -22,6 +22,7 @@ class DataSet(torch.utils.data.Dataset):
 		self.device = device
 		
 		# get all concepts
+		print("Computing all concepts...")
 		self.concepts = self.get_all_concepts()
 
 
@@ -95,11 +96,13 @@ class DataSet(torch.utils.data.Dataset):
 			receiver_input = [obj for obj in receiver_targets]
 			# append context objects
 			# get context of relevant context condition
-			for distractor_objects, context_cond in sender_context:
+			print("get distractors for sender in get_item")
+		for distractor_objects, context_cond in sender_context:
 				if context_cond == context_condition:
 					# add distractor objects for the sender
 					for obj in distractor_objects:
 						sender_input.append(obj)
+		print("get distractors for receiver in get_item")
 		for distractor_objects, context_cond in receiver_context:
 			if context_cond == context_condition:
 				# add distractor objects for the receiver
@@ -148,6 +151,7 @@ class DataSet(torch.utils.data.Dataset):
 		# sample distractor objects for given game size and each context condition (constrained by level of abstraction)
 		context = list()
 		context_candidates = list()
+		print("sample distractor objects for game size and each context condition in sample_distractors")
 		for i in range(sum(fixed)):
 			for dist_objects, context_condition in distractors:
 				# check for context condition
@@ -195,6 +199,64 @@ class DataSet(torch.utils.data.Dataset):
 		Returns all possible distractor objects for each context based on a given target concept.
 		return distractor_objects
 		"""
+		
+		def change_one_attribute(input_object, fixed):
+			"""
+			Returns a concept where one attribute is changed.
+			Input: A concept consisting of an (example) object and a fixed vector indicating which attributes are fixed in the concept. 
+			Output: A list of concepts consisting of an (example) object that differs in one attribute from the input object and a new fixed vector.
+			"""
+			changed_concepts = list()
+			# go through target object and fixed
+			#print("change_one_attribute")
+			for i, attribute in enumerate(input_object):
+				# check whether attribute in target object is fixed
+				if fixed[i] == 1:
+					# change one attribute to all possible attributes that don't match the target_object
+					for poss_attribute in range(self.properties_dim[i]):
+						new_fixed = fixed.copy()
+						if poss_attribute != attribute:
+							new_fixed[i] = 0
+							changed = list(input_object)
+							changed[i] = poss_attribute
+							# the new fixed values specify where the change took place: (1,1,0) means the change took place in 3rd attribute
+							changed_concepts.append((changed, new_fixed))
+			return changed_concepts
+		
+		def change_n_attributes(input_object, fixed, n_attributes):
+			"""
+			Changes a given number of attributes from a target object 
+				given a fixed vector (specifiying the attributes that can and should be changed)
+				and a target object
+				and a number of how many attributes should be changed.
+			"""
+			changed_concepts = list()
+			#print("while loop in change_n_attributes")
+			#while(n_attributes > 0):
+			print("Iterating through n attributes to change them...")
+			for _ in tqdm(range(n_attributes)):
+				# if changed_concepts is empty, I consider the target_object
+				if not changed_concepts:
+					changed_concepts = [change_one_attribute(input_object, fixed)]
+					n_attributes = n_attributes -1
+				# otherwise consider the changed concepts and change them again until n_attributes = 0
+				else:
+					old_changed_concepts = changed_concepts.copy()
+					for sublist in changed_concepts:
+						for (changed_concept, fixed) in sublist:
+							new_changed_concepts = change_one_attribute(changed_concept, fixed)
+							if new_changed_concepts not in old_changed_concepts:
+								old_changed_concepts.append(new_changed_concepts)
+					# copy and store for next iteration
+					changed_concepts = old_changed_concepts.copy()
+					#n_attributes = n_attributes -1
+			# flatten list
+			changed_concepts_flattened = [changed_concept for sublist in changed_concepts for changed_concept in sublist]
+			# remove doubles
+			changed_concepts_final = []
+			[changed_concepts_final.append(x) for x in changed_concepts_flattened if x not in changed_concepts_final]
+			return changed_concepts_final
+			
 		target_objects, fixed = self.concepts[concept_idx]
 		print(target_objects)
 		print(fixed)
@@ -316,7 +378,8 @@ class DataSet(torch.utils.data.Dataset):
 		
 		concepts = list()
 		# go through all concepts (i.e. fixed, objects pairs)
-		for concept in all_fixed_object_pairs:
+		print("get_all_concepts")
+		for concept in tqdm(all_fixed_object_pairs):
 			# treat each fixed_object pair as a target concept once
 			# e.g. target concept (_, _, 0) (i.e. fixed = (0,0,1) and objects e.g. (0,0,0), (1,0,0))
 			fixed = concept[1]
