@@ -15,7 +15,6 @@ import os
 import pickle
 
 import dataset
-# TBI: archs
 from archs import Sender, Receiver
 import itertools
 
@@ -31,6 +30,7 @@ def get_params(params):
     parser.add_argument('--load_dataset', type=str, default=None,
                         help='If provided that data set is loaded. Datasets can be generated with pickle.ds'
                             'This makes sense if running several runs with the exact same dataset.')
+    # NOTE: encountered some errors with dimensions, probably safer to only use attributes and values
     parser.add_argument('--dimensions', nargs='+', type=int, default= [3, 3, 3])
     parser.add_argument('--attributes', type=int, default=3)
     parser.add_argument('--values', type=int, default=4)
@@ -58,6 +58,8 @@ def get_params(params):
                         help="If set then zero_shot dataset will be trained and tested")
     parser.add_argument('--device', type=str, default='cuda',
                         help="Specifies the device for tensor computations. Defaults to 'cuda'.")
+    parser.add_argument('--include_concept', type=bool, default=False,
+                        help="If set to True, then full concepts will be created and preserved during training (opposed to preserving only targets and regenerating concepts after training)")
     
     args = core.init(parser, params)
 
@@ -243,7 +245,7 @@ def main(params):
             if not os.path.exists(opts.save_path) and opts.save:
                 os.makedirs(opts.save_path)
             #with torch.device('cuda'):
-            train(opts, data_set.get_datasets(split_ratio=SPLIT), verbose_callbacks=False)
+            train(opts, data_set.get_datasets(split_ratio=SPLIT, include_concept=opts.include_concept), verbose_callbacks=False)
 
 
 if __name__ == "__main__":
