@@ -67,33 +67,39 @@ class TestDataset(unittest.TestCase):
             n_objects = n_vals**n_atts
 
             for c_idx, concept in enumerate(concepts):
-                distractors_distributed = DataSet.get_distractors(ds, c_idx)
-                distractors = []
-                for elem in distractors_distributed:
-                    distractors += elem[0]
+                nr_possible_contexts = sum(concepts[c_idx][1])
+                for context_condition in range(1, nr_possible_contexts):
+                    print("context condition", context_condition)
+                    distractors_distributed = DataSet.get_distractors(ds, c_idx, context_condition)
+                    print("dist test", distractors_distributed)
+                    distractors = []
+                    for elem in distractors_distributed:
+                        print("elem", elem)
+                        distractors += elem#[0]
+                    print("distractors test", distractors)
 
-                # assert number of distractors correct
-                n_fixed = np.sum(concept[1])
-                n_expected_distractors = int(n_objects * (1 - (1 / n_vals) ** n_fixed))
-                self.assertEqual(n_expected_distractors, len(distractors))
+                    # assert number of distractors correct
+                    n_fixed = np.sum(concept[1])
+                    n_expected_distractors = int(n_objects * (1 - (1 / n_vals) ** n_fixed))
+                    self.assertEqual(n_expected_distractors, len(distractors))
 
-                # assert distractors do not correspond to the target
-                # self.assertFalse(concept[0] in distractors)
+                    # assert distractors do not correspond to the target
+                    # self.assertFalse(concept[0] in distractors)
 
-                # assert that distractors differ from target in at least one fixed attribute
-                for d in distractors:
-                    diff = np.abs(np.array(concept[0]) - np.array(d))
-                    # select the difference between target and distractor for fixed attributes
-                    mask = 1 - np.tile(np.array(concept[1]), (len(diff), 1))
-                    masked_difference = np.ma.masked_array(diff, mask)
-                    self.assertTrue(0 not in np.sum(masked_difference, axis=1))
+                    # assert that distractors differ from target in at least one fixed attribute
+                    for d in distractors:
+                        diff = np.abs(np.array(concept[0]) - np.array(d))
+                        # select the difference between target and distractor for fixed attributes
+                        mask = 1 - np.tile(np.array(concept[1]), (len(diff), 1))
+                        masked_difference = np.ma.masked_array(diff, mask)
+                        self.assertTrue(0 not in np.sum(masked_difference, axis=1))
 
     def test_get_item(self):
         """
         Test
         - if the game size is correct
         - if the target inputs correspond to the concept
-        - if the distractors do no correspond to the concept
+        - if the distractors do not correspond to the concept
         - if the distractors fulfill the context condition
         """
 
