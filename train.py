@@ -31,7 +31,7 @@ def get_params(params):
                         help='If provided that data set is loaded. Datasets can be generated with pickle.ds'
                             'This makes sense if running several runs with the exact same dataset.')
     # NOTE: encountered some errors with dimensions, probably safer to only use attributes and values
-    parser.add_argument('--dimensions', nargs='+', type=int, default= [3, 3, 3])
+    #parser.add_argument('--dimensions', nargs='+', type=int, default= [3, 3, 3])
     parser.add_argument('--attributes', type=int, default=3)
     parser.add_argument('--values', type=int, default=4)
     parser.add_argument('--game_size', type=int, default=10)
