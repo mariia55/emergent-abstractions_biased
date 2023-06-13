@@ -6,6 +6,9 @@ import itertools
 import random
 from tqdm import tqdm
 
+SPLIT = (0.6, 0.2, 0.2)
+# SPLIT_ZERO_SHOT = (0.75, 0.25) # split for train and val only?
+
 class DataSet(torch.utils.data.Dataset):
 	""" 
 	This class provides the torch.Dataloader-loadable dataset.
@@ -25,8 +28,16 @@ class DataSet(torch.utils.data.Dataset):
 		print("Computing all concepts...")
 		self.concepts = self.get_all_concepts()
 
+		self.dataset = self.get_datasets(split_ratio=SPLIT)
 
-	def get_datasets(self, split_ratio, include_concept):
+	def __len__(self):
+		return len(self.dataset)
+
+	def __getitem__(self, idx):
+		return self.dataset[idx]
+
+
+	def get_datasets(self, split_ratio, include_concept=False):
 		"""
 		Creates the train, validation and test datasets based on the number of possible concepts.
 		"""
@@ -68,7 +79,7 @@ class DataSet(torch.utils.data.Dataset):
 		return train, val, test
 
 
-	def get_item(self, concept_idx, context_condition, encoding_func, include_concept):
+	def get_item(self, concept_idx, context_condition, encoding_func, include_concept=False):
 		"""
 		Receives concept-context pairs and an encoding function.
 		Returns encoded (sender_input, labels, receiver_input).
@@ -96,13 +107,13 @@ class DataSet(torch.utils.data.Dataset):
 			receiver_input = [obj for obj in receiver_targets]
 			# append context objects
 			# get context of relevant context condition
-			print("get distractors for sender in get_item")
+			#print("get distractors for sender in get_item")
 		for distractor_objects, context_cond in sender_context:
 				if context_cond == context_condition:
 					# add distractor objects for the sender
 					for obj in distractor_objects:
 						sender_input.append(obj)
-		print("get distractors for receiver in get_item")
+		#print("get distractors for receiver in get_item")
 		for distractor_objects, context_cond in receiver_context:
 			if context_cond == context_condition:
 				# add distractor objects for the receiver
@@ -151,7 +162,7 @@ class DataSet(torch.utils.data.Dataset):
 		# sample distractor objects for given game size and each context condition (constrained by level of abstraction)
 		context = list()
 		context_candidates = list()
-		print("sample distractor objects for game size and each context condition in sample_distractors")
+		#print("sample distractor objects for game size and each context condition in sample_distractors")
 		for i in range(sum(fixed)):
 			for dist_objects, context_condition in distractors:
 				# check for context condition
@@ -194,10 +205,94 @@ class DataSet(torch.utils.data.Dataset):
 		return context
 
 
+	# def get_distractors(self, concept_idx):
+	# 	""" 
+	# 	Returns all possible distractor objects for each context based on a given target concept.
+	# 	return distractor_objects
+	# 	"""
+		
+	# 	def change_one_attribute(input_object, fixed):
+	# 		"""
+	# 		Returns a concept where one attribute is changed.
+	# 		Input: A concept consisting of an (example) object and a fixed vector indicating which attributes are fixed in the concept. 
+	# 		Output: A list of concepts consisting of an (example) object that differs in one attribute from the input object and a new fixed vector.
+	# 		"""
+	# 		changed_concepts = list()
+	# 		# go through target object and fixed
+	# 		#print("change_one_attribute")
+	# 		for i, attribute in enumerate(input_object):
+	# 			# check whether attribute in target object is fixed
+	# 			if fixed[i] == 1:
+	# 				# change one attribute to all possible attributes that don't match the target_object
+	# 				for poss_attribute in range(self.properties_dim[i]):
+	# 					new_fixed = fixed.copy()
+	# 					if poss_attribute != attribute:
+	# 						new_fixed[i] = 0
+	# 						changed = list(input_object)
+	# 						changed[i] = poss_attribute
+	# 						# the new fixed values specify where the change took place: (1,1,0) means the change took place in 3rd attribute
+	# 						changed_concepts.append((changed, new_fixed))
+	# 		return changed_concepts
+		
+	# 	def change_n_attributes(input_object, fixed, n_attributes):
+	# 		"""
+	# 		Changes a given number of attributes from a target object 
+	# 			given a fixed vector (specifiying the attributes that can and should be changed)
+	# 			and a target object
+	# 			and a number of how many attributes should be changed.
+	# 		"""
+	# 		changed_concepts = list()
+	# 		#print("while loop in change_n_attributes")
+	# 		#while(n_attributes > 0):
+	# 		print("Iterating through n attributes to change them...")
+	# 		for _ in tqdm(range(n_attributes)):
+	# 			# if changed_concepts is empty, I consider the target_object
+	# 			if not changed_concepts:
+	# 				changed_concepts = [change_one_attribute(input_object, fixed)]
+	# 				n_attributes = n_attributes -1
+	# 			# otherwise consider the changed concepts and change them again until n_attributes = 0
+	# 			else:
+	# 				old_changed_concepts = changed_concepts.copy()
+	# 				for sublist in changed_concepts:
+	# 					for (changed_concept, fixed) in sublist:
+	# 						new_changed_concepts = change_one_attribute(changed_concept, fixed)
+	# 						if new_changed_concepts not in old_changed_concepts:
+	# 							old_changed_concepts.append(new_changed_concepts)
+	# 				# copy and store for next iteration
+	# 				changed_concepts = old_changed_concepts.copy()
+	# 				#n_attributes = n_attributes -1
+	# 		# flatten list
+	# 		changed_concepts_flattened = [changed_concept for sublist in changed_concepts for changed_concept in sublist]
+	# 		# remove doubles
+	# 		changed_concepts_final = []
+	# 		[changed_concepts_final.append(x) for x in changed_concepts_flattened if x not in changed_concepts_final]
+	# 		return changed_concepts_final
+			
+	# 	target_objects, fixed = self.concepts[concept_idx]
+	# 	print(target_objects)
+	# 	print(fixed)
+
+			
+	# 	#fixed = list(fixed)
+	# 	# distractors: number and position of fixed attributes match target concept
+	# 	# the more fixed attributes are shared, the finer the context
+	# 	shared_vectors = self.get_shared_vectors(fixed)
+	# 	#for shared in shared_vectors:
+	# 	#	distractor_objects.append(self.get_all_objects_for_a_concept(self.properties_dim, target_objects, shared)
+	# 	#distractor_concepts = change_n_attributes(target_objects[0], fixed, sum(fixed))
+	# 	# the fixed vectors in the distractor_concepts indicate the number of shared features: (1,0,0) means only first attribute is shared
+	# 	# thus sum(fixed) indicates the context condition: from 0 = coarse to n_attributes = fine
+	# 	# for the dataset I need objects instead of concepts
+	# 	#distractor_objects = list()
+	# 	#for dist_concept in distractor_concepts:
+	# 		# same fixed vector as for the target concept
+	# 	#	distractor_objects.extend([(self.get_all_objects_for_a_concept(self.properties_dim, dist_concept[0], fixed), tuple(dist_concept[1]))])
+
+
 	def get_distractors(self, concept_idx):
-		""" 
+		"""
 		Returns all possible distractor objects for each context based on a given target concept.
-		return distractor_objects
+		return (context, distractor_objects) tuples
 		"""
 		
 		def change_one_attribute(input_object, fixed):
@@ -208,11 +303,12 @@ class DataSet(torch.utils.data.Dataset):
 			"""
 			changed_concepts = list()
 			# go through target object and fixed
-			#print("change_one_attribute")
+			# O(n_attributes)
 			for i, attribute in enumerate(input_object):
 				# check whether attribute in target object is fixed
 				if fixed[i] == 1:
 					# change one attribute to all possible attributes that don't match the target_object
+					# O(n_values)
 					for poss_attribute in range(self.properties_dim[i]):
 						new_fixed = fixed.copy()
 						if poss_attribute != attribute:
@@ -231,137 +327,48 @@ class DataSet(torch.utils.data.Dataset):
 				and a number of how many attributes should be changed.
 			"""
 			changed_concepts = list()
-			#print("while loop in change_n_attributes")
-			#while(n_attributes > 0):
-			print("Iterating through n attributes to change them...")
-			for _ in tqdm(range(n_attributes)):
+			# O(n_attributes), 
+			while(n_attributes > 0):
 				# if changed_concepts is empty, I consider the target_object
 				if not changed_concepts:
 					changed_concepts = [change_one_attribute(input_object, fixed)]
+					#print("changed_concepts", changed_concepts)
 					n_attributes = n_attributes -1
-				# otherwise consider the changed concepts and change them again until n_attributes = 0
+				# otherwise consider the changed concepts and change them again	 until n_attributes = 0
 				else:
 					old_changed_concepts = changed_concepts.copy()
+					# O(game_size)
 					for sublist in changed_concepts:
 						for (changed_concept, fixed) in sublist:
 							new_changed_concepts = change_one_attribute(changed_concept, fixed)
+							#print("new_changed_concepts", new_changed_concepts)
 							if new_changed_concepts not in old_changed_concepts:
 								old_changed_concepts.append(new_changed_concepts)
 					# copy and store for next iteration
 					changed_concepts = old_changed_concepts.copy()
-					#n_attributes = n_attributes -1
+					n_attributes = n_attributes -1
 			# flatten list
 			changed_concepts_flattened = [changed_concept for sublist in changed_concepts for changed_concept in sublist]
+			#print("changed-concepts", changed_concepts_flattened)
 			# remove doubles
 			changed_concepts_final = []
 			[changed_concepts_final.append(x) for x in changed_concepts_flattened if x not in changed_concepts_final]
+			#print("changed final", changed_concepts_final)
 			return changed_concepts_final
 			
 		target_objects, fixed = self.concepts[concept_idx]
-		print(target_objects)
-		print(fixed)
-
-			
-		#fixed = list(fixed)
+		fixed = list(fixed)
 		# distractors: number and position of fixed attributes match target concept
 		# the more fixed attributes are shared, the finer the context
-		shared_vectors = self.get_shared_vectors(fixed)
-		#for shared in shared_vectors:
-		#	distractor_objects.append(self.get_all_objects_for_a_concept(self.properties_dim, target_objects, shared)
-		#distractor_concepts = change_n_attributes(target_objects[0], fixed, sum(fixed))
+		distractor_concepts = change_n_attributes(target_objects[0], fixed, sum(fixed))
 		# the fixed vectors in the distractor_concepts indicate the number of shared features: (1,0,0) means only first attribute is shared
 		# thus sum(fixed) indicates the context condition: from 0 = coarse to n_attributes = fine
 		# for the dataset I need objects instead of concepts
-		#distractor_objects = list()
-		#for dist_concept in distractor_concepts:
+		distractor_objects = list()
+		for dist_concept in distractor_concepts:
 			# same fixed vector as for the target concept
-		#	distractor_objects.extend([(self.get_all_objects_for_a_concept(self.properties_dim, dist_concept[0], fixed), tuple(dist_concept[1]))])
-
-
-	# def get_distractors(self, concept_idx):
-	# 	"""
-	# 	Returns all possible distractor objects for each context based on a given target concept.
-	# 	return (context, distractor_objects) tuples
-	# 	"""
-		
-	# 	def change_one_attribute(input_object, fixed):
-	# 		"""
-	# 		Returns a concept where one attribute is changed.
-	# 		Input: A concept consisting of an (example) object and a fixed vector indicating which attributes are fixed in the concept. 
-	# 		Output: A list of concepts consisting of an (example) object that differs in one attribute from the input object and a new fixed vector.
-	# 		"""
-	# 		changed_concepts = list()
-	# 		# go through target object and fixed
-	# 		# O(n_attributes)
-	# 		for i, attribute in enumerate(input_object):
-	# 			# check whether attribute in target object is fixed
-	# 			if fixed[i] == 1:
-	# 				# change one attribute to all possible attributes that don't match the target_object
-	# 				# O(n_values)
-	# 				for poss_attribute in range(self.properties_dim[i]):
-	# 					new_fixed = fixed.copy()
-	# 					if poss_attribute != attribute:
-	# 						new_fixed[i] = 0
-	# 						changed = list(input_object)
-	# 						changed[i] = poss_attribute
-	# 						# the new fixed values specify where the change took place: (1,1,0) means the change took place in 3rd attribute
-	# 						changed_concepts.append((changed, new_fixed))
-	# 		return changed_concepts
-		
-	# 	def change_n_attributes(input_object, fixed, n_attributes):
-	# 		"""
-	# 		Changes a given number of attributes from a target object 
-	# 			given a fixed vector (specifiying the attributes that can and should be changed)
-	# 			and a target object
-	# 			and a number of how many attributes should be changed.
-	# 		"""
-	# 		print("change_n_attributes")
-	# 		print("inp obj", input_object)
-	# 		print("fixed", fixed)
-	# 		print("n_attr", n_attributes)
-	# 		changed_concepts = list()
-	# 		# O(n_attributes), 
-	# 		while(n_attributes > 0):
-	# 			# if changed_concepts is empty, I consider the target_object
-	# 			if not changed_concepts:
-	# 				changed_concepts = [change_one_attribute(input_object, fixed)]
-	# 				print("changed_concepts", changed_concepts)
-	# 				n_attributes = n_attributes -1
-	# 			# otherwise consider the changed concepts and change them again	 until n_attributes = 0
-	# 			else:
-	# 				old_changed_concepts = changed_concepts.copy()
-	# 				# O(game_size)
-	# 				for sublist in changed_concepts:
-	# 					for (changed_concept, fixed) in sublist:
-	# 						new_changed_concepts = change_one_attribute(changed_concept, fixed)
-	# 						print("new_changed_concepts", new_changed_concepts)
-	# 						if new_changed_concepts not in old_changed_concepts:
-	# 							old_changed_concepts.append(new_changed_concepts)
-	# 				# copy and store for next iteration
-	# 				changed_concepts = old_changed_concepts.copy()
-	# 				n_attributes = n_attributes -1
-	# 		# flatten list
-	# 		changed_concepts_flattened = [changed_concept for sublist in changed_concepts for changed_concept in sublist]
-	# 		#print("changed-concepts", changed_concepts_flattened)
-	# 		# remove doubles
-	# 		changed_concepts_final = []
-	# 		[changed_concepts_final.append(x) for x in changed_concepts_flattened if x not in changed_concepts_final]
-	# 		print("changed final", changed_concepts_final)
-	# 		return changed_concepts_final
-			
-	# 	target_objects, fixed = self.concepts[concept_idx]
-	# 	fixed = list(fixed)
-	# 	# distractors: number and position of fixed attributes match target concept
-	# 	# the more fixed attributes are shared, the finer the context
-	# 	distractor_concepts = change_n_attributes(target_objects[0], fixed, sum(fixed))
-	# 	# the fixed vectors in the distractor_concepts indicate the number of shared features: (1,0,0) means only first attribute is shared
-	# 	# thus sum(fixed) indicates the context condition: from 0 = coarse to n_attributes = fine
-	# 	# for the dataset I need objects instead of concepts
-	# 	distractor_objects = list()
-	# 	for dist_concept in distractor_concepts:
-	# 		# same fixed vector as for the target concept
-	# 		distractor_objects.extend([(self.get_all_objects_for_a_concept(self.properties_dim, dist_concept[0], fixed), tuple(dist_concept[1]))])
-	# 	return distractor_objects
+			distractor_objects.extend([(self.get_all_objects_for_a_concept(self.properties_dim, dist_concept[0], fixed), tuple(dist_concept[1]))])
+		return distractor_objects
 		
 		
 	def get_all_concepts(self):
@@ -378,7 +385,7 @@ class DataSet(torch.utils.data.Dataset):
 		
 		concepts = list()
 		# go through all concepts (i.e. fixed, objects pairs)
-		print("get_all_concepts")
+		#print("get_all_concepts")
 		for concept in tqdm(all_fixed_object_pairs):
 			# treat each fixed_object pair as a target concept once
 			# e.g. target concept (_, _, 0) (i.e. fixed = (0,0,1) and objects e.g. (0,0,0), (1,0,0))
@@ -407,7 +414,7 @@ class DataSet(torch.utils.data.Dataset):
 			if attribute == 1:
 				shared[i] = 1
 				shared_vectors.append(shared)
-		print(shared_vectors)
+		#print(shared_vectors)
 		return shared_vectors
 
 		

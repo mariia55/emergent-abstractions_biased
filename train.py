@@ -247,7 +247,8 @@ def main(params):
             if not os.path.exists(opts.save_path) and opts.save:
                 os.makedirs(opts.save_path)
             #with torch.device('cuda'):
-            train(opts, data_set.get_datasets(split_ratio=SPLIT, include_concept=opts.include_concept), verbose_callbacks=False)
+            #train(opts, data_set.get_datasets(split_ratio=SPLIT, include_concept=opts.include_concept), verbose_callbacks=False)
+            train(opts, data_set, verbose_callbacks=False)
 
 
 if __name__ == "__main__":
