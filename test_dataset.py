@@ -19,7 +19,7 @@ class TestDataset(unittest.TestCase):
         self.datasets = []
         for props in self.possible_properties:
             for size in self.game_sizes:
-                self.datasets.append(DataSet(props, size, 'cpu'))
+                self.datasets.append(DataSet(props, size, 'cpu', testing=True))
 
     def test_get_all_concepts(self):
         """
