@@ -17,8 +17,9 @@ parser.add_argument('--game_size', type=int, default=10,
 args = parser.parse_args()
 
 
-data_set = DataSet(args.dimensions,
-                    game_size=args.game_size)
+data_set = DataSet(properties_dim=args.dimensions,
+                    game_size=args.game_size,
+                    device='cpu')
 
 if not os.path.exists('data/'):
     os.makedirs('data/')

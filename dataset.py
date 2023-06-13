@@ -6,6 +6,9 @@ import itertools
 import random
 from tqdm import tqdm
 
+SPLIT = (0.6, 0.2, 0.2)
+# SPLIT_ZERO_SHOT = (0.75, 0.25) # split for train and val only?
+
 class DataSet(torch.utils.data.Dataset):
 	""" 
 	This class provides the torch.Dataloader-loadable dataset.
@@ -22,8 +25,21 @@ class DataSet(torch.utils.data.Dataset):
 		self.device = device
 		
 		# get all concepts
-		#print("Computing all concepts...")
 		self.concepts = self.get_all_concepts()
+
+		# generate dataset
+		self.dataset = self.get_datasets(split_ratio=SPLIT)
+
+
+	def __len__(self):
+		""" Returns the total amount of samples in dataset """
+		return len(self.dataset)
+	
+
+	def __getitem__(self, idx):
+		""" Returns the i-th sample (and label?) given an index (idx) """
+		return self.dataset[idx]
+
 
 
 	def get_datasets(self, split_ratio, include_concept=False):
@@ -82,9 +98,6 @@ class DataSet(torch.utils.data.Dataset):
 		# The concrete sampled objects can differ between sender and receiver.
 		sender_concept, sender_context = self.get_sample(concept_idx, context_condition)
 		receiver_concept, receiver_context = self.get_sample(concept_idx, context_condition)
-		#print("sender stuff")
-		#print(sender_concept)
-		#print(sender_context)
 		# TODO: change such that sender input also includes fixed vectors (i.e. full concepts) and fixed vectors are only 
 		# ignored in the sender architecture
 		# NOTE: also do this for context conditions?
@@ -99,13 +112,11 @@ class DataSet(torch.utils.data.Dataset):
 		receiver_input = [obj for obj in receiver_targets]
 		# append context objects
 		# get context of relevant context condition
-		#print("get distractors for sender in get_item")
 		for distractor_objects, context_cond in sender_context:
 				if context_cond == context_condition:
 					# add distractor objects for the sender
 					for obj in distractor_objects:
 						sender_input.append(obj)
-		#print("get distractors for receiver in get_item")
 		for distractor_objects, context_cond in receiver_context:
 			if context_cond == context_condition:
 				# add distractor objects for the receiver
@@ -151,21 +162,23 @@ class DataSet(torch.utils.data.Dataset):
 		"""
 		Computes distractors.
 		"""
-		print(concept_idx, context_condition)
 		all_target_objects, fixed = self.concepts[concept_idx]
-		print("concept: ", all_target_objects[0], fixed)
+		# Here I take care of the fixed vectors and that context vectors should differ from fixed vectors
 		context_vectors = self.create_context_vectors(fixed, context_condition)
-		print("context vectors: ", context_vectors)
 		context = []
 
 		for context_vector in context_vectors:
 			poss_dist = self.get_all_objects_for_a_concept(
 				self.properties_dim, all_target_objects[0], context_vector)
 			for obj in poss_dist:
-				if obj not in all_target_objects:
-					context.append(obj)
+				# distractor should not be a target or share more attributes than specified in context_condition
+				#if obj not in all_target_objects:
+				#	context.append(obj)
+				for target in all_target_objects:
+					shared = sum(1 for idx in range(0, len(fixed)) if obj[idx] == target[idx])
+					if shared == context_condition and obj not in context:
+						context.append(obj)
 
-		print("context", context)
 		return context
 	
 
@@ -177,8 +190,6 @@ class DataSet(torch.utils.data.Dataset):
 			how many shared attributes a distractor object should have
 		Outputs all possible context vectors.
 		"""
-		#change_n = sum(fixed) - context_condition
-		#print("context condition", context_condition)
 		if context_condition == 0:
 			return [list(itertools.repeat(0, len(fixed)))]
 		else: 
@@ -202,14 +213,12 @@ class DataSet(torch.utils.data.Dataset):
 		Function for sampling the distractors from a specified context condition.
 		"""
 		# sample distractor objects for given game size and the specified context condition
-		distractors = [dist_obj for dist_objs in context for dist_obj in dist_objs]
-		#print("distractors", distractors)
+		#distractors = [dist_obj for dist_objs in context for dist_obj in dist_objs]
 		context_new = []
 		try: 
-			context_new.append([random.sample(distractors, self.game_size), context_condition])
+			context_new.append([random.sample(context, self.game_size), context_condition])
 		except ValueError:
-			context_new.append([random.choices(distractors, k=self.game_size), context_condition])
-		#print("context new", context_new)
+			context_new.append([random.choices(context, k=self.game_size), context_condition])
 		return context_new
 	
 	
@@ -220,7 +229,6 @@ class DataSet(torch.utils.data.Dataset):
 		# sample distractor objects for given game size and each context condition (constrained by level of abstraction)
 		context = list()
 		context_candidates = list()
-		#print("sample distractor objects for game size and each context condition in sample_distractors")
 		for i in range(sum(fixed)):
 			for dist_objects, context_condition in distractors:
 				# check for context condition
@@ -277,7 +285,6 @@ class DataSet(torch.utils.data.Dataset):
 		
 		concepts = list()
 		# go through all concepts (i.e. fixed, objects pairs)
-		#print("get_all_concepts") # tqdm
 		for concept in all_fixed_object_pairs:
 			# treat each fixed_object pair as a target concept once
 			# e.g. target concept (_, _, 0) (i.e. fixed = (0,0,1) and objects e.g. (0,0,0), (1,0,0))
@@ -306,7 +313,6 @@ class DataSet(torch.utils.data.Dataset):
 			if attribute == 1:
 				shared[i] = 1
 				shared_vectors.append(shared)
-		#print(shared_vectors)
 		return shared_vectors
 
 		
@@ -454,17 +460,12 @@ def get_distractors_old(self, concept_idx):
 				and a target object
 				and a number of how many attributes should be changed.
 			"""
-			#print("change_n_attributes")
-			#print("inp obj", input_object)
-			#print("fixed", fixed)
-			#print("n_attr", n_attributes)
 			changed_concepts = list()
 			# O(n_attributes), 
 			while(n_attributes > 0):
 				# if changed_concepts is empty, I consider the target_object
 				if not changed_concepts:
 					changed_concepts = [change_one_attribute(input_object, fixed)]
-					#print("changed_concepts", changed_concepts)
 					n_attributes = n_attributes -1
 				# otherwise consider the changed concepts and change them again	 until n_attributes = 0
 				else:
@@ -473,7 +474,6 @@ def get_distractors_old(self, concept_idx):
 					for sublist in changed_concepts:
 						for (changed_concept, fixed) in sublist:
 							new_changed_concepts = change_one_attribute(changed_concept, fixed)
-							#print("new_changed_concepts", new_changed_concepts)
 							if new_changed_concepts not in old_changed_concepts:
 								old_changed_concepts.append(new_changed_concepts)
 					# copy and store for next iteration
@@ -481,11 +481,9 @@ def get_distractors_old(self, concept_idx):
 					n_attributes = n_attributes -1
 			# flatten list
 			changed_concepts_flattened = [changed_concept for sublist in changed_concepts for changed_concept in sublist]
-			#print("changed-concepts", changed_concepts_flattened)
 			# remove doubles
 			changed_concepts_final = []
 			[changed_concepts_final.append(x) for x in changed_concepts_flattened if x not in changed_concepts_final]
-			#print("changed final", changed_concepts_final)
 			return changed_concepts_final
 			
 		# distractors: number and position of fixed attributes match target concept
