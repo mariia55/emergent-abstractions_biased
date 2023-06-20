@@ -16,12 +16,13 @@ class Sender(nn.Module):
     Sender gets as input targets and distractors in an ordered fashion (targets first).
     It embeds both targets and distractors and returns a joint embedding.
     """
-    def __init__(self, n_hidden, n_features, n_targets):
+    def __init__(self, n_hidden, n_features, n_targets, context_unaware=False):
         super(Sender, self).__init__()
         # embedding layers:
         self.fc1 = nn.Linear(n_features * n_targets, n_hidden)
         self.fc2 = nn.Linear(n_features * n_targets, n_hidden)
         self.fc3 = nn.Linear(2 * n_hidden, n_hidden)
+        self.context_unaware = context_unaware
 
     def forward(self, x, aux_input=None):
         # NOTE: Mu & Goodman (2021) use MLP (with at least 2 layers) to encode features
@@ -35,14 +36,21 @@ class Sender(nn.Module):
         targets_flat = targets.reshape(batch_size, n_targets * n_features)
         target_feature_embedding = F.relu(self.fc1(targets_flat))
         
-        # embed distractor objects:
-        distractors = x[:, n_targets:]
-        distractors_flat = distractors.reshape(batch_size, n_targets * n_features)
-        distractor_feature_embedding = F.relu(self.fc2(distractors_flat))
+        # context unaware speakers only process the targets
+        if self.context_unaware:
+            return target_feature_embedding
+        
+        # context aware speakers process both targets and distractors
+        else:
+            # embed distractor objects:
+            distractors = x[:, n_targets:]
+            distractors_flat = distractors.reshape(batch_size, n_targets * n_features)
+            distractor_feature_embedding = F.relu(self.fc2(distractors_flat))
 
-        # create joint embedding
-        joint_embedding = self.fc3(torch.cat([target_feature_embedding, distractor_feature_embedding], dim=1)).tanh()
-        return joint_embedding
+            # create joint embedding
+            joint_embedding = self.fc3(torch.cat([target_feature_embedding, distractor_feature_embedding], dim=1)).tanh()
+            return joint_embedding
+        
 
 
 class Receiver(nn.Module):
