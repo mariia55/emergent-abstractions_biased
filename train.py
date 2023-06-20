@@ -204,7 +204,7 @@ def main(params):
 
     # if name of precreated data set is given, load dataset
     if opts.load_dataset:
-        data_set = torch.load('data/' + opts.load_dataset)
+        data_set = torch.load(opts.path + 'data/' + opts.load_dataset)
         print('data loaded from: ' + 'data/' + opts.load_dataset)
 
     for _ in range(opts.num_of_runs):
@@ -235,10 +235,6 @@ def main(params):
             if not os.path.exists(opts.save_path) and opts.save:
                 os.makedirs(opts.save_path)
             #with torch.device('cuda'):
-<<<<<<< Updated upstream
-            #train(opts, data_set.get_datasets(split_ratio=SPLIT, include_concept=opts.include_concept), verbose_callbacks=False)
-=======
->>>>>>> Stashed changes
             train(opts, data_set, verbose_callbacks=False)
 
 
