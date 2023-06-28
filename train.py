@@ -20,7 +20,7 @@ import itertools
 
 
 SPLIT = (0.6, 0.2, 0.2)
-# SPLIT_ZERO_SHOT = (0.75, 0.25) # split for train and val only?
+SPLIT_ZERO_SHOT = (0.75, 0.25)
 
 
 def get_params(params):
@@ -30,8 +30,7 @@ def get_params(params):
     parser.add_argument('--load_dataset', type=str, default=None,
                         help='If provided that data set is loaded. Datasets can be generated with pickle.ds'
                             'This makes sense if running several runs with the exact same dataset.')
-    # NOTE: encountered some errors with dimensions, probably safer to only use attributes and values
-    #parser.add_argument('--dimensions', nargs='+', type=int, default= [3, 3, 3])
+    parser.add_argument('--dimensions', nargs='+', type=int, default= [3, 3, 3])
     parser.add_argument('--attributes', type=int, default=3)
     parser.add_argument('--values', type=int, default=4)
     parser.add_argument('--game_size', type=int, default=10)
@@ -56,6 +55,8 @@ def get_params(params):
     parser.add_argument('--num_of_runs', type=int, default=1, help="How often this simulation should be repeated")
     parser.add_argument('--zero_shot', type=bool, default=False,
                         help="If set then zero_shot dataset will be trained and tested")
+    parser.add_argument('--zero_shot_test', type=str, default=None,
+                        help="Must be either 'generic' or 'sepcific'.")
     parser.add_argument('--device', type=str, default='cuda',
                         help="Specifies the device for tensor computations. Defaults to 'cuda'.")
     parser.add_argument('--path', type=str, default="",
@@ -211,31 +212,57 @@ def main(params):
 
         # otherwise generate data set (new for each run for the small datasets)
         if not opts.load_dataset:
-            data_set = dataset.DataSet(opts.dimensions,
-                                        game_size=opts.game_size,
-                                        device=opts.device)
-        if opts.zero_shot:
-            raise NotImplementedError
-            ## create subfolder if necessary
-            #opts.save_path = os.path.join(opts.path, folder_name, 'zero_shot')
-            #if not os.path.exists(opts.save_path) and opts.save:
-            #    os.makedirs(opts.save_path)
-            #train(opts, item_set.get_zero_shot_datasets(SPLIT_ZERO_SHOT), verbose_callbacks=False)
-            
-        if opts.context_unaware:
-            # create subfolder if necessary
-            opts.save_path = os.path.join(opts.path, folder_name, 'context_unaware')
-            if not os.path.exists(opts.save_path) and opts.save:
-                os.makedirs(opts.save_path)
-            train(opts, data_set, verbose_callbacks=False)
+            if not opts.zero_shot:
+                data_set = dataset.DataSet(opts.dimensions,
+                                            game_size=opts.game_size,
+                                            device=opts.device)
+        
+                # train context-unaware agents (comparison baseline)
+                if opts.context_unaware:
+                    # create subfolder if necessary
+                    opts.save_path = os.path.join(opts.path, folder_name, 'context_unaware')
+                    if not os.path.exists(opts.save_path) and opts.save:
+                        os.makedirs(opts.save_path)
 
-        else:
-            # create subfolder if necessary
-            opts.save_path = os.path.join(opts.path, folder_name, 'standard')
-            if not os.path.exists(opts.save_path) and opts.save:
-                os.makedirs(opts.save_path)
-            #with torch.device('cuda'):
-            train(opts, data_set, verbose_callbacks=False)
+                # train context-aware agents (basic setup)
+                else:
+                    # create subfolder if necessary
+                    opts.save_path = os.path.join(opts.path, folder_name, 'standard')
+                    if not os.path.exists(opts.save_path) and opts.save:
+                        os.makedirs(opts.save_path)
+            
+        # zero-shot
+        if opts.zero_shot:
+            # either the zero-shot test condition is given (with pre-generated dataset)
+            if opts.zero_shot_test is not None:
+                # create subfolder if necessary
+                opts.save_path = os.path.join(opts.path, folder_name, 'zero_shot', opts.zero_shot_test)
+                if not os.path.exists(opts.save_path) and opts.save:
+                    os.makedirs(opts.save_path)
+                if not opts.load_dataset:
+                    data_set = dataset.DataSet(opts.dimensions,
+                                                    game_size=opts.game_size,
+                                                    device=opts.device,
+                                                    zero_shot=True,
+                                                    zero_shot_test=opts.zero_shot_test)
+            # or both test conditions are generated
+            else:
+                # implement two zero-shot conditions: test on most generic vs. test on most specific dataset
+                for cond in ['generic', 'specific']:
+                    print("Zero-shot condition:", cond)
+                    # create subfolder if necessary
+                    opts.save_path = os.path.join(opts.path, folder_name, 'zero_shot', cond)
+                    if not os.path.exists(opts.save_path) and opts.save:
+                        os.makedirs(opts.save_path)
+                    data_set = dataset.DataSet(opts.dimensions,
+                                                game_size=opts.game_size,
+                                                device=opts.device,
+                                                zero_shot=True,
+                                                zero_shot_test=cond)
+                    train(opts, data_set, verbose_callbacks=False)
+                break
+
+        train(opts, data_set, verbose_callbacks=False)
 
 
 if __name__ == "__main__":
