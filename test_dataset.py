@@ -67,10 +67,17 @@ class TestDataset(unittest.TestCase):
             n_objects = n_vals**n_atts
 
             for c_idx, concept in enumerate(concepts):
-                distractors_distributed = DataSet.get_distractors(ds, c_idx)
+                nr_possible_contexts = sum(concepts[c_idx][1])
+                # collect distractors over all possible context conditions
                 distractors = []
-                for elem in distractors_distributed:
-                    distractors += elem[0]
+                for context_condition in range(0, nr_possible_contexts):
+                    distractors_distributed = DataSet.get_distractors(ds, c_idx, context_condition)
+
+                    for elem in distractors_distributed:
+                        distractors.append(elem)
+
+                # make sure distractors are not counted twice
+                distractors = set(distractors)
 
                 # assert number of distractors correct
                 n_fixed = np.sum(concept[1])
@@ -93,7 +100,7 @@ class TestDataset(unittest.TestCase):
         Test
         - if the game size is correct
         - if the target inputs correspond to the concept
-        - if the distractors do no correspond to the concept
+        - if the distractors do not correspond to the concept
         - if the distractors fulfill the context condition
         """
 
