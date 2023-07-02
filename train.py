@@ -190,7 +190,7 @@ def main(params):
     #torch.set_default_device(opts.device)
 
     # has to be executed in Project directory for consistency
-    assert os.path.split(os.getcwd())[-1] == 'emergent-abstractions'
+    #assert os.path.split(os.getcwd())[-1] == 'emergent-abstractions'
 
     # dimensions calculated from attribute-value pairs:
     if not opts.dimensions:
@@ -202,6 +202,22 @@ def main(params):
     folder_name = (data_set_name + '_game_size_' + str(opts.game_size) 
                         + '_vsf_' + str(opts.vocab_size_factor))
     folder_name = os.path.join("results", folder_name)
+
+    if opts.save:
+        # prepare folders for saving:
+        # context-aware agents (basic setup)
+        if not opts.zero_shot and not opts.context_unaware:
+            # create subfolder if necessary
+            opts.save_path = os.path.join(opts.path, folder_name, 'standard')
+            if not os.path.exists(opts.save_path) and opts.save:
+                os.makedirs(opts.save_path)
+        # context-unaware agents (comparison baseline)
+        elif opts.context_unaware:
+            # create subfolder if necessary
+            opts.save_path = os.path.join(opts.path, folder_name, 'context_unaware')
+            if not os.path.exists(opts.save_path) and opts.save:
+                os.makedirs(opts.save_path)
+        # zero-shot folders are created later
 
     # if name of precreated data set is given, load dataset
     if opts.load_dataset:
@@ -215,21 +231,7 @@ def main(params):
             if not opts.zero_shot:
                 data_set = dataset.DataSet(opts.dimensions,
                                             game_size=opts.game_size,
-                                            device=opts.device)
-                
-                # train context-unaware agents (comparison baseline)
-                if opts.context_unaware:
-                    # create subfolder if necessary
-                    opts.save_path = os.path.join(opts.path, folder_name, 'context_unaware')
-                    if not os.path.exists(opts.save_path) and opts.save:
-                        os.makedirs(opts.save_path)
-
-                # train context-aware agents (basic setup)
-                else:
-                    # create subfolder if necessary
-                    opts.save_path = os.path.join(opts.path, folder_name, 'standard')
-                    if not os.path.exists(opts.save_path) and opts.save:
-                        os.makedirs(opts.save_path)
+                                            device=opts.device)                   
 
         # zero-shot                
         if opts.zero_shot:
