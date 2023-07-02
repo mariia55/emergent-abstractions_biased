@@ -19,8 +19,12 @@ parser.add_argument('--zero_shot', type=bool, default=False,
 args = parser.parse_args()
 
 # prepare folder for saving
-if not os.path.exists('data/'):
-    os.makedirs('data/')
+if args.path:
+    if not os.path.exists(args.path + 'data/'):
+        os.makedirs(args.path + 'data/')
+else:
+    if not os.path.exists('data/'):
+        os.makedirs('data/')
 
 # for normal dataset (not zero-shot)
 if not args.zero_shot:
