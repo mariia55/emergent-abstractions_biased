@@ -112,9 +112,7 @@ class MessageLengthHierarchical(Callback):
 
         message_length = MessageLengthHierarchical.compute_message_length(messages)
         n_attributes = fixed_vectors.shape[1]
-        print(n_attributes)
         number_same = torch.sum(fixed_vectors, dim=1)
-        print(number_same)
 
         message_lengths = []
         for n in range(1, n_attributes + 1):

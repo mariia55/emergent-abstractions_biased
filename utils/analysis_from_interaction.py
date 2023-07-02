@@ -188,7 +188,6 @@ def message_length_per_hierarchy_level(interaction, n_attributes):
     n_objects = sender_input.shape[1]
     n_targets = int(n_objects/2)
     n_values = int(sender_input.shape[2]/n_attributes)
-    print("values", n_values)
 
     # get target objects and fixed vectors to re-construct concepts
     target_objects = sender_input[:, :n_targets]
@@ -198,7 +197,7 @@ def message_length_per_hierarchy_level(interaction, n_attributes):
 
     message = interaction.message.argmax(dim=-1)
 
-    ml_hierarchical = MessageLengthHierarchical.compute_message_length_hierarchical(message, fixed)
+    ml_hierarchical = MessageLengthHierarchical.compute_message_length_hierarchical(message, torch.from_numpy(fixed))
     return ml_hierarchical
 
 

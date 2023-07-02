@@ -2,10 +2,11 @@ import pickle
 import numpy as np
 
 
-def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=True):
+def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=True, context_unaware=True):
     """ loads all accuracies into a dictionary, val_steps should be set to the same as val_frequency during training
     """
-    result_dict = {'train_acc': [], 'val_acc': [], 'test_acc': [], 'zs_acc_objects': [], 'zs_acc_abstraction': []}
+    result_dict = {'train_acc': [], 'val_acc': [], 'test_acc': [], 'zs_acc_objects': [], 'zs_acc_abstraction': [],
+                   'cu_train_acc': [], 'cu_val_acc': [], 'cu_test_acc': []}
 
     for path_idx, path in enumerate(all_paths):
 
@@ -13,11 +14,14 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
         val_accs = []
         zs_accs_objects = []
         zs_accs_abstraction = []
+        cu_train_accs = []
+        cu_val_accs = []
 
         for run in range(n_runs):
             
             standard_path = path + '/standard/' + str(run) + '/'
             zero_shot_path = path + '/zero_shot/' + str(run) + '/'
+            context_unaware_path = path + '/context_unaware/' + str(run) + '/'
             
             # train and validation accuracy
             
@@ -27,22 +31,36 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
             train_accs.append(train_acc)
             lists = sorted(data['metrics_test0'].items()) 
             _, val_acc = zip(*lists)
-            if len(val_acc) > n_epochs // val_steps:  # we had some runs where we set val freq to 5 instead of 10
+            if len(val_acc) > n_epochs // val_steps:  # old: we had some runs where we set val freq to 5 instead of 10
                 val_acc = val_acc[::2]
             val_accs.append(val_acc)
             if zero_shot:
                 zs_accs_objects.append(data['final_test_acc'])
             
-            # zero shot accuracy
-            if zero_shot == True:
+                # zero shot accuracy
                 zs_data = pickle.load(open(zero_shot_path + 'loss_and_metrics.pkl', 'rb'))
                 zs_accs_abstraction.append(zs_data['final_test_acc'])
+            
+            # context-unaware accuracy
+            if context_unaware:
+                cu_data = pickle.load(open(context_unaware_path + 'loss_and_metrics.pkl', 'rb'))
+                lists = sorted(cu_data['metrics_train0'].items())
+                _, cu_train_acc = zip(*lists)
+                cu_train_accs.append(cu_train_acc)
+                lists = sorted(cu_data['metrics_test0'].items()) 
+                _, cu_val_acc = zip(*lists)
+                if len(cu_val_acc) > n_epochs // val_steps:  # old: we had some runs where we set val freq to 5 instead of 10
+                    cu_val_acc = cu_val_acc[::2]
+                cu_val_accs.append(cu_val_acc)
 
         result_dict['train_acc'].append(train_accs)
         result_dict['val_acc'].append(val_accs)
         if zero_shot:
             result_dict['zs_acc_objects'].append(zs_accs_objects)
             result_dict['zs_acc_abstraction'].append(zs_accs_abstraction)
+        if context_unaware:
+            result_dict['cu_train_acc'].append(cu_train_accs)
+            result_dict['cu_val_acc'].append(cu_val_accs)
 
     for key in result_dict.keys():
         result_dict[key] = np.array(result_dict[key])
