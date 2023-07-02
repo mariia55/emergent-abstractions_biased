@@ -56,7 +56,7 @@ def get_params(params):
     parser.add_argument('--zero_shot', type=bool, default=False,
                         help="If set then zero_shot dataset will be trained and tested")
     parser.add_argument('--zero_shot_test', type=str, default=None,
-                        help="Must be either 'generic' or 'sepcific'.")
+                        help="Must be either 'generic' or 'specific'.")
     parser.add_argument('--device', type=str, default='cuda',
                         help="Specifies the device for tensor computations. Defaults to 'cuda'.")
     parser.add_argument('--path', type=str, default="",
@@ -216,7 +216,7 @@ def main(params):
                 data_set = dataset.DataSet(opts.dimensions,
                                             game_size=opts.game_size,
                                             device=opts.device)
-        
+                
                 # train context-unaware agents (comparison baseline)
                 if opts.context_unaware:
                     # create subfolder if necessary
@@ -230,8 +230,8 @@ def main(params):
                     opts.save_path = os.path.join(opts.path, folder_name, 'standard')
                     if not os.path.exists(opts.save_path) and opts.save:
                         os.makedirs(opts.save_path)
-            
-        # zero-shot
+
+        # zero-shot                
         if opts.zero_shot:
             # either the zero-shot test condition is given (with pre-generated dataset)
             if opts.zero_shot_test is not None:
@@ -241,11 +241,11 @@ def main(params):
                     os.makedirs(opts.save_path)
                 if not opts.load_dataset:
                     data_set = dataset.DataSet(opts.dimensions,
-                                                    game_size=opts.game_size,
-                                                    device=opts.device,
-                                                    zero_shot=True,
-                                                    zero_shot_test=opts.zero_shot_test)
-            # or both test conditions are generated
+                                                game_size=opts.game_size,
+                                                device=opts.device,
+                                                zero_shot=True,
+                                                zero_shot_test=opts.zero_shot_test)
+            # or both test conditions are generated        
             else:
                 # implement two zero-shot conditions: test on most generic vs. test on most specific dataset
                 for cond in ['generic', 'specific']:
@@ -260,9 +260,10 @@ def main(params):
                                                 zero_shot=True,
                                                 zero_shot_test=cond)
                     train(opts, data_set, verbose_callbacks=False)
-                break
 
-        train(opts, data_set, verbose_callbacks=False)
+        if opts.zero_shot_test != None or not opts.zero_shot:
+            train(opts, data_set, verbose_callbacks=False)
+        
 
 
 if __name__ == "__main__":

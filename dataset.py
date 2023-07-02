@@ -26,7 +26,10 @@ class DataSet(torch.utils.data.Dataset):
 		
 		# get all concepts
 		self.concepts = self.get_all_concepts()
+		# get all objects
+		self.all_objects = self._get_all_possible_objects(properties_dim)
 
+		# generate dataset
 		if not testing and not zero_shot:
 			self.dataset = self.get_datasets(split_ratio=SPLIT)
 		if zero_shot:
@@ -37,7 +40,7 @@ class DataSet(torch.utils.data.Dataset):
 		return len(self.dataset)
 
 	def __getitem__(self, idx):
-		"""Returns the i-th sample given an index (idx)."""
+		"""Returns the i-th sample (and label?) given an index (idx)."""
 		return self.dataset[idx]
 
 
@@ -79,6 +82,65 @@ class DataSet(torch.utils.data.Dataset):
 				nr_possible_contexts = sum(self.concepts[concept_idx][1])
 				for context_condition in range(nr_possible_contexts):
 					test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+
+		return train, val, test
+	
+
+	def get_zero_shot_datasets(self, split_ratio, test_cond='generic', include_concept=False):
+		"""
+        Note: Generates train, val and test data. 
+            Test and training set contain different concepts. There are two possible datasets:
+            1) 'generic': train on more specific concepts, test on most generic concepts
+            2) 'specific': train on more generic concepts, test on most specific concepts
+        :param split_ratio Tuple of ratios (train, val) of the samples should be in the training and validation sets.
+        """
+
+		if sum(split_ratio) != 1:
+			raise ValueError
+
+        # For each category, one attribute will be chosen for zero shot
+        # The attributes will be taken from a random object
+        # zero_shot_object = pd.Series([0 for _ in self.properties_dim])  # self.objects.sample().iloc[0]
+
+        # split ratio applies only to train and validation datasets - size of test dataset depends on available concepts
+		train_ratio, val_ratio = split_ratio
+
+		train_and_val = []
+		test = []
+
+		print("Creating train_ds, val_ds and test_ds...")
+		for concept_idx in tqdm(range(len(self.concepts))):
+			for _ in range(self.game_size):
+            # for each concept, we consider all possible context conditions
+            # i.e. 1 for generic concepts, and up to len(properties_dim) for more specific concepts
+				nr_possible_contexts = sum(self.concepts[concept_idx][1])
+                #print("nr poss cont", nr_possible_contexts)
+				for context_condition in range(nr_possible_contexts):
+                	# 1) 'generic'
+					if test_cond == 'generic':
+                        # test dataset only contains most generic concepts
+						if nr_possible_contexts == 1:
+							test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+						else:
+							train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+
+                    # 2) 'specific'
+					if test_cond == 'specific':
+                    	# test dataset only contains most specific concepts
+						if nr_possible_contexts == len(self.properties_dim):
+							test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+						else:
+							train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+
+        # Train val split
+		train_samples = int(len(train_and_val)*train_ratio)
+		val_samples = len(train_and_val) - train_samples
+		train, val = torch.utils.data.random_split(train_and_val, [train_samples, val_samples])
+
+        # Save information about train dataset
+		train.dimensions = self.properties_dim
+		print("Length of train and validation datasets:", len(train), "/", len(val))
+		print("Length of test dataset:", len(test))
 
 		return train, val, test
 
@@ -221,21 +283,23 @@ class DataSet(torch.utils.data.Dataset):
 		Computes distractors.
 		"""
 		all_target_objects, fixed = self.concepts[concept_idx]
-		# Here I take care of the fixed vectors and that context vectors should differ from fixed vectors
-		context_vectors = self.create_context_vectors(fixed, context_condition)
 		context = []
+		
+		# save fixed attribute indices in a list for later comparisons
+		fixed_attr_indices = []
+		for index, value in enumerate(fixed):
+			if value == 1:
+				fixed_attr_indices.append(index)
 
-		for context_vector in context_vectors:
-			poss_dist = self.get_all_objects_for_a_concept(
-				self.properties_dim, all_target_objects[0], context_vector)
-			for obj in poss_dist:
-				# distractor should not be a target or share more attributes than specified in context_condition
-				#if obj not in all_target_objects:
-				#	context.append(obj)
-				for target in all_target_objects:
-					shared = sum(1 for idx in range(0, len(fixed)) if obj[idx] == target[idx])
-					if shared == context_condition and obj not in context:
-						context.append(obj)
+		# consider all objects as possible distractors
+		poss_dist = self.all_objects
+		
+		for obj in poss_dist:
+			# find out how many attributes are shared between the possible distractor object and the target concept
+			# (by only comparing fixed attributes because only these are relevant for defining the context)
+			shared = sum(1 for idx in fixed_attr_indices if obj[idx] == all_target_objects[0][idx])
+			if shared == context_condition:
+				context.append(obj)
 
 		return context
 	
@@ -248,6 +312,7 @@ class DataSet(torch.utils.data.Dataset):
 			how many shared attributes a distractor object should have
 		Outputs all possible context vectors.
 		"""
+		print("calculating context vectors")
 		if context_condition == 0:
 			return [list(itertools.repeat(0, len(fixed)))]
 		else: 
@@ -256,13 +321,17 @@ class DataSet(torch.utils.data.Dataset):
 				if value == 1:
 					fixed_attr_indices.append(index)
 			
+			print("fixed indices", fixed_attr_indices)
 			# get all possible context vectors
 			all_possible = list(itertools.product(range(2), repeat=len(fixed)))
 			# keep only those which match the context condition
-			possible_vecs = [poss_vec for poss_vec in all_possible if sum(poss_vec) == context_condition]
+			# fixed - context_condition ensures that if, e.g. 3 attributes are fixed in the target concept, in the distractor concept, 2 attributes
+			# are still fixed, one of which is shared and the other not.
+			possible_vecs = [poss_vec for poss_vec in all_possible if sum(poss_vec) == sum(fixed) - context_condition]
+			print("match context condition", possible_vecs)
 			# keep only those which match the fixed vector:
 			context_vectors = [poss_vec for poss_vec in possible_vecs for idx, attr in enumerate(poss_vec) if attr == 1 and idx in fixed_attr_indices]
-
+			print("match fixed indices", context_vectors)
 			return context_vectors
 	
 
@@ -379,6 +448,7 @@ class DataSet(torch.utils.data.Dataset):
 	def satisfies(object, concept):
 		"""
 		Checks whether an object satisfies a target concept, returns a boolean value.
+		Concept consists of an object vector and a fixed vector tuple.
 		"""
 		satisfied = False
 		same_counter = 0
