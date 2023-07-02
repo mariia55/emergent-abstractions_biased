@@ -56,11 +56,17 @@ def get_params(params):
     parser.add_argument('--num_of_runs', type=int, default=1, help="How often this simulation should be repeated")
     parser.add_argument('--zero_shot', type=bool, default=False,
                         help="If set then zero_shot dataset will be trained and tested")
+    parser.add_argument('--zero_shot_test', type=str, default=None,
+                        help="Must be either 'generic' or 'specific'.")
     parser.add_argument('--device', type=str, default='cuda',
                         help="Specifies the device for tensor computations. Defaults to 'cuda'.")
+    parser.add_argument('--path', type=str, default="",
+                        help="Path where to save the results - needed for running on HPC3.")
     parser.add_argument('--include_concept', type=bool, default=False,
-                        help="If set to True, then full concepts will be created and preserved during training (opposed to preserving only targets and regenerating concepts after training)")
-    
+                        help="Not implemented yet: If set to True, then full concepts will be created and preserved during training (opposed to preserving only targets and regenerating concepts after training)")
+    parser.add_argument('--context_unaware', type=bool, default=False,
+                        help="If set to True, then the speakers will be trained context-unaware, i.e. without access to the distractors.")
+
     args = core.init(parser, params)
 
     return args
@@ -173,30 +179,6 @@ def train(opts, datasets, verbose_callbacks=False):
             loss_and_metrics['final_test_acc'] = acc
             pickle.dump(loss_and_metrics, open(opts.save_path + '/loss_and_metrics.pkl', 'wb'))
 
-    #if not opts.zero_shot:
-        # NOTE: If I would like to implement something similar, I would need some way to find out the level of specificity of the concepts again
-        # evaluate accuracy and topsim where all attributes are relevant
-        #max_same_indices = torch.where(torch.sum(interaction.sender_input[:, -len(dimensions):], axis=1) == 0)[0]
-        #print("max", max_same_indices.shape)
-        #acc = torch.mean(interaction.aux['acc'][max_same_indices]).item()
-        #sender_input = interaction.sender_input[max_same_indices]
-        #messages = interaction.message[max_same_indices]
-        #messages = messages.argmax(dim=-1)
-        #messages = [msg.tolist() for msg in messages]
-        #sender_input_hierarchical = encode_input_for_topsim_hierarchical(sender_input, dimensions)
-        #target_concepts = encode_target_concepts_for_topsim(sender_input)
-        #topsim = TopographicSimilarity.compute_topsim(target_concepts,
-        #                                                           messages,
-        #                                                           meaning_distance_fn="hausdorff",
-        #                                                           message_distance_fn="edit")
-        #max_nsame_dict = dict()
-        #max_nsame_dict['acc'] = acc
-        #max_nsame_dict['topsim'] = topsim
-        #print("maximal #same eval", max_nsame_dict)
-
-        #if opts.save:
-        #    pickle.dump(max_nsame_dict, open(opts.save_path + '/max_nsame_eval.pkl', 'wb'))
-
 
 def main(params):
     """
@@ -212,7 +194,8 @@ def main(params):
     assert os.path.split(os.getcwd())[-1] == 'emergent-abstractions'
 
     # dimensions calculated from attribute-value pairs:
-    opts.dimensions = list(itertools.repeat(opts.values, opts.attributes))
+    if not opts.dimensions:
+        opts.dimensions = list(itertools.repeat(opts.values, opts.attributes))
 
     if not opts.dimensions == [16, 16, 16, 16, 16]: # TODO: take out again, just for hyperparameter search
 
@@ -228,29 +211,60 @@ def main(params):
 
         for _ in range(opts.num_of_runs):
 
-            # otherwise generate data set
+            # otherwise generate data set (new for each run for the small datasets)
             if not opts.load_dataset:
-                data_set = dataset.DataSet(opts.dimensions,
-                                            game_size=opts.game_size,
-                                            device=opts.device)
-            if opts.zero_shot:
-                raise NotImplementedError
-                ## create subfolder if necessary
-                #opts.save_path = os.path.join(folder_name, 'zero_shot')
-                #if not os.path.exists(opts.save_path) and opts.save:
-                #    os.makedirs(opts.save_path)
-                #train(opts, item_set.get_zero_shot_datasets(SPLIT_ZERO_SHOT), verbose_callbacks=False)
+                if not opts.zero_shot:
+                    data_set = dataset.DataSet(opts.dimensions,
+                                                game_size=opts.game_size,
+                                                device=opts.device)
+                    
+                    # train context-unaware agents (comparison baseline)
+                    if opts.context_unaware:
+                        # create subfolder if necessary
+                        opts.save_path = os.path.join(opts.path, folder_name, 'context_unaware')
+                        if not os.path.exists(opts.save_path) and opts.save:
+                            os.makedirs(opts.save_path)
 
-        else:
-            # create subfolder if necessary
-            opts.save_path = os.path.join(folder_name, 'standard')
-            if not os.path.exists(opts.save_path) and opts.save:
-                os.makedirs(opts.save_path)
-            #with torch.device('cuda'):
-            if not opts.load_dataset:
-                train(opts, data_set.get_datasets(split_ratio=SPLIT, include_concept=opts.include_concept), verbose_callbacks=False)
-            else:
-                train(opts, data_set, verbose_callbacks=False)
+                    # train context-aware agents (basic setup)
+                    else:
+                        # create subfolder if necessary
+                        opts.save_path = os.path.join(opts.path, folder_name, 'standard')
+                        if not os.path.exists(opts.save_path) and opts.save:
+                            os.makedirs(opts.save_path)
+
+            # zero-shot                
+            if opts.zero_shot:
+                # either the zero-shot test condition is given (with pre-generated dataset)
+                if opts.zero_shot_test is not None:
+                    # create subfolder if necessary
+                    opts.save_path = os.path.join(opts.path, folder_name, 'zero_shot', opts.zero_shot_test)
+                    if not os.path.exists(opts.save_path) and opts.save:
+                        os.makedirs(opts.save_path)
+                    if not opts.load_dataset:
+                        data_set = dataset.DataSet(opts.dimensions,
+                                                   game_size=opts.game_size,
+                                                   device=opts.device,
+                                                   zero_shot=True,
+                                                   zero_shot_test=opts.zero_shot_test)
+                # or both test conditions are generated        
+                else:
+                    # implement two zero-shot conditions: test on most generic vs. test on most specific dataset
+                    for cond in ['generic', 'specific']:
+                        print("Zero-shot condition:", cond)
+                        # create subfolder if necessary
+                        opts.save_path = os.path.join(opts.path, folder_name, 'zero_shot', cond)
+                        if not os.path.exists(opts.save_path) and opts.save:
+                            os.makedirs(opts.save_path)
+                        data_set = dataset.DataSet(opts.dimensions,
+                                                    game_size=opts.game_size,
+                                                    device=opts.device,
+                                                    zero_shot=True,
+                                                    zero_shot_test=cond)
+                        train(opts, data_set, verbose_callbacks=False)
+
+        if opts.zero_shot_test != None or not opts.zero_shot:
+            train(opts, data_set, verbose_callbacks=False)
+        
 
 
 if __name__ == "__main__":
