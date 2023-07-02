@@ -304,37 +304,6 @@ class DataSet(torch.utils.data.Dataset):
 		return context
 	
 
-	def create_context_vectors(self, fixed, context_condition):
-		"""
-		Takes a fixed vector and a context condition:
-			fixed: fixed vector from concept
-			context_condition: int between 0 and up to the number of attributes, also interpretable as 
-			how many shared attributes a distractor object should have
-		Outputs all possible context vectors.
-		"""
-		print("calculating context vectors")
-		if context_condition == 0:
-			return [list(itertools.repeat(0, len(fixed)))]
-		else: 
-			fixed_attr_indices = []
-			for index, value in enumerate(fixed):
-				if value == 1:
-					fixed_attr_indices.append(index)
-			
-			print("fixed indices", fixed_attr_indices)
-			# get all possible context vectors
-			all_possible = list(itertools.product(range(2), repeat=len(fixed)))
-			# keep only those which match the context condition
-			# fixed - context_condition ensures that if, e.g. 3 attributes are fixed in the target concept, in the distractor concept, 2 attributes
-			# are still fixed, one of which is shared and the other not.
-			possible_vecs = [poss_vec for poss_vec in all_possible if sum(poss_vec) == sum(fixed) - context_condition]
-			print("match context condition", possible_vecs)
-			# keep only those which match the fixed vector:
-			context_vectors = [poss_vec for poss_vec in possible_vecs for idx, attr in enumerate(poss_vec) if attr == 1 and idx in fixed_attr_indices]
-			print("match fixed indices", context_vectors)
-			return context_vectors
-	
-
 	def sample_distractors(self, context, context_condition):
 		"""
 		Function for sampling the distractors from a specified context condition.
