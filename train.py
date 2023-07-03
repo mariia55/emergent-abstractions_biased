@@ -36,7 +36,7 @@ def get_params(params):
     parser.add_argument('--game_size', type=int, default=10)
     parser.add_argument('--vocab_size_factor', type=int, default=3,
                         help='Factor applied to minimum vocab size to calculate actual vocab size')
-    parser.add_argument('--hidden_size', type=int, default=256,
+    parser.add_argument('--hidden_size', type=int, default=128,
                         help='Size of the hidden layer of Sender and Receiver,\
                              the embedding will be half the size of hidden ')
     parser.add_argument('--sender_cell', type=str, default='gru',
@@ -45,7 +45,7 @@ def get_params(params):
                         help='Type of the cell used for Receiver {rnn, gru, lstm}')
     parser.add_argument('--learning_rate', type=float, default=0.0005,
                         help="Learning rate for Sender's and Receiver's parameters ")
-    parser.add_argument('--temperature', type=float, default=1.5,
+    parser.add_argument('--temperature', type=float, default=2,
                         help="Starting GS temperature for the sender")
     parser.add_argument('--length_cost', type=float, default=0.0,
                         help="linear cost term per message length")
@@ -203,16 +203,22 @@ def main(params):
                         + '_vsf_' + str(opts.vocab_size_factor))
     folder_name = os.path.join("results", folder_name)
 
-    # if name of precreated data set is given, load dataset
-    if opts.load_dataset:
-        data_set = torch.load(opts.path + 'data/' + opts.load_dataset)
-        print('data loaded from: ' + 'data/' + opts.load_dataset)
-
     # define game setting from args
     if opts.context_unaware:
         opts.game_setting = 'context_unaware'
     else:
         opts.game_setting = 'standard'
+
+    # if name of precreated data set is given, load dataset
+    if opts.load_dataset:
+        data_set = torch.load(opts.path + 'data/' + opts.load_dataset)
+        print('data loaded from: ' + 'data/' + opts.load_dataset)
+        if not opts.zero_shot:
+            # create subfolder if necessary
+            opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
+            if not os.path.exists(opts.save_path) and opts.save:
+                os.makedirs(opts.save_path)  
+
 
     for _ in range(opts.num_of_runs):
 
