@@ -4,4 +4,7 @@
 *.tar
 **/interaction*
 *.ds
-*.ds
+grid_search/07-03_new/
+grid_search/07-02/
+grid_search/results_07-03_new.csv
+grid_search/results_07-02.csv
