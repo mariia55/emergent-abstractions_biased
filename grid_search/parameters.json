@@ -8,5 +8,5 @@
 	"learning_rate": [0.0005, 0.0010],
 	"hidden_size": [128, 256],
 	"temp_update": [0.97, 0.99],
-	"temperature": [1.5]
+	"temperature": [2]
 }
