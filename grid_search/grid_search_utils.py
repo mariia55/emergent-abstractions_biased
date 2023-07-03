@@ -14,7 +14,7 @@ def get_grid_search_results(directory):
             with open(os.path.join(directory, filename), "r") as file:
                 lines = file.readlines()
                 
-                if len(lines) == 205: # if files have less lines, the search did not run for 100 epochs
+                if len(lines) == 125: # if files have less lines, the search did not run for 100 epochs
                     header = lines[0].strip()
 
                     # create a dictionary with parameters
@@ -44,6 +44,7 @@ def get_grid_search_results(directory):
 
     # sort and save as csv
     data = data.astype(float)
+    print(data)
     data[['attributes', 'values', 'game_size', 'batch_size', 'hidden_size']] = data[['attributes', 'values', 'game_size', 'batch_size', 'hidden_size']].astype(int)
     data = data.sort_values(by=['attributes', 'values', 'game_size', 'batch_size', 'learning_rate', 'hidden_size', 'temperature', 'temp_update'])
 
