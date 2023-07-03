@@ -203,22 +203,6 @@ def main(params):
                         + '_vsf_' + str(opts.vocab_size_factor))
     folder_name = os.path.join("results", folder_name)
 
-    if opts.save:
-        # prepare folders for saving:
-        # context-aware agents (basic setup)
-        if not opts.zero_shot and not opts.context_unaware:
-            # create subfolder if necessary
-            opts.save_path = os.path.join(opts.path, folder_name, 'standard')
-            if not os.path.exists(opts.save_path) and opts.save:
-                os.makedirs(opts.save_path)
-        # context-unaware agents (comparison baseline)
-        elif opts.context_unaware:
-            # create subfolder if necessary
-            opts.save_path = os.path.join(opts.path, folder_name, 'context_unaware')
-            if not os.path.exists(opts.save_path) and opts.save:
-                os.makedirs(opts.save_path)
-        # zero-shot folders are created later
-
     # if name of precreated data set is given, load dataset
     if opts.load_dataset:
         data_set = torch.load(opts.path + 'data/' + opts.load_dataset)
@@ -227,11 +211,21 @@ def main(params):
     for _ in range(opts.num_of_runs):
 
         # otherwise generate data set (new for each run for the small datasets)
-        if not opts.load_dataset:
-            if not opts.zero_shot:
-                data_set = dataset.DataSet(opts.dimensions,
-                                            game_size=opts.game_size,
-                                            device=opts.device)                   
+        if not opts.load_dataset and not opts.zero_shot:
+            data_set = dataset.DataSet(opts.dimensions,
+                                        game_size=opts.game_size,
+                                        device=opts.device)
+            # prepare folders for saving
+            if not opts.context_unaware:
+                # create subfolder if necessary
+                opts.save_path = os.path.join(opts.path, folder_name, 'standard')
+                if not os.path.exists(opts.save_path) and opts.save:
+                    os.makedirs(opts.save_path)
+            elif opts.context_unaware:
+                # create subfolder if necessary
+                opts.save_path = os.path.join(opts.path, folder_name, 'context_unaware')
+                if not os.path.exists(opts.save_path) and opts.save:
+                    os.makedirs(opts.save_path)                   
 
         # zero-shot                
         if opts.zero_shot:
