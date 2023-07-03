@@ -19,8 +19,12 @@ parser.add_argument('--zero_shot', type=bool, default=False,
 args = parser.parse_args()
 
 # prepare folder for saving
-if not os.path.exists('data/'):
-    os.makedirs('data/')
+if args.path:
+    if not os.path.exists(args.path + 'data/'):
+        os.makedirs(args.path + 'data/')
+else:
+    if not os.path.exists('data/'):
+        os.makedirs('data/')
 
 # for normal dataset (not zero-shot)
 if not args.zero_shot:
@@ -28,10 +32,10 @@ if not args.zero_shot:
                         game_size=args.game_size,
                         device='cpu')
     
-    if args.path is None:
-        path = ('data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ').ds')
+    if args.path:
+        path = (args.path + 'data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ').ds')
     else:
-        path = args.path
+        path = ('data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ').ds')
 
     with open(path, "wb") as f:
         torch.save(data_set, f)
@@ -47,10 +51,10 @@ else:
                            device='cpu')
         data_set = data_set.get_zero_shot_datasets(split_ratio=SPLIT_ZERO_SHOT, test_cond=cond)
         
-        if args.path is None:
-            path = ('data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ')_' + str(cond) + '.ds')
+        if args.path:
+            path = (args.path + 'data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ')_' + str(cond) + '.ds')
         else:
-            path = args.path
+            path = ('data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ')_' + str(cond) + '.ds')
 
         with open(path, "wb") as f:
             torch.save(data_set, f)
