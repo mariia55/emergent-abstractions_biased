@@ -208,6 +208,12 @@ def main(params):
         data_set = torch.load(opts.path + 'data/' + opts.load_dataset)
         print('data loaded from: ' + 'data/' + opts.load_dataset)
 
+    # define game setting from args
+    if opts.context_unaware:
+        opts.game_setting = 'context_unaware'
+    else:
+        opts.game_setting = 'standard'
+
     for _ in range(opts.num_of_runs):
 
         # otherwise generate data set (new for each run for the small datasets)
@@ -215,24 +221,17 @@ def main(params):
             data_set = dataset.DataSet(opts.dimensions,
                                         game_size=opts.game_size,
                                         device=opts.device)
-            # prepare folders for saving
-            if not opts.context_unaware:
-                # create subfolder if necessary
-                opts.save_path = os.path.join(opts.path, folder_name, 'standard')
-                if not os.path.exists(opts.save_path) and opts.save:
-                    os.makedirs(opts.save_path)
-            elif opts.context_unaware:
-                # create subfolder if necessary
-                opts.save_path = os.path.join(opts.path, folder_name, 'context_unaware')
-                if not os.path.exists(opts.save_path) and opts.save:
-                    os.makedirs(opts.save_path)                   
+            # create subfolder if necessary
+            opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
+            if not os.path.exists(opts.save_path) and opts.save:
+                os.makedirs(opts.save_path)             
 
         # zero-shot                
         if opts.zero_shot:
             # either the zero-shot test condition is given (with pre-generated dataset)
             if opts.zero_shot_test is not None:
                 # create subfolder if necessary
-                opts.save_path = os.path.join(opts.path, folder_name, 'zero_shot', opts.zero_shot_test)
+                opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting, 'zero_shot', opts.zero_shot_test)
                 if not os.path.exists(opts.save_path) and opts.save:
                     os.makedirs(opts.save_path)
                 if not opts.load_dataset:
@@ -247,7 +246,7 @@ def main(params):
                 for cond in ['generic', 'specific']:
                     print("Zero-shot condition:", cond)
                     # create subfolder if necessary
-                    opts.save_path = os.path.join(opts.path, folder_name, 'zero_shot', cond)
+                    opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting, 'zero_shot', cond)
                     if not os.path.exists(opts.save_path) and opts.save:
                         os.makedirs(opts.save_path)
                     data_set = dataset.DataSet(opts.dimensions,
