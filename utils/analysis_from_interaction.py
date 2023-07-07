@@ -61,12 +61,15 @@ def convert_fixed_to_intentions(fixed_vectors):
     return np.asarray(intentions)
 
 
-def retrieve_concepts_sampling(target_objects):
+def retrieve_concepts_sampling(target_objects, all_targets=False):
     """
     Builds concept representations consisting of one sampled target object and a fixed vector.
     """
     fixed_vectors = retrieve_fixed_vectors(target_objects)
-    target_objects_sampled = [random.choice(target_object) for target_object in target_objects]
+    if all_targets:
+        target_objects_sampled = target_objects
+    else:
+        target_objects_sampled = [random.choice(target_object) for target_object in target_objects]
     return (np.asarray(target_objects_sampled), np.asarray(fixed_vectors))
             
 
