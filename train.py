@@ -110,7 +110,7 @@ def train(opts, datasets, verbose_callbacks=False):
     dimensions = train.dimensions
 
     train = torch.utils.data.DataLoader(train, batch_size=opts.batch_size, shuffle=True)
-    val = torch.utils.data.DataLoader(val, batch_size=opts.batch_size, shuffle=False)
+    val = torch.utils.data.DataLoader(val, batch_size=opts.batch_size, shuffle=False, drop_last=True)
     test = torch.utils.data.DataLoader(test, batch_size=opts.batch_size, shuffle=False)
 
     # initialize sender and receiver agents
@@ -152,7 +152,7 @@ def train(opts, datasets, verbose_callbacks=False):
         callbacks.extend([core.callbacks.InteractionSaver([opts.n_epochs],
                                                           test_epochs=[opts.n_epochs],
                                                           checkpoint_dir=opts.save_path),
-                          core.callbacks.CheckpointSaver(opts.save_path, checkpoint_freq=0)])
+                          core.callbacks.CheckpointSaver(opts.save_path, checkpoint_freq=0)]) # TODO
     if verbose_callbacks:
         callbacks.extend([
             TopographicSimilarityConceptLevel(dimensions, is_gumbel=True,
