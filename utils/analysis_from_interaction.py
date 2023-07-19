@@ -83,6 +83,61 @@ def joint_entropy(xs, ys):
     return calc_entropy(xys)
 
 
+def retrieve_context_condition(targets, fixed, distractors):
+    """returns the context condition given a list of targets and a list of distractors (from interaction)"""
+    context_conds = []
+    # go through all observations
+    for i, t_obj in enumerate(targets):
+        # consider first target and first distractor
+        shared = 0
+        # go through attributes
+        if t_obj.ndim > 1:
+            for k, attr in enumerate(t_obj[0]):
+                # if target attribute was fixed:
+                if fixed[i][k] == 1:
+                    #shared = np.zeros(len(t_obj))
+                    # go through distractors
+                    #for dist_obj in distractors[i]:
+                    # compare target attribute with distractor attribute
+                    if attr == distractors[i][0][k]:
+                        # count shared attributes
+                        shared = shared + 1
+        else:
+            for k, attr in enumerate(t_obj):
+                if fixed[i][k] == 1:
+                    if attr == distractors[i][0][k]:
+                        shared = shared + 1
+        #print("target", t_obj, "fixed", fixed[i], "distractors", distractors[i][0], "shared", shared)
+        context_conds.append(shared)  
+    return context_conds
+
+
+def retrieve_context_condition_all_targets(targets, fixed, distractors):
+    """returns the context condition given a list of targets and a list of distractors (from interaction)"""
+    context_conds = []
+    # go through all observations
+    for i, t_objs in enumerate(targets):
+        # go through objects
+        #for j, t_obj in enumerate(t_objs):
+        # consider first target and first distractor
+        shared = 0
+        # go through attributes
+        for k, attr in enumerate(t_objs[0]):
+            # if target attribute was fixed:
+            if fixed[i][k] == 1:
+                #shared = np.zeros(len(t_obj))
+                # go through distractors
+                #for dist_obj in distractors[i]:
+                # compare target attribute with distractor attribute
+                print(attr, distractors[i][0][k])
+                if attr == distractors[i][0][k]:
+                    # count shared attributes
+                    shared = shared + 1
+        #print("target", t_objs[0], "fixed", fixed[i], "distractors", distractors[i][0], "shared", shared)
+        context_conds.append(shared)  
+    return context_conds
+
+
 def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
     """calculate entropy scores: mutual information (MI), effectiveness and consistency. 
     
@@ -106,6 +161,12 @@ def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
     objects = objects + 1
     concepts = torch.from_numpy(objects * (np.array(fixed)))
 
+    # get distractor objects to re-construct context conditions
+    distractor_objects = sender_input[:, n_targets:]
+    distractor_objects = k_hot_to_attributes(distractor_objects, n_values)
+    distractor_objects = distractor_objects + 1
+    context_conds = retrieve_context_condition(objects, fixed, distractor_objects)
+
     # get messages from interaction
     messages = interaction.message.argmax(dim=-1)
 
@@ -125,14 +186,24 @@ def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
     c_entropy_hierarchical = np.array([calc_entropy(concepts[n_relevant]) for n_relevant in n_relevant_idx])
     joint_entropy_hierarchical = np.array([joint_entropy(messages[n_relevant], concepts[n_relevant])
                                   for n_relevant in n_relevant_idx])
+    
+    # Context-dependent Entropies:
+    context_cond_idx = [np.where(np.array(context_conds) == i)[0] for i in range(0, n_dims)]
+    # H(m), H(c), H(m,c) for each context condition
+    m_entropy_context_dep = np.array([calc_entropy(messages[context_cond]) for context_cond in context_cond_idx])    
+    c_entropy_context_dep = np.array([calc_entropy(concepts[context_cond]) for context_cond in context_cond_idx])
+    joint_entropy_context_dep = np.array([joint_entropy(messages[context_cond], concepts[context_cond])
+                                  for context_cond in context_cond_idx])
 
     # Normalized scores: NMI, consistency, effectiveness
     if normalizer == "arithmetic":
         normalizer = 0.5 * (m_entropy + c_entropy)
         normalizer_hierarchical = 0.5 * (m_entropy_hierarchical + c_entropy_hierarchical)
+        normalizer_context_dep = 0.5 * (m_entropy_context_dep + c_entropy_context_dep)
     elif normalizer == "joint":
         normalizer = joint_mc_entropy
         normalizer_hierarchical = joint_entropy_hierarchical
+        normalizer_context_dep = joint_entropy_context_dep
     else:
         raise AttributeError("Unknown normalizer")
 
@@ -140,22 +211,30 @@ def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
     normalized_MI = (m_entropy + c_entropy - joint_mc_entropy) / normalizer
     normalized_MI_hierarchical = ((m_entropy_hierarchical + c_entropy_hierarchical - joint_entropy_hierarchical)
                                   / normalizer_hierarchical)
+    normalized_MI_context_dep = ((m_entropy_context_dep + c_entropy_context_dep - joint_entropy_context_dep)
+                                  / normalizer_context_dep)
 
     # normalized version of h(c|m), i.e. h(c|m)/h(c)
     normalized_effectiveness = (joint_mc_entropy - m_entropy) / c_entropy
     normalized_effectiveness_hierarchical = ((joint_entropy_hierarchical - m_entropy_hierarchical) 
                                              / c_entropy_hierarchical)
+    normalized_effectiveness_context_dep = ((joint_entropy_context_dep - m_entropy_context_dep) 
+                                             / c_entropy_context_dep)
 
     # normalized version of h(m|c), i.e. h(m|c)/h(m)
     normalized_consistency = (joint_mc_entropy - c_entropy) / m_entropy
     normalized_consistency_hierarchical = (joint_entropy_hierarchical - c_entropy_hierarchical) / m_entropy_hierarchical
+    normalized_consistency_context_dep = (joint_entropy_context_dep - c_entropy_context_dep) / m_entropy_context_dep
 
     score_dict = {'normalized_mutual_info': normalized_MI,
                   'normalized_mutual_info_hierarchical': normalized_MI_hierarchical,
+                  'normalized_mutual_info_context_dep': normalized_MI_context_dep,
                   'effectiveness': 1 - normalized_effectiveness,
                   'effectiveness_hierarchical': 1 - normalized_effectiveness_hierarchical,
+                  'effectiveness_context_dep': 1 - normalized_effectiveness_context_dep,
                   'consistency': 1 - normalized_consistency,
-                  'consistency_hierarchical': 1 - normalized_consistency_hierarchical
+                  'consistency_hierarchical': 1 - normalized_consistency_hierarchical,
+                  'consistency_context_dep': 1 - normalized_consistency_context_dep
                   }
     return score_dict
 
@@ -199,8 +278,10 @@ def message_length_per_hierarchy_level(interaction, n_attributes):
     (objects, fixed) = retrieve_concepts_sampling(target_objects)
 
     message = interaction.message.argmax(dim=-1)
-
+    ml = MessageLengthHierarchical.compute_message_length(message)
+    #print("message length", ml)
     ml_hierarchical = MessageLengthHierarchical.compute_message_length_hierarchical(message, torch.from_numpy(fixed))
+    #print("hierarchical", ml_hierarchical)
     return ml_hierarchical
 
 
