@@ -112,30 +112,30 @@ def retrieve_context_condition(targets, fixed, distractors):
     return context_conds
 
 
-def retrieve_context_condition_all_targets(targets, fixed, distractors):
-    """returns the context condition given a list of targets and a list of distractors (from interaction)"""
-    context_conds = []
-    # go through all observations
-    for i, t_objs in enumerate(targets):
-        # go through objects
-        #for j, t_obj in enumerate(t_objs):
-        # consider first target and first distractor
-        shared = 0
-        # go through attributes
-        for k, attr in enumerate(t_objs[0]):
-            # if target attribute was fixed:
-            if fixed[i][k] == 1:
-                #shared = np.zeros(len(t_obj))
-                # go through distractors
-                #for dist_obj in distractors[i]:
-                # compare target attribute with distractor attribute
-                print(attr, distractors[i][0][k])
-                if attr == distractors[i][0][k]:
-                    # count shared attributes
-                    shared = shared + 1
-        #print("target", t_objs[0], "fixed", fixed[i], "distractors", distractors[i][0], "shared", shared)
-        context_conds.append(shared)  
-    return context_conds
+# def retrieve_context_condition_all_targets(targets, fixed, distractors):
+#     """returns the context condition given a list of targets and a list of distractors (from interaction)"""
+#     context_conds = []
+#     # go through all observations
+#     for i, t_objs in enumerate(targets):
+#         # go through objects
+#         #for j, t_obj in enumerate(t_objs):
+#         # consider first target and first distractor
+#         shared = 0
+#         # go through attributes
+#         for k, attr in enumerate(t_objs[0]):
+#             # if target attribute was fixed:
+#             if fixed[i][k] == 1:
+#                 #shared = np.zeros(len(t_obj))
+#                 # go through distractors
+#                 #for dist_obj in distractors[i]:
+#                 # compare target attribute with distractor attribute
+#                 print(attr, distractors[i][0][k])
+#                 if attr == distractors[i][0][k]:
+#                     # count shared attributes
+#                     shared = shared + 1
+#         #print("target", t_objs[0], "fixed", fixed[i], "distractors", distractors[i][0], "shared", shared)
+#         context_conds.append(shared)  
+#     return context_conds
 
 
 def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
@@ -176,7 +176,7 @@ def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
     c_entropy = calc_entropy(concepts)
     joint_mc_entropy = joint_entropy(messages, concepts)
 
-    # Hierarchical Entropies:
+    # Concept-dependent Entropies:
     # sum of fixed vectors gives the specificity of the concept (all attributes fixed means
     # specific concept, one attribute fixed means generic concept)
     # n_relevant_idx stores the indices of the concepts on a specific level of abstraction
@@ -190,20 +190,39 @@ def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
     # Context-dependent Entropies:
     context_cond_idx = [np.where(np.array(context_conds) == i)[0] for i in range(0, n_dims)]
     # H(m), H(c), H(m,c) for each context condition
-    m_entropy_context_dep = np.array([calc_entropy(messages[context_cond]) for context_cond in context_cond_idx])    
+    m_entropy_context_dep = np.array([calc_entropy(messages[context_cond]) for context_cond in context_cond_idx])
     c_entropy_context_dep = np.array([calc_entropy(concepts[context_cond]) for context_cond in context_cond_idx])
     joint_entropy_context_dep = np.array([joint_entropy(messages[context_cond], concepts[context_cond])
                                   for context_cond in context_cond_idx])
+
+    # Concept-context dependent Entropies:
+    # go through concept conditions
+    conceptxcontext_idx = []
+    for i in range(len(n_relevant_idx)):
+        # go through context conditions
+        for j in range(len(context_cond_idx)):
+            # only keep shared entries for each concept-context condition
+            shared_elements = [elem for elem in n_relevant_idx[i] if elem in context_cond_idx[j]]
+            conceptxcontext_idx.append(shared_elements)
+
+    # H(m), H(c), H(m,c) for each concept and context condition
+    m_entropy_concept_x_context = np.array([calc_entropy(messages[concept_x_context]) for concept_x_context in conceptxcontext_idx])    
+    c_entropy_concept_x_context = np.array([calc_entropy(concepts[concept_x_context]) for concept_x_context in conceptxcontext_idx])
+    joint_entropy_concept_x_context = np.array([joint_entropy(messages[concept_x_context], concepts[concept_x_context])
+                                  for concept_x_context in conceptxcontext_idx])
+            
 
     # Normalized scores: NMI, consistency, effectiveness
     if normalizer == "arithmetic":
         normalizer = 0.5 * (m_entropy + c_entropy)
         normalizer_hierarchical = 0.5 * (m_entropy_hierarchical + c_entropy_hierarchical)
         normalizer_context_dep = 0.5 * (m_entropy_context_dep + c_entropy_context_dep)
+        normalizer_conc_x_cont = 0.5 * (m_entropy_concept_x_context + c_entropy_concept_x_context)
     elif normalizer == "joint":
         normalizer = joint_mc_entropy
         normalizer_hierarchical = joint_entropy_hierarchical
         normalizer_context_dep = joint_entropy_context_dep
+        normalizer_conc_x_cont = joint_entropy_concept_x_context
     else:
         raise AttributeError("Unknown normalizer")
 
@@ -213,6 +232,8 @@ def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
                                   / normalizer_hierarchical)
     normalized_MI_context_dep = ((m_entropy_context_dep + c_entropy_context_dep - joint_entropy_context_dep)
                                   / normalizer_context_dep)
+    normalized_MI_conc_x_cont = ((m_entropy_concept_x_context + c_entropy_concept_x_context - joint_entropy_concept_x_context)
+                                    / normalizer_conc_x_cont)
 
     # normalized version of h(c|m), i.e. h(c|m)/h(c)
     normalized_effectiveness = (joint_mc_entropy - m_entropy) / c_entropy
@@ -220,21 +241,27 @@ def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
                                              / c_entropy_hierarchical)
     normalized_effectiveness_context_dep = ((joint_entropy_context_dep - m_entropy_context_dep) 
                                              / c_entropy_context_dep)
+    normalized_effectiveness_conc_x_cont = ((joint_entropy_concept_x_context - m_entropy_concept_x_context)
+                                            / c_entropy_concept_x_context)
 
     # normalized version of h(m|c), i.e. h(m|c)/h(m)
     normalized_consistency = (joint_mc_entropy - c_entropy) / m_entropy
     normalized_consistency_hierarchical = (joint_entropy_hierarchical - c_entropy_hierarchical) / m_entropy_hierarchical
     normalized_consistency_context_dep = (joint_entropy_context_dep - c_entropy_context_dep) / m_entropy_context_dep
+    normalized_consistency_conc_x_cont = (joint_entropy_concept_x_context - c_entropy_concept_x_context) / m_entropy_concept_x_context
 
     score_dict = {'normalized_mutual_info': normalized_MI,
                   'normalized_mutual_info_hierarchical': normalized_MI_hierarchical,
                   'normalized_mutual_info_context_dep': normalized_MI_context_dep,
+                  'normalized_mutual_info_concept_x_context': normalized_MI_conc_x_cont,
                   'effectiveness': 1 - normalized_effectiveness,
                   'effectiveness_hierarchical': 1 - normalized_effectiveness_hierarchical,
                   'effectiveness_context_dep': 1 - normalized_effectiveness_context_dep,
+                  'effectiveness_concept_x_context': 1 - normalized_effectiveness_conc_x_cont,
                   'consistency': 1 - normalized_consistency,
                   'consistency_hierarchical': 1 - normalized_consistency_hierarchical,
-                  'consistency_context_dep': 1 - normalized_consistency_context_dep
+                  'consistency_context_dep': 1 - normalized_consistency_context_dep,
+                  'consistency_concept_x_context': 1 - normalized_consistency_conc_x_cont
                   }
     return score_dict
 
@@ -290,11 +317,16 @@ def symbol_frequency(interaction, n_attributes, n_values, vocab_size, is_gumbel=
     messages = interaction.message.argmax(dim=-1) if is_gumbel else interaction.message
     messages = messages[:, :-1]
     sender_input = interaction.sender_input
-    k_hots = sender_input[:, :-n_attributes]
-    objects = k_hot_to_attributes(k_hots, n_values)
-    intentions = sender_input[:, -n_attributes:]  # (0=same, 1=any)
+    n_objects = sender_input.shape[1]
+    n_targets = int(n_objects/2)
+    #k_hots = sender_input[:, :-n_attributes]
+    #objects = k_hot_to_attributes(k_hots, n_values)
+    target_objects = sender_input[:, :n_targets]
+    target_objects = k_hot_to_attributes(target_objects, n_values)
+    #intentions = sender_input[:, -n_attributes:]  # (0=same, 1=any)
+    (objects, fixed) = retrieve_concepts_sampling(target_objects)
 
-    objects[intentions == 1] = np.nan
+    objects[fixed == 1] = np.nan
 
     objects = objects
     messages = messages
