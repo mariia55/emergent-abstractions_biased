@@ -9,3 +9,6 @@ grid_search/07-02/
 grid_search/results_07-03_new.csv
 grid_search/results_07-02.csv
 *.tar
+previous_dataset_generation_code/dataset.py
+store_running_HPC3_code/dataset.py
+store_running_HPC3_code/train.py
