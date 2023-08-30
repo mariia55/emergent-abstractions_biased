@@ -65,6 +65,8 @@ def get_params(params):
                         help="Not implemented yet: If set to True, then full concepts will be created and preserved during training (opposed to preserving only targets and regenerating concepts after training)")
     parser.add_argument('--context_unaware', type=bool, default=False,
                         help="If set to True, then the speakers will be trained context-unaware, i.e. without access to the distractors.")
+    parser.add_argument('--max_mess_len', type=int, default=None,
+                        help="Allows user to specify a maximum message length. (defaults to the number of attributes in a dataset)")
 
     args = core.init(parser, params)
 
@@ -119,6 +121,14 @@ def train(opts, datasets, verbose_callbacks=False):
 
     minimum_vocab_size = dimensions[0] + 1  # plus one for 'any'
     vocab_size = minimum_vocab_size * opts.vocab_size_factor + 1  # multiply by factor plus add one for eos-symbol
+    print("vocab size", vocab_size)
+    # allow user to specify a maximum message length
+    if opts.max_mess_len:
+        max_len = opts.max_mess_len
+    # default: number of attributes
+    else:
+        max_len = len(dimensions)
+    print("message length", max_len)
 
     # initialize game
     sender = core.RnnSenderGS(sender,
@@ -126,7 +136,7 @@ def train(opts, datasets, verbose_callbacks=False):
                               int(opts.hidden_size / 2),
                               opts.hidden_size,
                               cell=opts.sender_cell,
-                              max_len=len(dimensions),
+                              max_len=max_len,
                               temperature=opts.temperature)
 
     receiver = core.RnnReceiverGS(receiver,
