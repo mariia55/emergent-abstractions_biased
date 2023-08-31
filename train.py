@@ -43,7 +43,7 @@ def get_params(params):
                         help='Type of the cell used for Sender {rnn, gru, lstm}')
     parser.add_argument('--receiver_cell', type=str, default='gru',
                         help='Type of the cell used for Receiver {rnn, gru, lstm}')
-    parser.add_argument('--learning_rate', type=float, default=0.0005,
+    parser.add_argument('--learning_rate', type=float, default=0.001,
                         help="Learning rate for Sender's and Receiver's parameters ")
     parser.add_argument('--temperature', type=float, default=2,
                         help="Starting GS temperature for the sender")
@@ -216,6 +216,8 @@ def main(params):
     # define game setting from args
     if opts.context_unaware:
         opts.game_setting = 'context_unaware'
+    elif opts.length_cost:
+        opts.game_setting = 'length_cost'
     else:
         opts.game_setting = 'standard'
 
