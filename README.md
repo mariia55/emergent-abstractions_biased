@@ -3,6 +3,23 @@
 Implementation of a concept-level reference game in a language emergence paradigm using [EGG](https://github.com/facebookresearch/EGG/tree/main). The implementation builds on the [hierarchical reference game](https://github.com/XeniaOhmer/hierarchical_reference_game/tree/master) by Ohmer et al. (2022) and the [concept game](https://github.com/jayelm/emergent-generalization/tree/master) by Mu & Goodman (2021). A first abstract of this research has been published at the workshop 'Procedural and computational models of semantic and pragmatic processes' held at the 34th European Summer School in Logic, Language and Information (ESSLLI) at University of Ljubljana, Faculty of Computer and Information Science from 31 July – 4 August 2023: Kristina Kobrock, Xenia Ohmer, Elia Bruni and Nicole Gotzner (2023): [Pragmatics in referential communication: An investigation of concept
 communication and the role of pragmatics with an emergent communication game](https://prosandcomps.github.io/assets/pdf/abstracts/ProsComps2023_Kobrock.pdf).
 
+## Installing dependencies
+We used Python 3.9.15 and PyTorch 1.13.0. Generally, the minimal requirements are Python 3.6 and PyTorch 1.1.0.
+`requirements.txt` lists the python packages needed to run this code. Additionally, please make sure you install EGG following the instructions [here](https://github.com/facebookresearch/EGG#installing-egg).
+1. (optional) Create a new conda environement:
+```
+conda create --name emergab python=3.9
+conda activate emergab
+```
+2. EGG can be installed as a package to be used as a library (see [here](https://github.com/facebookresearch/EGG#installing-egg) for more options):
+```
+pip install git+ssh://git@github.com/facebookresearch/EGG.git
+```
+3. Install packages from the requirements file:
+```
+pip install -r requirements.txt
+```
+
 ## Training
 
 Agents can be trained using 'train.py'. The file provides explanations for how to configure agents and training using command line parameters.
