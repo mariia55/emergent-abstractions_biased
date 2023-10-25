@@ -35,8 +35,6 @@ def plot_heatmap(result_list,
         if results.shape[-1] > n_runs:
             results = results[:, :, -1]
 
-        print(results)
-
         plt.subplot(plot_dims[0], plot_dims[1], i + 1)
 
         if mode == 'mean':
@@ -147,8 +145,8 @@ def plot_heatmap_concept_x_context(result_list,
 
         im = plt.imshow(heatmap, vmin=y_lim[0], vmax=y_lim[1])
         plt.title(titles[i], fontsize=fontsize)
-        plt.xlabel('# fixed', fontsize=fontsize)
-        plt.ylabel('# shared', fontsize=fontsize)
+        plt.xlabel('# Fixed Attributes', fontsize=fontsize)
+        plt.ylabel('# Shared Attributes', fontsize=fontsize)
         plt.xticks(ticks=list(range(len(heatmap))), labels=list(range(1, len(heatmap)+1)), fontsize=fontsize-1)
         plt.yticks(ticks=list(range(len(heatmap))), labels=list(range(len(heatmap))), fontsize=fontsize-1)
         cbar = plt.colorbar(im, fraction=0.046, pad=0.04)

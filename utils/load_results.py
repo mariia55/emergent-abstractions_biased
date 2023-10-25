@@ -11,12 +11,14 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
 
         train_accs = []
         val_accs = []
+        test_accs = []
         zs_accs_objects = []
         zs_accs_abstraction = []
         zs_specific_test_accs = []
         zs_generic_test_accs = []
         cu_train_accs = []
         cu_val_accs = []
+        cu_test_accs = []
         cu_zs_specific_test_accs = []
         cu_zs_generic_test_accs = []
 
@@ -38,6 +40,7 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
             if len(val_acc) > n_epochs // val_steps:  # old: we had some runs where we set val freq to 5 instead of 10
                 val_acc = val_acc[::2]
             val_accs.append(val_acc)
+            test_accs.append(data['final_test_acc'])
             if zero_shot:
                 for cond in ['specific', 'generic']:
                 # zs_accs_objects.append(data['final_test_acc']) # not sure what's the purpose of this
@@ -75,9 +78,11 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
                 if len(cu_val_acc) > n_epochs // val_steps:  # old: we had some runs where we set val freq to 5 instead of 10
                     cu_val_acc = cu_val_acc[::2]
                 cu_val_accs.append(cu_val_acc)
+                cu_test_accs.append(cu_data['final_test_acc'])
 
         result_dict['train_acc'].append(train_accs)
         result_dict['val_acc'].append(val_accs)
+        result_dict['test_acc'].append(test_accs)
         if zero_shot:
             #result_dict['zs_acc_objects'].append(zs_accs_objects)
             #result_dict['zs_acc_abstraction'].append(zs_accs_abstraction)
@@ -89,6 +94,7 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
         if context_unaware:
             result_dict['cu_train_acc'].append(cu_train_accs)
             result_dict['cu_val_acc'].append(cu_val_accs)
+            result_dict['cu_test_acc'].append(cu_test_accs)
 
     for key in result_dict.keys():
         result_dict[key] = np.array(result_dict[key])
