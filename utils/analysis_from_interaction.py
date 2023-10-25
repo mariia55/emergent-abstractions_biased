@@ -1,6 +1,6 @@
 # copied and adapted from https://github.com/XeniaOhmer/hierarchical_reference_game/blob/master/utils/analysis_from_interaction.py
 
-from egg.core.language_analysis import calc_entropy, _hashable_tensor
+from egg.core.language_analysis import calc_entropy, _hashable_tensor, Disent
 from sklearn.metrics import normalized_mutual_info_score
 from language_analysis_local import MessageLengthHierarchical
 import numpy as np
@@ -112,30 +112,55 @@ def retrieve_context_condition(targets, fixed, distractors):
     return context_conds
 
 
-# def retrieve_context_condition_all_targets(targets, fixed, distractors):
-#     """returns the context condition given a list of targets and a list of distractors (from interaction)"""
-#     context_conds = []
-#     # go through all observations
-#     for i, t_objs in enumerate(targets):
-#         # go through objects
-#         #for j, t_obj in enumerate(t_objs):
-#         # consider first target and first distractor
-#         shared = 0
-#         # go through attributes
-#         for k, attr in enumerate(t_objs[0]):
-#             # if target attribute was fixed:
-#             if fixed[i][k] == 1:
-#                 #shared = np.zeros(len(t_obj))
-#                 # go through distractors
-#                 #for dist_obj in distractors[i]:
-#                 # compare target attribute with distractor attribute
-#                 print(attr, distractors[i][0][k])
-#                 if attr == distractors[i][0][k]:
-#                     # count shared attributes
-#                     shared = shared + 1
-#         #print("target", t_objs[0], "fixed", fixed[i], "distractors", distractors[i][0], "shared", shared)
-#         context_conds.append(shared)  
-#     return context_conds
+def bosdis(interaction, n_dims, n_values, vocab_size):
+    """
+    calculate bag-of-symbol disentanglement for all concept and context conditions
+    """
+    # Get relevant attributes
+    sender_input = interaction.sender_input
+    n_objects = sender_input.shape[1]
+    n_targets = int(n_objects/2)
+
+    # get target objects and fixed vectors to re-construct concepts
+    target_objects = sender_input[:, :n_targets]
+    target_objects = k_hot_to_attributes(target_objects, n_values)
+    # concepts are defined by a list of target objects (here one sampled target object) and a fixed vector
+    (objects, fixed) = retrieve_concepts_sampling(target_objects)
+    # add one such that zero becomes an empty attribute for the calculation (_)
+    objects = objects + 1
+    concepts = torch.from_numpy(objects * (np.array(fixed)))
+
+    # get distractor objects to re-construct context conditions
+    distractor_objects = sender_input[:, n_targets:]
+    distractor_objects = k_hot_to_attributes(distractor_objects, n_values)
+    distractor_objects = distractor_objects + 1
+    context_conds = retrieve_context_condition(objects, fixed, distractor_objects)
+
+    # get messages from interaction
+    messages = interaction.message.argmax(dim=-1)
+
+    # sum of fixed vectors gives the specificity of the concept (all attributes fixed means
+    # specific concept, one attribute fixed means generic concept)
+    # n_relevant_idx stores the indices of the concepts on a specific level of abstraction
+    n_relevant_idx = [np.where(np.sum(np.array(fixed), axis=1) == i)[0] for i in range(1, n_dims + 1)]
+
+    context_cond_idx = [np.where(np.array(context_conds) == i)[0] for i in range(0, n_dims)]
+
+    # Concept-context dependent Entropies:
+    # go through concept conditions
+    conceptxcontext_idx = []
+    for i in range(len(n_relevant_idx)):
+        # go through context conditions
+        for j in range(len(context_cond_idx)):
+            # only keep shared entries for each concept-context condition
+            shared_elements = [elem for elem in n_relevant_idx[i] if elem in context_cond_idx[j]]
+            conceptxcontext_idx.append(shared_elements)
+
+    # Bosdis for each concept and context condition
+    bosdis_concept_x_context = np.array([Disent.bosdis(concepts[concept_x_context], messages[concept_x_context], vocab_size) for concept_x_context in conceptxcontext_idx])  
+
+    return bosdis_concept_x_context  
+            
 
 
 def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
