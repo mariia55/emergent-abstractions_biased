@@ -97,6 +97,8 @@ def plot_heatmap_concept_x_context(result_list,
         score_idx = 1
     elif score == 'consistency':
         score_idx = 2
+    elif score == 'bosdis':
+        pass
     else:
         raise AssertionError("Score should be one of the following: 'NMI','effectiveness', 'consistency'.")
 
@@ -120,10 +122,13 @@ def plot_heatmap_concept_x_context(result_list,
 
         heatmap = np.empty(heatmap_size)
         heatmap[:] = np.nan
-        results = result_list[score_idx][i]
-        if results.shape[-1] > n_runs:
-            results = results[:, :, -1]
-
+        if score == 'bosdis':
+            results = result_list[i]
+        else:
+            results = result_list[score_idx][i]
+            if results.shape[-1] > n_runs:
+                results = results[:, :, -1]
+            
         plt.subplot(plot_dims[0], plot_dims[1], i + 1)
 
         results_ls = [res.tolist() for res in results]
