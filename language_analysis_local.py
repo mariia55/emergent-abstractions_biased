@@ -97,13 +97,17 @@ class MessageLengthHierarchical(Callback):
 
     @staticmethod
     def compute_message_length(messages):
-
         max_len = messages.shape[1]
+        #print(max_len)
         # replace all symbols with zeros from first zero element
         for m_idx, m in enumerate(messages):
             first_zero_index = torch.where(m == 0)[0][0]
+            #print(torch.where(m==0))
+            #print(first_zero_index)
             messages[m_idx, first_zero_index:] = torch.zeros((1, max_len - first_zero_index))
         # calculate message length
+        print(messages)
+        print(torch.sum(messages==0, dim=1))
         message_length = max_len - torch.sum(messages == 0, dim=1)
         return message_length
 

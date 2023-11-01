@@ -331,9 +331,9 @@ def message_length_per_hierarchy_level(interaction, n_attributes):
 
     message = interaction.message.argmax(dim=-1)
     ml = MessageLengthHierarchical.compute_message_length(message)
-    #print("message length", ml)
+    print("message length", ml)
     ml_hierarchical = MessageLengthHierarchical.compute_message_length_hierarchical(message, torch.from_numpy(fixed))
-    #print("hierarchical", ml_hierarchical)
+    print("hierarchical", ml_hierarchical)
     return ml_hierarchical
 
 

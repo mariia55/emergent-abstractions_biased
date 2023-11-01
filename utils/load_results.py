@@ -102,11 +102,13 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
     return result_dict
 
 
-def load_entropies(all_paths, n_runs=5, context_unaware=False):
+def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=0.001):
     """ loads all entropy scores into a dictionary"""
 
     if context_unaware:
         setting = 'context_unaware'
+    elif length_cost == 0.001:
+        setting = 'length_cost_001'
     else:
         setting = 'standard'
 
