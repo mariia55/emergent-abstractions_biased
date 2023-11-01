@@ -16,6 +16,8 @@ import pickle
 
 import dataset
 from archs import Sender, Receiver
+from archs_mu_goodman import Speaker, Listener
+import feature
 import itertools
 
 
@@ -67,6 +69,18 @@ def get_params(params):
                         help="If set to True, then the speakers will be trained context-unaware, i.e. without access to the distractors.")
     parser.add_argument('--max_mess_len', type=int, default=None,
                         help="Allows user to specify a maximum message length. (defaults to the number of attributes in a dataset)")
+    parser.add_argument('--mu_and_goodman', type=bool, default=False,
+                        help="Use for baselining against Mu and Goodman (2021) setting.")
+    parser.add_argument("--speaker_hidden_size", default=1024, type=int,
+                        help="Use for baselining against Mu and Goodman (2021) setting.")
+    parser.add_argument("--listener_hidden_size", default=1024, type=int,
+                        help="Use for baselining against Mu and Goodman (2021) setting.")
+    parser.add_argument("--speaker_n_layers", default=2, type=int,
+                        help="Use for baselining against Mu and Goodman (2021) setting.")
+    parser.add_argument("--listener_n_layers", default=2, type=int,
+                        help="Use for baselining against Mu and Goodman (2021) setting.")
+    parser.add_argument("--embedding_size", default=500, type=int,
+                        help="Use for baselining against Mu and Goodman (2021) setting.")
 
     args = core.init(parser, params)
 
@@ -116,8 +130,24 @@ def train(opts, datasets, verbose_callbacks=False):
     test = torch.utils.data.DataLoader(test, batch_size=opts.batch_size, shuffle=False)
 
     # initialize sender and receiver agents
-    sender = Sender(opts.hidden_size, sum(dimensions), opts.game_size, opts.context_unaware)
-    receiver = Receiver(sum(dimensions), opts.hidden_size)
+    if opts.mu_and_goodman:
+        sender = Speaker(feature.FeatureMLP(
+                input_size=sum(dimensions),
+                output_size=opts.speaker_hidden_size,
+                n_layers=opts.speaker_n_layers,
+            ),
+            nn.Embedding(opts.vocab_size + 3, opts.embedding_size),
+            tau=opts.temperature,
+            hidden_size=opts.speaker_hidden_size)
+        receiver = Listener(feature.FeatureMLP(
+                            input_size=sum(dimensions),
+                            output_size=opts.listener_hidden_size,
+                            n_layers=opts.listener_n_layers,
+                            ),
+                            nn.Embedding(opts.vocab_size + 3, opts.embedding_size))
+    else:
+        sender = Sender(opts.hidden_size, sum(dimensions), opts.game_size, opts.context_unaware)
+        receiver = Receiver(sum(dimensions), opts.hidden_size)
 
     minimum_vocab_size = dimensions[0] + 1  # plus one for 'any'
     vocab_size = minimum_vocab_size * opts.vocab_size_factor + 1  # multiply by factor plus add one for eos-symbol
@@ -131,6 +161,8 @@ def train(opts, datasets, verbose_callbacks=False):
     print("message length", max_len)
 
     # initialize game
+    if opts.mu_and_goodman:
+        opts.hidden_size = opts.speaker_hidden_size
     sender = core.RnnSenderGS(sender,
                               vocab_size,
                               int(opts.hidden_size / 2),
