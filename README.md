@@ -13,7 +13,7 @@ conda activate emergab
 ```
 2. EGG can be installed as a package to be used as a library (see [here](https://github.com/facebookresearch/EGG#installing-egg) for more options):
 ```
-pip install git+ssh://git@github.com/facebookresearch/EGG.git
+pip install git+https://github.com/facebookresearch/EGG.git
 ```
 3. Install packages from the requirements file:
 ```
