@@ -13,11 +13,18 @@ class DataSet(torch.utils.data.Dataset):
 	""" 
 	This class provides the torch.Dataloader-loadable dataset.
 	"""
-	def __init__(self, properties_dim=[3,3,3], game_size=10, device='cuda', testing=False, zero_shot=False, zero_shot_test='generic'):
+	def __init__(self, properties_dim=None, game_size=10, device=None, testing=False, zero_shot=False, zero_shot_test=None):
 		"""
 		properties_dim: vector that defines how many attributes and features per attributes the dataset should contain, defaults to a 3x3x3 dataset
 		game_size: integer that defines how many targets and distractors a game consists of
 		"""
+		if properties_dim is None:
+			properties_dim = [3, 3, 3]
+		if device is None:
+			device =  'cuda'
+		if zero_shot_test is None:
+			zero_shot_test = 'generic'
+		
 		super().__init__()
 		
 		self.properties_dim = properties_dim
