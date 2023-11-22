@@ -382,7 +382,7 @@ class DataSet(torch.utils.data.Dataset):
         else:
             target_objects = random.sample(target_objects, self.game_size)
 
-        # Get all possible distractors for a given concept (for all possible context conditions)
+        # Get all possible distractors for a given concept (for all possible context conditions).
         context = self.get_distractors(concept_idx, context_condition)
         context_sampled = self.sample_distractors(context, context_condition)
 
@@ -390,32 +390,27 @@ class DataSet(torch.utils.data.Dataset):
 
     def get_distractors(self, concept_idx, context_condition):
         """
-        Computes distractors.
+        Computes distractors for concepts with continuous attributes.
         """
         all_target_objects, fixed = self.concepts[concept_idx]
         context = []
-
-        # save fixed attribute indices in a list for later comparisons
-        fixed_attr_indices = []
-        for index, value in enumerate(fixed):
-            if value == 1:
-                fixed_attr_indices.append(index)
-
-        # consider all objects as possible distractors
-        poss_dist = self.all_objects
-
-        for obj in poss_dist:
-            # find out how many attributes are shared between the possible distractor object and the target concept
-            # (by only comparing fixed attributes because only these are relevant for defining the context)
-            shared = sum(
-                1
-                for idx in fixed_attr_indices
-                if obj[idx] == all_target_objects[0][idx]
-            )
-            if shared == context_condition:
+        similarity_threshold = 0.1  # Define how close a distractor's attributes should be to the target's.
+        for obj in self.all_objects:
+            similarity_score = self.compute_similarity(obj, all_target_objects[0], fixed)
+            if similarity_score >= similarity_threshold:
                 context.append(obj)
-
         return context
+
+    def compute_similarity(self, object1, object2, fixed):
+        """
+        Computes a similarity score based on continuous attributes.
+        """
+        score = 0
+        for i, is_fixed in enumerate(fixed):
+            if is_fixed == 1:
+                score += 1 - abs(object1[i] - object2[i]) 
+        # Normalize the score by the number of fixed attributes, if not zero.
+        return score / sum(fixed) if sum(fixed) != 0 else 0  
 
     def sample_distractors(self, context, context_condition):
         """
@@ -494,48 +489,25 @@ class DataSet(torch.utils.data.Dataset):
                 helper_list.append(dist_object)
         return context
 
-    def get_all_concepts(self): #OG
+    def get_all_concepts(self):
         """
-        Returns all possible concepts for a given dataset size.
-        Concepts consist of (objects, fixed) tuples
-                objects: a list with all object-tuples that satisfy the concept
-                fixed: a tuple that denotes how many and which attributes are fixed
-        """
-        fixed_vectors = self.get_fixed_vectors(self.properties_dim)
-        all_objects = self._get_all_possible_objects(self.properties_dim)
-        # create all possible concepts
-        all_fixed_object_pairs = list(itertools.product(all_objects, fixed_vectors))
-
-        concepts = list()
-        # go through all concepts (i.e. fixed, objects pairs)
-        for concept in all_fixed_object_pairs:
-            # treat each fixed_object pair as a target concept once
-            # e.g. target concept (_, _, 0) (i.e. fixed = (0,0,1) and objects e.g. (0,0,0), (1,0,0))
-            fixed = concept[1]
-            # go through all objects and check whether they satisfy the target concept (in this example have 0 as 3rd attribute)
-            target_objects = list()
-            for object in all_objects:
-                if self.satisfies(object, concept):
-                    if object not in target_objects:
-                        target_objects.append(object)
-            # concepts are tuples of fixed attributes and all target objects that satisfy the concept
-            if (target_objects, fixed) not in concepts:
-                concepts.append((target_objects, fixed))
-        return concepts
-
-    def get_all_concepts(self): #NEw
-        """
-        Returns all possible concepts with attributes as ranges for floating-point values.
+        Returns all possible concepts for a given dataset size with continuos attributes.
+        Each concept is represented as a range of values for each attribute. 
         """
         all_objects = self._get_all_possible_objects(self.properties_dim)
-        concepts = list()
-        # Define a range width for concept determination
+        concepts = []
+        # Define the width of the range around the attribute value that is considered part of the concept.
         range_width = 0.1
+        
         for obj in all_objects:
-            # Create a concept where each attribute is a range centered around the object's value
-            concept = [(obj[i] - range_width, obj[i] + range_width) for i in range(len(obj))]
-            concepts.append(concept)
-        return concepts
+            concept = []  # Initialize an empty list to represent a single concept.
+            for i, value in enumerate(obj):  
+                # Create a range around each attribute value.
+                attribute_range = (max(0, value - range_width), min(1, value + range_width))
+                concept.append(attribute_range)  
+            concepts.append(tuple(concept))  # Add the concept as a tuple to the list of concepts.
+        return concepts 
+           
 
     def get_shared_vectors(self, fixed):
         """
