@@ -204,96 +204,6 @@ class DataSet(torch.utils.data.Dataset):
 
         return train, val, test
 
-    def get_zero_shot_datasets(
-        self, split_ratio, test_cond="generic", include_concept=False
-    ):
-        """
-        Note: Generates train, val and test data.
-                Test and training set contain different concepts. There are two possible datasets:
-                1) 'generic': train on more specific concepts, test on most generic concepts
-                2) 'specific': train on more generic concepts, test on most specific concepts
-        :param split_ratio Tuple of ratios (train, val) of the samples should be in the training and validation sets.
-        """
-
-        if sum(split_ratio) != 1:
-            raise ValueError
-
-            # For each category, one attribute will be chosen for zero shot
-            # The attributes will be taken from a random object
-        # zero_shot_object = pd.Series([0 for _ in self.properties_dim])  # self.objects.sample().iloc[0]
-
-        # split ratio applies only to train and validation datasets - size of test dataset depends on available concepts
-        train_ratio, val_ratio = split_ratio
-
-        train_and_val = []
-        test = []
-
-        print("Creating train_ds, val_ds and test_ds...")
-        for concept_idx in tqdm(range(len(self.concepts))):
-            for _ in range(self.game_size):
-                # for each concept, we consider all possible context conditions
-                # i.e. 1 for generic concepts, and up to len(properties_dim) for more specific concepts
-                nr_possible_contexts = sum(self.concepts[concept_idx][1])
-                # print("nr poss cont", nr_possible_contexts)
-                for context_condition in range(nr_possible_contexts):
-                    # 1) 'generic'
-                    if test_cond == "generic":
-                        # test dataset only contains most generic concepts
-                        if nr_possible_contexts == 1:
-                            test.append(
-                                self.get_item(
-                                    concept_idx,
-                                    context_condition,
-                                    self._normalized_encoding,
-                                    include_concept,
-                                )
-                            )
-                        else:
-                            train_and_val.append(
-                                self.get_item(
-                                    concept_idx,
-                                    context_condition,
-                                    self._normalized_encoding,
-                                    include_concept,
-                                )
-                            )
-
-                    # 2) 'specific'
-                    if test_cond == "specific":
-                        # test dataset only contains most specific concepts
-                        if nr_possible_contexts == len(self.properties_dim):
-                            test.append(
-                                self.get_item(
-                                    concept_idx,
-                                    context_condition,
-                                    self._normalized_encoding,
-                                    include_concept,
-                                )
-                            )
-                        else:
-                            train_and_val.append(
-                                self.get_item(
-                                    concept_idx,
-                                    context_condition,
-                                    self._normalized_encoding,
-                                    include_concept,
-                                )
-                            )
-
-                            # Train val split
-        train_samples = int(len(train_and_val) * train_ratio)
-        val_samples = len(train_and_val) - train_samples
-        train, val = torch.utils.data.random_split(
-            train_and_val, [train_samples, val_samples]
-        )
-
-        # Save information about train dataset
-        train.dimensions = self.properties_dim
-        print("Length of train and validation datasets:", len(train), "/", len(val))
-        print("Length of test dataset:", len(test))
-
-        return train, val, test
-
     def get_item(
         self, concept_idx, context_condition, encoding_func, include_concept=False
     ):
@@ -410,7 +320,7 @@ class DataSet(torch.utils.data.Dataset):
             if is_fixed == 1:
                 score += 1 - abs(object1[i] - object2[i]) 
         # Normalize the score by the number of fixed attributes, if not zero.
-        return score / sum(fixed) if sum(fixed) != 0 else 0  
+        return score / sum(fixed) if sum(fixed) != 0 else 0
 
     def sample_distractors(self, context, context_condition):
         """
