@@ -211,7 +211,28 @@ class DataSet(torch.utils.data.Dataset):
 		#return torch.cat([sender_input, sender_label]), receiver_label, receiver_input
 		return sender_input, receiver_label, receiver_input
 
+	def find_image(self, object):
+		# create lists with all possible label values
+		floors = [0.0, 0.1, 0.2, 0.30000000000000004, 0.4, 0.5, 0.6000000000000001, 0.7000000000000001, 0.8, 0.9]
+		walls = [0.0, 0.1, 0.2, 0.30000000000000004, 0.4, 0.5, 0.6000000000000001, 0.7000000000000001, 0.8, 0.9]
+		colors = [0.0, 0.1, 0.2, 0.30000000000000004, 0.4, 0.5, 0.6000000000000001, 0.7000000000000001, 0.8, 0.9]
+		scales = [0.75, 0.8214285714285714, 0.8928571428571428, 0.9642857142857143, 1.0357142857142856, 1.1071428571428572, 1.1785714285714286, 1.25]
+		shapes = [0.0, 1.0, 2.0, 3.0]
+		orientations = [-30.0, -25.714285714285715, -21.42857142857143, -17.142857142857142, -12.857142857142858, -8.571428571428573, -4.285714285714285, 
+						0.0, 4.285714285714285, 8.57142857142857, 12.857142857142854, 17.14285714285714, 21.42857142857143, 25.714285714285715, 30.0]
+		# translate symbolic labels to their real value counterparts
+		object_label = np.asarray([floors[object[0]], walls[object[1]], colors[object[2]],
+				scales[object[3]], shapes[object[4]], orientations[object[5]]])
+		# search the labels for it's index in all labels
 		
+		for idx,label in enumerate(self.labels):
+			if (label == object_label).all():
+				print("this is pbject label: " + str(object_label))
+				print("this is label: " + str(label))
+				# assign corresponding image to label accordingly
+				image = self.images[idx]
+			return (image, label)
+
 	def get_sample(self, concept_idx, context_condition):
 		"""
 		Returns a full sample consisting of a set of target objects (target concept) 
