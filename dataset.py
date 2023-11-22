@@ -6,6 +6,9 @@ import itertools
 import random
 from tqdm import tqdm
 
+import numpy as np
+import h5py
+
 SPLIT = (0.6, 0.2, 0.2)
 SPLIT_ZERO_SHOT = (0.75, 0.25)
 
@@ -23,7 +26,14 @@ class DataSet(torch.utils.data.Dataset):
 		self.properties_dim = properties_dim
 		self.game_size = game_size
 		self.device = device
-		
+
+		if self.properties_dim == [10, 10, 10, 8, 4, 15] or self.properties_dim == [10, 10, 4, 4, 4, 15]:
+			print("Loading 3dshapes dataset...")
+			load_dataset = h5py.File('3dshapes/3dshapes.h5', 'r')
+			self.images = np.asarray(load_dataset['images'])  # array shape [480000,64,64,3], uint8 in range(256)
+			self.labels = np.asarray(load_dataset['labels'])  # array shape [480000,6], float64
+			print("3dshapes loaded successfully")
+
 		# get all concepts
 		self.concepts = self.get_all_concepts()
 		# get all objects
@@ -389,7 +399,8 @@ class DataSet(torch.utils.data.Dataset):
 		# concrete: [(1,1,0), (0,1,1), (1,0,1)]
 		# most concrete: [(1,1,1)]
 		# for variable dataset sizes
-		
+		if properties_dim == [10, 10, 10, 8, 4, 15] or properties_dim == [10, 10, 4, 4, 4, 15]:
+			return [(0, 0, 1, 0, 0, 0), (0, 0, 0, 1, 0, 0), (0, 0, 0, 0, 1, 0), (0, 0, 1, 1, 0, 0), (0, 0, 1, 0, 1, 0), (0, 0, 0, 1, 1, 0), (0, 0, 1, 1, 1, 0)]
 		# range(0,2) because I want [0,1] values for whether an attribute is fixed or not		
 		list_of_dim = [range(0, 2) for dim in properties_dim]
 		fixed_vectors = list(itertools.product(*list_of_dim))
@@ -436,6 +447,36 @@ class DataSet(torch.utils.data.Dataset):
 		"""
 		Returns all possible combinations of attribute-feature values as a dataframe.
 		"""
+		if properties_dim == [10, 10, 10, 8, 4, 15]:
+			# create all possible combinations of relevant attributes
+			incomplete_objects = [range(0,9), range(0,7), range(0,3)]
+			incomplete_objects = list(itertools.product(*incomplete_objects))
+
+			all_objects = list()
+			# add random values for non-relevant attributes in valid values
+			for tuple in incomplete_objects:
+				prepend =   (random.randint(0,9), random.randint(0,9))
+				append =    (random.randint(0,14),)
+				# concatenate random values for non-relevant attributes with all possible combinations of relevant attributes
+				all_objects.append(prepend + tuple + append)
+			return all_objects
+		
+		elif properties_dim == [10, 10, 4, 4, 4, 15]:
+			# define 4 possible values for color, scale and shape
+			possible_colors, possible_scales, possible_shapes = [0,3,5,8], [0,2,5,7], [0,1,2,3]
+			# create all possible combinations of the 12 values
+			incomplete_objects = [(c for c in possible_colors), (sc for sc in possible_scales), (s for s in possible_shapes)]
+			incomplete_objects = list(itertools.product(*incomplete_objects))
+
+			all_objects = list()
+			# add random values for non-relevant attributes in valid range
+			for tuple in incomplete_objects:
+				prepend =   (random.randint(0,9), random.randint(0,9))
+				append =    (random.randint(0,14),)
+				# concatenate random values for non-relevant attributes with all possible combinations of relevant attributes
+				all_objects.append(prepend + tuple + append)
+			return all_objects
+		
 		list_of_dim = [range(0, dim) for dim in properties_dim]
 		# Each object is a row
 		all_objects = list(itertools.product(*list_of_dim))
