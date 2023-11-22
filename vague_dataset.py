@@ -15,19 +15,18 @@ class DataSet(torch.utils.data.Dataset):
     This class provides the torch.Dataloader-loadable dataset.
     """
 
-    def __init__(
-        self,
-        properties_dim=[3, 3, 3],
-        game_size=10,
-        device="cpu",
-        testing=False,
-        zero_shot=False,
-        zero_shot_test="generic",
-    ):
+    def __init__(self, properties_dim=None, game_size=10, device=None, testing=False, zero_shot=False, zero_shot_test=None):
         """
-        properties_dim: vector that defines how many attributes and features per attributes the dataset should contain, defaults to a 3x3x3 dataset
-        game_size: integer that defines how many targets and distractors a game consists of
-        """
+		properties_dim: vector that defines how many attributes and features per attributes the dataset should contain, defaults to a 3x3x3 dataset
+		game_size: integer that defines how many targets and distractors a game consists of
+		"""
+	    if properties_dim is None:
+			properties_dim = [3, 3, 3]
+		if device is None:
+			device =  'cuda'
+		if zero_shot_test is None:
+			zero_shot_test = 'generic'
+
         super().__init__()
 
         self.properties_dim = properties_dim
@@ -298,9 +297,11 @@ class DataSet(torch.utils.data.Dataset):
 
         return [target_objects, fixed], context_sampled
 
-    def get_distractors(self, concept_idx, context_condition):
+    def get_distractors(self, concept_idx):
         """
-        Computes distractors for concepts with continuous attributes.
+        Computes distractors for concepts with continuous attributes. Distractors are based purely on 
+        the similarity score, not on a discrete count of matching attributes like in orginal dataset.
+        Therefore context_condition is not used as an argument 
         """
         all_target_objects, fixed = self.concepts[concept_idx]
         context = []
