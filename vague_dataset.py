@@ -509,7 +509,12 @@ class DataSet(torch.utils.data.Dataset):
         """
         Returns all possible combinations of attribute-feature values as a list of tuples.
         """
-        all_objects = list(itertools.product(*[torch.rand(dim) for dim in properties_dim]))
+        # Create a list of torch tensors, each with randomly sampled values between 0 and 1
+        continuous_dims = [torch.rand(dim) for dim in properties_dim]
+    
+        # Convert each tensor to a list and then create a Cartesian product of these lists
+        all_objects = list(itertools.product(*[dim.tolist() for dim in continuous_dims]))
+    
         return all_objects 
 
     def _normalized_encoding(self, input_list):
