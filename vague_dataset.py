@@ -517,11 +517,15 @@ class DataSet(torch.utils.data.Dataset):
         This function outputs a normalized encoded tensor for a given input list where each element in the input list corresponds to an attribute of an object, 
         and the values are indices within their respective attribute's range. 
         """
-        # Assuming that each attribute value in input_list is a float between 0 and 1
         output = torch.tensor(input_list, device=self.device)
-        #normalizes the vector to have a sum of 1
-        output = output / output.sum()
+        # Add a small epsilon to avoid division by zero
+        output_sum = output.sum().item()
+        if output_sum == 0:
+            output_sum = 1e-10  # small number to avoid division by zero
+        # Normalizes the vector to have a sum of 1
+        output = output / output_sum
         return output
+        
 
 
 def get_distractors_old(self, concept_idx):
