@@ -472,35 +472,23 @@ class DataSet(torch.utils.data.Dataset):
         return fixed_vectors
 
     @staticmethod
-    def get_all_objects_for_a_concept(properties_dim, features, fixed):
+    def get_all_objects_for_a_concept(properties_dim, feature_ranges):
         """
-        Returns all possible objects for a concept at a given level of abstraction
-        features: Defines the features which are fixed
-        fixed: Defines how many and which attributes are fixed
+        Generates all possible objects for a concept given the range of each attribute for a dataset with continuous attributes.
+        
+        properties_dim: A list of the number of divisions or samples within the range for each attribute.
+        feature_ranges: A list of tuples where each tuple consists of (min_value, max_value) for each attribute.
+        
+        Returns a list of concept objects where each object is a tuple of values within the specified ranges.
         """
-        # retrieve all possible objects
-        list_of_dim = [torch.linspace(0, dim - 1, steps=dim) for dim in properties_dim]
-        all_objects = list(itertools.product(*list_of_dim))
-
-        # get concept objects
-        concept_objects = list()
-
-        # account for the case where 0 attributes should be shared in context_condition 0
-        if not 1 in fixed:
-            return all_objects
-
-        # determine the indices of attributes that should be fixed
-        fixed_indices = list(itertools.compress(range(0, len(fixed)), fixed))
-        # find possible concepts for each index
-        possible_concepts = dict()
-        for index in fixed_indices:
-            possible_concepts[index] = [
-                object for object in all_objects if object[index] == features[index]
-            ]
-
-        # keep only those that also match with the other fixed features, i.e. that are possible concepts for all fixed indices
-        all = list(possible_concepts.values())
-        concept_objects = list(set(all[0]).intersection(*all[1:]))
+        all_objects = []
+        
+        # For each attribute's range, generate a set of points.
+        for dim, (min_val, max_val) in zip(properties_dim, feature_ranges):
+            # Assumes an equal distribution of points within the range
+            all_objects.append(torch.linspace(min_val, max_val, steps=dim).tolist())
+            
+        concept_objects = list(itertools.product(*all_objects))
 
         return concept_objects
 
