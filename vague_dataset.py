@@ -268,137 +268,69 @@ class DataSet(torch.utils.data.Dataset):
         # return torch.cat([sender_input, sender_label]), receiver_label, receiver_input
         return sender_input, receiver_label, receiver_input
 
+    def sample_attribute(self, min_value, max_value):
+        """
+        This function samples a random number within the range [min_value, max_value].
+        """
+        sample_attribute = min_value + torch.rand(1) * (max_value - min_value)
+        return sample_attribute
+
+    def sample_target(self, concept_ranges):
+        """ This function samples a target object based on ranges for each attribute.
+        It iterates over each range, calling 'sample_attribute' for each.
+        'r' is a tuple representing the range for one attribute, with 'r[0]' being the lower bound and 'r[1]' the upper bound.
+        """
+        sample_target = [self.sample_attribute(r[0], r[1]).item() for r in concept_ranges]
+        return sample_target
+
+    def sample_distractor(concept_ranges, context='fine', overlap=0.1):
+        """
+        This function generates a distractor object based on the context condition and desired overlap.
+        """
+        distractor = []
+        for r in concept_ranges:
+            if context == 'fine':
+                # Ensure some overlap with the target range for a 'fine' context.
+                min_value = max(0, r[0] - overlap)
+                max_value = min(1, r[1] + overlap)
+            else:
+                # Ensure no overlap (separation) for a 'coarse' context.
+                if torch.rand(1).item() > 0.5:
+                    # Choose to separate below or above the target range randomly.
+                    min_value = max(0, r[0] - 1)
+                    max_value = r[0] - overlap
+                else:
+                    min_value = r[1] + overlap
+                    max_value = min(1, r[1] + 1)
+            # Sample a value within the calculated bounds for the distractor.
+            distractor.append(self.sample_attribute(min_value, max_value).item())
+        return distractor
+    
     def get_sample(self, concept_idx, context_condition):
         """
         Returns a full sample consisting of a set of target objects (target concept)
         and a set of distractor objects (context) for a given concept condition.
         """
-        all_target_objects, fixed = self.concepts[concept_idx]
-        # Define the range within which an object's attribute value can vary to be considered a target
-        range_threshold = 0.1  # This threshold can be adjusted as needed
+        # Get the concept range for the current concept index
+        concept_ranges = self.concepts[concept_idx]
 
-        # Sample target objects within the specified range threshold
-        target_objects = [
-            obj for obj in all_target_objects if all(
-                abs(obj[i] - all_target_objects[0][i]) < range_threshold
-                for i, fix in enumerate(fixed) if fix == 1
-            )
-        ]
+        # Sample a target object using the concept ranges
+        target_object = self.sample_target(concept_ranges)
 
-        # If the number of target objects is less than the game size, sample with replacement
-        if len(target_objects) < self.game_size:
-            target_objects = random.choices(target_objects, k=self.game_size)
-        else:
-            target_objects = random.sample(target_objects, self.game_size)
+        # Initialize an empty list to hold the distractors
+        distractors = []
 
-        # Get all possible distractors for a given concept (for all possible context conditions).
-        context = self.get_distractors(concept_idx, context_condition)
-        context_sampled = self.sample_distractors(context, context_condition)
+        # Define the number of distractors you want to generate
+        num_distractors = self.game_size - 1
 
-        return [target_objects, fixed], context_sampled
+        # Generate the required number of distractor objects
+        for _ in range(num_distractors):
+            distractor = self.sample_distractor(concept_ranges, context=context_condition)
+            distractors.append(distractor)
 
-    def get_distractors(self, concept_idx):
-        """
-        Computes distractors for concepts with continuous attributes. Distractors are based purely on 
-        the similarity score, not on a discrete count of matching attributes like in orginal dataset.
-        Therefore context_condition is not used as an argument 
-        """
-        all_target_objects, fixed = self.concepts[concept_idx]
-        context = []
-        similarity_threshold = 0.1  # Define how close a distractor's attributes should be to the target's.
-        for obj in self.all_objects:
-            similarity_score = self.compute_similarity(obj, all_target_objects[0], fixed)
-            if similarity_score >= similarity_threshold:
-                context.append(obj)
-        return context
+        # Return the target object and the list of distractor objects
+        return target_object, distractors
 
-    def compute_similarity(self, object1, object2, fixed):
-        """
-        Computes a similarity score based on continuous attributes.
-        """
-        score = 0
-        for i, is_fixed in enumerate(fixed):
-            if is_fixed == 1:
-                score += 1 - abs(object1[i] - object2[i]) 
-        # Normalize the score by the number of fixed attributes, if not zero.
-        return score / sum(fixed) if sum(fixed) != 0 else 0
-
-    def sample_distractors(self, context, context_condition):
-        """
-        Function for sampling the distractors from a specified context condition.
-        """
-        # sample distractor objects for given game size and the specified context condition
-        # distractors = [dist_obj for dist_objs in context for dist_obj in dist_objs]
-        context_new = []
-        try:
-            context_new.append(
-                [random.sample(context, self.game_size), context_condition]
-            )
-        except ValueError:
-            context_new.append(
-                [random.choices(context, k=self.game_size), context_condition]
-            )
-        return context_new
-
-    def sample_distractors_old(self, distractors, fixed):
-        """
-        Function for sampling the distractors from all possible context conditions.
-        """
-        # sample distractor objects for given game size and each context condition (constrained by level of abstraction)
-        context = list()
-        context_candidates = list()
-        for i in range(sum(fixed)):
-            for dist_objects, context_condition in distractors:
-                # check for context condition
-                # sum(context_condition) gives the number of shared attributes
-                if sum(context_condition) == i:
-                    for dist_object in dist_objects:
-                        context_candidates.append([dist_object, i])
-        helper_i = 0
-        helper_list = list()
-        # for i in range(len(self.properties_dim)):
-        for i, (dist_object, context_condition) in enumerate(context_candidates):
-            if helper_i == context_condition:
-                # gather all objects belonging to the same context condition
-                helper_list.append(dist_object)
-                # final index: should be sampled
-                if i == len(context_candidates) - 1:
-                    try:
-                        context.append(
-                            [random.sample(helper_list, self.game_size), helper_i]
-                        )
-                    except ValueError:
-                        context.append(
-                            [random.choices(helper_list, k=self.game_size), helper_i]
-                        )
-            # catch the final context condition as well
-            elif context_condition == len(self.properties_dim) - 1:
-                try:
-                    context.append(
-                        [random.sample(helper_list, self.game_size), helper_i]
-                    )
-                except ValueError:
-                    context.append(
-                        [random.choices(helper_list, k=self.game_size), helper_i]
-                    )
-                helper_i = helper_i + 1
-                helper_list = list()
-                helper_list.append(dist_object)
-            # when moving to the next context condition, first sample from the old
-            else:
-                # sample from all objects belonging to the same context condition
-                try:
-                    context.append(
-                        [random.sample(helper_list, self.game_size), helper_i]
-                    )
-                except ValueError:
-                    context.append(
-                        [random.choices(helper_list, k=self.game_size), helper_i]
-                    )
-                helper_i = helper_i + 1
-                helper_list = list()
-                helper_list.append(dist_object)
-        return context
 
     def get_all_concepts(self):
         """
@@ -453,25 +385,6 @@ class DataSet(torch.utils.data.Dataset):
         return True
 
     @staticmethod
-    def get_fixed_vectors(properties_dim):
-        """
-        Returns all possible fixed vectors for a given dataset size.
-        Fixed vectors are vectors of length len(properties_dim), where 1 denotes that an attribute is fixed, 0 that it isn't.
-        The more attributes are fixed, the more specific the concept -- the less attributes fixed, the more generic the concept.
-        """
-        # what I want to get: [(1,0,0), (0,1,0), (0,0,1)] for most generic
-        # concrete: [(1,1,0), (0,1,1), (1,0,1)]
-        # most concrete: [(1,1,1)]
-        # for variable dataset sizes
-
-        # range(0,2) because I want [0,1] values for whether an attribute is fixed or not
-        list_of_dim = [range(0, 2) for dim in properties_dim]
-        fixed_vectors = list(itertools.product(*list_of_dim))
-        # remove first element (0,..,0) as one attribute always has to be fixed
-        fixed_vectors.pop(0)
-        return fixed_vectors
-
-    @staticmethod
     def get_all_objects_for_a_concept(properties_dim, feature_ranges):
         """
         Generates all possible objects for a concept given the range of each attribute for a dataset with continuous attributes.
@@ -518,17 +431,6 @@ class DataSet(torch.utils.data.Dataset):
         # Normalizes the vector to have a sum of 1
         output = output / output_sum
         return output
-        
-
-
-def get_distractors_old(self, concept_idx):
-    """
-    Returns all possible distractor objects for each context based on a given target concept.
-    return (context, distractor_objects) tuples
-    """
-
-    target_objects, fixed = self.concepts[concept_idx]
-    fixed = list(fixed)
 
     def change_one_attribute(input_object, fixed):
         """
