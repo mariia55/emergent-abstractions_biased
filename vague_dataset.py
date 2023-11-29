@@ -414,32 +414,34 @@ class DataSet(torch.utils.data.Dataset):
         output = output / output_sum
         return output
     
-    def create_game_instance(target_objects, all_objects, similarity_threshold):
+    def create_game_instance(self, target_object, all_objects, context_condition):
         game_instance = {
-            "target": target_objects,
+            "target": target_object,
             "distractors": []
         }
-        for target in target_objects:
-            # Sample distractors based on the current context defined by similarity_threshold
-            similar, dissimilar = self.sample_distractors(target, all_objects, similarity_threshold)
-            # Choose whether to add a similar or dissimilar distractor for this round
-            if np.random.rand() < 0.5:  # Randomly choosing the type of context for this instance
-                game_instance["distractors"].append(np.random.choice(similar))
-            else:
-                game_instance["distractors"].append(np.random.choice(dissimilar))
-        
+
+        # Generate the required number of distractor objects
+        for _ in range(self.game_size - 1):
+            distractor = self.sample_distractor(all_objects, context=context_condition)
+            game_instance["distractors"].append(distractor)
+
         return game_instance
     
-    def create_game_instances(num_instances, context_condition, properties_dim):
+    def create_game_instances(self, num_instances, context_condition):
         game_instances = []
+
         for _ in range(num_instances):
-            # Generate target concepts based on the context condition
-            targets = self.sample_targets(context_condition, properties_dim)
-            # Generate distractors based on the context condition
-            distractors = self.sample_distractors(context_condition, properties_dim)
-            # Combine targets and distractors to create a game instance
-            game_instance = self.create_game_instance(targets, distractors)
+            # Sample a concept for the target
+            concept_idx = np.random.randint(len(self.concepts))
+            concept_ranges = self.concepts[concept_idx][1]
+
+            # Sample a target object using the concept ranges
+            target_object = self.sample_target(concept_ranges)
+
+            # Generate a game instance
+            game_instance = self.create_game_instance(target_object, self.all_objects, context_condition)
             game_instances.append(game_instance)
+
         return game_instances
 
     def change_one_attribute(input_object, fixed):
