@@ -46,6 +46,7 @@ class DataSet(torch.utils.data.Dataset):
                 split_ratio=SPLIT_ZERO_SHOT, test_cond=zero_shot_test
             )
 
+
     def __len__(self):
         """Returns the total amount of samples in dataset."""
         return len(self.dataset)
@@ -331,58 +332,39 @@ class DataSet(torch.utils.data.Dataset):
         # Return the target object and the list of distractor objects
         return target_object, distractors
 
-
+           
     def get_all_concepts(self):
         """
-        Returns all possible concepts for a given dataset size with continuos attributes.
-        Each concept is represented as a range of values for each attribute. 
+        Returns all possible concepts for a given dataset size with continuous attributes.
+        Each concept is represented as a range of values for each attribute.
         """
         all_objects = self._get_all_possible_objects(self.properties_dim)
         concepts = []
+
         # Define the width of the range around the attribute value that is considered part of the concept.
         range_width = 0.1
         
+        # Generate concepts
         for obj in all_objects:
-            concept = []  # Initialize an empty list to represent a single concept.
-            for i, value in enumerate(obj):  
-                # Create a range around each attribute value.
-                attribute_range = (max(0, value - range_width), min(1, value + range_width))
-                concept.append(attribute_range)  
-            concepts.append(tuple(concept))  # Add the concept as a tuple to the list of concepts.
-        return concepts 
-           
+            concept_range = [(max(0, value - range_width), min(1, value + range_width)) for value in obj]
+            
+            # Find objects that fit into this concept
+            concept_objects = [o for o in all_objects if self.satisfies(o, concept_range)]
+            
+            # Add concept (range and objects that fit into it) to the concepts list
+            if concept_objects:
+                concepts.append((concept_objects, concept_range))
 
-    def get_shared_vectors(self, fixed):
-        """
-        Returns fixed vectors for all possible context conditions based on a concept (i.e. the fixed vector).
-        These are called "shared_vectors" because the number and position of attributes which are shared with the
-        target concept define the context condition. The more fixed attributes are shared, the finer the context.
-        """
-        shared_vectors = []
-        for i, attribute in enumerate(fixed):
-            shared = list(itertools.repeat(0, len(fixed)))
-            if attribute == 1:
-                shared[i] = 1
-                shared_vectors.append(shared)
-        return shared_vectors
+        return concepts
     
     @staticmethod
-    def satisfies(object, concept, threshold=0.1):
+    def satisfies(object_attributes, concept_ranges):
         """
-        Checks whether an object satisfies a target concept, returns a boolean value.
-        Concept consists of an object vector and a fixed vector tuple.
-        A threshold is used to determine if a float attribute value matches.
+        Checks if an object fits within the concept ranges.
+        It returns True if all attributes ('attr') of the object fall within the corresponding ranges ('r').
         """
-        concept_object, fixed = concept
-        # Iterate through each attribute to check if it's fixed and within the threshold of the concept.
-        for i, attr in enumerate(fixed):
-            if attr == 1: #if attribute is fixed
-                # Compare the object's attribute with the concept's
-                if not (abs(object[i] - concept_object[i]) < threshold):
-                    # If the attribute is not within the threshold, return False
-                    return False
-        #If the loop completes without returning False, all fixed attributes are within the threshold
-        return True
+        return all(r[0] <= attr <= r[1] for attr, r in zip(object_attributes, concept_ranges))
+
 
     @staticmethod
     def get_all_objects_for_a_concept(properties_dim, feature_ranges):
@@ -431,6 +413,34 @@ class DataSet(torch.utils.data.Dataset):
         # Normalizes the vector to have a sum of 1
         output = output / output_sum
         return output
+    
+    def create_game_instance(target_objects, all_objects, similarity_threshold):
+        game_instance = {
+            "target": target_objects,
+            "distractors": []
+        }
+        for target in target_objects:
+            # Sample distractors based on the current context defined by similarity_threshold
+            similar, dissimilar = self.sample_distractors(target, all_objects, similarity_threshold)
+            # Choose whether to add a similar or dissimilar distractor for this round
+            if np.random.rand() < 0.5:  # Randomly choosing the type of context for this instance
+                game_instance["distractors"].append(np.random.choice(similar))
+            else:
+                game_instance["distractors"].append(np.random.choice(dissimilar))
+        
+        return game_instance
+    
+    def create_game_instances(num_instances, context_condition, properties_dim):
+        game_instances = []
+        for _ in range(num_instances):
+            # Generate target concepts based on the context condition
+            targets = self.sample_targets(context_condition, properties_dim)
+            # Generate distractors based on the context condition
+            distractors = self.sample_distractors(context_condition, properties_dim)
+            # Combine targets and distractors to create a game instance
+            game_instance = self.create_game_instance(targets, distractors)
+            game_instances.append(game_instance)
+        return game_instances
 
     def change_one_attribute(input_object, fixed):
         """
