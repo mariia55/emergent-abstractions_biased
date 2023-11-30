@@ -57,44 +57,34 @@ class DataSet(torch.utils.data.Dataset):
 
     def get_datasets(self, split_ratio, include_concept=False):
         """
-        Creates the train, validation and test datasets based on the number of possible concepts.
+        Creates the train, validation, and test datasets based on the number of possible concepts.
         """
         if sum(split_ratio) != 1:
-            raise ValueError
+            raise ValueError("Split ratio must sum up to 1.")
 
-        train_ratio, val_ratio, test_ratio = split_ratio
+        train_ratio, val_ratio, _ = split_ratio
 
-        # Shuffle sender indices
+        # Shuffle concept indices
         concept_indices = torch.randperm(len(self.concepts)).tolist()
-        # Split is based on how many distinct concepts there are (regardless context conditions)
+        # Split based on how many distinct concepts there are
         ratio = int(len(self.concepts) * (train_ratio + val_ratio))
 
         train_and_val = []
         print("Creating train_ds and val_ds...")
         for concept_idx in tqdm(concept_indices[:ratio]):
             for _ in range(self.game_size):
-                # for each concept, we consider all possible context conditions
-                # i.e. 1 for generic concepts, and up to len(properties_dim) for more specific concepts
+                # Consider all possible context conditions for each concept
                 nr_possible_contexts = sum(self.concepts[concept_idx][1])
                 for context_condition in range(nr_possible_contexts):
-                    train_and_val.append(
-                        self.get_item(
-                            concept_idx,
-                            context_condition,
-                            self._normalized_encoding,
-                            include_concept,
-                        )
-                    )
+                    item = self.get_item(concept_idx, context_condition, self._normalized_encoding, include_concept)
+                    train_and_val.append(item)
 
-        # Calculating how many train
-        train_samples = int(
-            len(train_and_val) * (train_ratio / (train_ratio + val_ratio))
-        )
+        # Calculate the number of samples for training and validation
+        train_samples = int(len(train_and_val) * train_ratio / (train_ratio + val_ratio))
         val_samples = len(train_and_val) - train_samples
-        train, val = torch.utils.data.random_split(
-            train_and_val, [train_samples, val_samples]
-        )
-        # Save information about train dataset
+        train, val = torch.utils.data.random_split(train_and_val, [train_samples, val_samples])
+
+        # Information about the train dataset
         train.dimensions = self.properties_dim
 
         test = []
@@ -103,22 +93,14 @@ class DataSet(torch.utils.data.Dataset):
             for _ in range(self.game_size):
                 nr_possible_contexts = sum(self.concepts[concept_idx][1])
                 for context_condition in range(nr_possible_contexts):
-                    test.append(
-                        self.get_item(
-                            concept_idx,
-                            context_condition,
-                            self._normalized_encoding,
-                            include_concept,
-                        )
-                    )
+                    item = self.get_item(concept_idx, context_condition, self._normalized_encoding, include_concept)
+                    test.append(item)
 
         return train, val, test
 
-    def get_zero_shot_datasets(
-        self, split_ratio, test_cond="generic", include_concept=False
-    ):
+    def get_zero_shot_datasets(self, split_ratio, test_cond='generic', include_concept=False):
         """
-        Note: Generates train, val and test data.
+        Note: Generates train, val, and test data.
             Test and training set contain different concepts. There are two possible datasets:
             1) 'generic': train on more specific concepts, test on most generic concepts
             2) 'specific': train on more generic concepts, test on most specific concepts
@@ -126,13 +108,8 @@ class DataSet(torch.utils.data.Dataset):
         """
 
         if sum(split_ratio) != 1:
-            raise ValueError
+            raise ValueError("Split ratio must sum up to 1.")
 
-            # For each category, one attribute will be chosen for zero shot
-            # The attributes will be taken from a random object
-            # zero_shot_object = pd.Series([0 for _ in self.properties_dim])  # self.objects.sample().iloc[0]
-
-            # split ratio applies only to train and validation datasets - size of test dataset depends on available concepts
         train_ratio, val_ratio = split_ratio
 
         train_and_val = []
@@ -141,132 +118,75 @@ class DataSet(torch.utils.data.Dataset):
         print("Creating train_ds, val_ds and test_ds...")
         for concept_idx in tqdm(range(len(self.concepts))):
             for _ in range(self.game_size):
-                # for each concept, we consider all possible context conditions
-                # i.e. 1 for generic concepts, and up to len(properties_dim) for more specific concepts
                 nr_possible_contexts = sum(self.concepts[concept_idx][1])
-                # print("nr poss cont", nr_possible_contexts)
                 for context_condition in range(nr_possible_contexts):
-                    # 1) 'generic'
-                    if test_cond == "generic":
-                        # test dataset only contains most generic concepts
-                        if nr_possible_contexts == 1:
-                            test.append(
-                                self.get_item(
-                                    concept_idx,
-                                    context_condition,
-                                    self._normalized_encoding,
-                                    include_concept,
-                                )
-                            )
+                    # For 'generic' test condition
+                    if test_cond == 'generic':
+                        if nr_possible_contexts == 1:  # Most generic concepts
+                            item = self.get_item(concept_idx, context_condition, self._normalized_encoding, include_concept)
+                            test.append(item)
                         else:
-                            train_and_val.append(
-                                self.get_item(
-                                    concept_idx,
-                                    context_condition,
-                                    self._normalized_encoding,
-                                    include_concept,
-                                )
-                            )
+                            item = self.get_item(concept_idx, context_condition, self._normalized_encoding, include_concept)
+                            train_and_val.append(item)
 
-                            # 2) 'specific'
-                    if test_cond == "specific":
-                        # test dataset only contains most specific concepts
-                        if nr_possible_contexts == len(self.properties_dim):
-                            test.append(
-                                self.get_item(
-                                    concept_idx,
-                                    context_condition,
-                                    self._normalized_encoding,
-                                    include_concept,
-                                )
-                            )
+                    # For 'specific' test condition
+                    if test_cond == 'specific':
+                        if nr_possible_contexts == len(self.properties_dim):  # Most specific concepts
+                            item = self.get_item(concept_idx, context_condition, self._normalized_encoding, include_concept)
+                            test.append(item)
                         else:
-                            train_and_val.append(
-                                self.get_item(
-                                    concept_idx,
-                                    context_condition,
-                                    self._normalized_encoding,
-                                    include_concept,
-                                )
-                            )
+                            item = self.get_item(concept_idx, context_condition, self._normalized_encoding, include_concept)
+                            train_and_val.append(item)
 
-                            # Train val split
+        # Splitting train and validation datasets
         train_samples = int(len(train_and_val) * train_ratio)
         val_samples = len(train_and_val) - train_samples
-        train, val = torch.utils.data.random_split(
-            train_and_val, [train_samples, val_samples]
-        )
+        train, val = torch.utils.data.random_split(train_and_val, [train_samples, val_samples])
 
-        # Save information about train dataset
+        # Information about the train dataset
         train.dimensions = self.properties_dim
         print("Length of train and validation datasets:", len(train), "/", len(val))
         print("Length of test dataset:", len(test))
 
         return train, val, test
 
-    def get_item(
-        self, concept_idx, context_condition, encoding_func, include_concept=False
-    ):
+    def get_item(self, concept_idx, context_condition, encoding_func, include_concept=False):
         """
         Receives concept-context pairs and an encoding function.
         Returns encoded (sender_input, labels, receiver_input).
-                sender_input: (sender_input_objects, sender_labels)
-                labels: indices of target objects in the receiver_input
-                receiver_input: receiver_input_objects
-        The sender_input_objects and the receiver_input_objects are different objects sampled from the same concept
+            sender_input: (sender_input_objects, sender_labels)
+            labels: indices of target objects in the receiver_input
+            receiver_input: receiver_input_objects
+        The sender_input_objects and the receiver_input_objects are different objects sampled from the same concept 
         and context condition.
         """
-        # use get_sample() to get sampled target and distractor objects
+        # Use get_sample() to get sampled target and distractor objects 
         # The concrete sampled objects can differ between sender and receiver.
-        sender_concept, sender_context = self.get_sample(concept_idx, context_condition)
-        receiver_concept, receiver_context = self.get_sample(
-            concept_idx, context_condition
-        )
-        # TODO: change such that sender input also includes fixed vectors (i.e. full concepts) and fixed vectors are only
-        # ignored in the sender architecture
-        # NOTE: also do this for context conditions?
-        # initalize sender and receiver input with target objects only
-        if include_concept == True:
-            raise NotImplementedError
+        sender_target, sender_distractors = self.get_sample(concept_idx, context_condition)
+        receiver_target, receiver_distractors = self.get_sample(concept_idx, context_condition)
 
-        # subset such that only target objects are presented to sender and receiver
-        sender_targets = sender_concept[0]
-        receiver_targets = receiver_concept[0]
-        sender_input = [obj for obj in sender_targets]
-        receiver_input = [obj for obj in receiver_targets]
-        # append context objects
-        # get context of relevant context condition
-        for distractor_objects, context_cond in sender_context:
-            if context_cond == context_condition:
-                # add distractor objects for the sender
-                for obj in distractor_objects:
-                    sender_input.append(obj)
-        for distractor_objects, context_cond in receiver_context:
-            if context_cond == context_condition:
-                # add distractor objects for the receiver
-                for obj in distractor_objects:
-                    receiver_input.append(obj)
-        # sender input does not need to be shuffled - that way I don't need labels either
-        # random.shuffle(sender_input)
-        # sender_label = [idx for idx, obj in enumerate(sender_input) if obj in sender_targets]
-        # sender_label = torch.Tensor(sender_label).to(torch.int64)
-        # sender_label = F.one_hot(sender_label, num_classes=self.game_size*2).sum(dim=0).float()
-        # shuffle receiver input and create (many-hot encoded) label
+        # Initialize sender and receiver input with target objects only
+        sender_input = [sender_target]
+        receiver_input = [receiver_target]
+
+        # Append context objects (distractors) based on the context condition
+        sender_input.extend(sender_distractors)
+        receiver_input.extend(receiver_distractors)
+
+        # Shuffle receiver input and create labels
         random.shuffle(receiver_input)
-        receiver_label = [
-            idx for idx, obj in enumerate(receiver_input) if obj in receiver_targets
-        ]
-        receiver_label = (
-            torch.Tensor(receiver_label).to(torch.int64).to(device=self.device)
-        )
-        receiver_label = (
-            F.one_hot(receiver_label, num_classes=self.game_size * 2).sum(dim=0).float()
-        )
-        # ENCODE and return as TENSOR
-        sender_input = torch.stack([encoding_func(elem) for elem in sender_input])
-        receiver_input = torch.stack([encoding_func(elem) for elem in receiver_input])
-        # output needs to have the structure sender_input, labels, receiver_input
-        # return torch.cat([sender_input, sender_label]), receiver_label, receiver_input
+        receiver_label = [idx for idx, obj in enumerate(receiver_input) if obj == receiver_target]
+        # note alternative: receiver_label = [1 if obj == receiver_target else 0 for obj in receiver_input] 
+
+        # Convert receiver labels to tensor and apply one-hot encoding
+        receiver_label = torch.Tensor(receiver_label).to(torch.int64).to(device=self.device)
+        receiver_label = F.one_hot(receiver_label, num_classes=self.game_size*2).sum(dim=0).float()
+
+        # Encode and return as tensor
+        sender_input = torch.stack([encoding_func(obj) for obj in sender_input])
+        receiver_input = torch.stack([encoding_func(obj) for obj in receiver_input])
+
+        # Output needs to have the structure sender_input, labels, receiver_input
         return sender_input, receiver_label, receiver_input
 
     def sample_attribute(self, min_value, max_value):
@@ -414,36 +334,6 @@ class DataSet(torch.utils.data.Dataset):
         output = output / output_sum
         return output
     
-    def create_game_instance(self, target_object, all_objects, context_condition):
-        game_instance = {
-            "target": target_object,
-            "distractors": []
-        }
-
-        # Generate the required number of distractor objects
-        for _ in range(self.game_size - 1):
-            distractor = self.sample_distractor(all_objects, context=context_condition)
-            game_instance["distractors"].append(distractor)
-
-        return game_instance
-    
-    def create_game_instances(self, num_instances, context_condition):
-        game_instances = []
-
-        for _ in range(num_instances):
-            # Sample a concept for the target
-            concept_idx = np.random.randint(len(self.concepts))
-            concept_ranges = self.concepts[concept_idx][1]
-
-            # Sample a target object using the concept ranges
-            target_object = self.sample_target(concept_ranges)
-
-            # Generate a game instance
-            game_instance = self.create_game_instance(target_object, self.all_objects, context_condition)
-            game_instances.append(game_instance)
-
-        return game_instances
-
     def change_one_attribute(input_object, fixed):
         """
         Returns a concept where one attribute is changed.
