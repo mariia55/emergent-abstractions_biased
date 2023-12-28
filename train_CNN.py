@@ -1,4 +1,4 @@
-from resnet import resnet20, resnet32, resnet44, resnet56, resnet110
+from vis_module import vision_module
 import img_dataset
 import torch
 import torchmetrics
@@ -13,23 +13,26 @@ test_loader = torch.utils.data.DataLoader(data,
                                           shuffle = False,
                                           pin_memory = True)
 
-network = resnet20()
+network = vision_module(batch_size=32, num_classes=6)
 
 criterion = torch.nn.CrossEntropyLoss()
 
 lr = 0.001
 
 
-optimizer = torch.optim.Adam(network.parameter(),
+optimizer = torch.optim.Adam(network.parameters(),
                              lr = 0.001,
                              weight_decay = 0.0001)
 
 def train(train_loader, network, criterion, optimizer, epochs):
+    print("why did we start?!")
+    losses = []
+    accuracies = []
     network.train()
     
     for epoch in range(epochs):
-        losses = []
-        accuracies = []
+        print("starting epoch ", epoch+1)
+        
         for i, (input, target) in enumerate(train_loader):
             output = network(input)
 
@@ -42,3 +45,6 @@ def train(train_loader, network, criterion, optimizer, epochs):
             accuracy = torchmetrics.Accuracy(task="multiclass", num_classes=6)
             accuracy(output, target)
             accuracies.append(accuracy)
+            losses.append(loss)
+
+train(train_loader, network, criterion, optimizer, epochs = 5)
