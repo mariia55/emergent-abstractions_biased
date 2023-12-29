@@ -1,5 +1,3 @@
-import numpy as np
-import torchvision
 from torch.utils.data import Dataset
 import h5py
 
@@ -17,7 +15,11 @@ class shapes3d(Dataset):
     
     def __getitem__(self, index):
         img = self.images[index]
+        img.shape = (3,64,64)
         label = self.labels[index]
         if self.transform:
             img = self.transform(img)
         return (img, label)
+    
+    def one_hot_labels(self, index):
+        label = self.labels[index]

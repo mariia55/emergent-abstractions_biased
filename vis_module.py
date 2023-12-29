@@ -6,28 +6,34 @@ class vision_module(nn.Module):
     def __init__(self, batch_size, num_classes):
         super(vision_module, self).__init__()
         # init all layers
-        self.conv1 = nn.Conv2d(in_channels = 64, out_channels = 32, kernel_size = 3)
-        self.conv2 = nn.Conv2d(in_channels = 32, out_channels = 32, kernel_size = 3)
+        self.conv1 = nn.Conv2d(in_channels = 3, out_channels = 16, kernel_size = 3)
+        self.pool = nn.MaxPool2d(kernel_size = 2, stride = 2)
+        self.conv2 = nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 3)
 
-        self.dense1 = nn.Linear(in_features = 32, out_features = 16)
-        self.dense2 = nn.Linear(in_features = 16, out_features = 16)
+        self.dense1 = nn.Linear(in_features = 32*29*29, out_features = 64)
+        self.dense2 = nn.Linear(in_features = 64, out_features = 16)
 
         self.classification = nn.Linear(in_features = 16, out_features = num_classes)
-        self.softmax = nn.Softmax(dim=0)
+        #self.softmax = nn.Softmax(dim=0)
     
     def forward(self, x):
-        #print("this is x: ", x)
-        #print("this is it's type : ", type(x))
         x = x.float()
-        print("this is it's shape: ", x.shape)
+        #print("initial shape: ", x.shape)
         out = F.relu(self.conv1(x))
-        print("that fixed it?!")
+        #print("after conv1 shape: ", out.shape)
+        out = self.pool(out)
+        #print("after pool1 shape: ", out.shape)
         out = F.relu(self.conv2(out))
+        #print("after conv2 shape: ", out.shape)
 
+        out = out.view(-1, 32*29*29)
         out = F.relu(self.dense1(out))
-        out = F.relu(self.dense1(out))
+        #print("after dense1 shape: ", out.shape)
+        out = F.relu(self.dense2(out))
+        #print("after dense2: ", out.shape)
 
         out = self.classification(out)
-        out = self.softmax(out)
+        #print("after classification shape: ", out.shape)
+        #out = self.softmax(out)
 
         return out
