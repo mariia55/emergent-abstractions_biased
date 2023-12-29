@@ -39,7 +39,7 @@ lr = 0.001
 weight_decay = 0.0001
 
 # use adam as optimizer (maybe try SGD?)
-optimizer = torch.optim.Adam(vis_module.parameters(),
+optimizer = torch.optim.SGD(vis_module.parameters(),
                              lr = lr,
                              weight_decay = weight_decay)
 
@@ -71,11 +71,11 @@ def train(train_loader, network, criterion, optimizer, epochs):
 
             # compute accuracy for 1 epoch
             accuracy = MultilabelAccuracy(num_labels=6, average = 'micro', multidim_average = 'global')
-            acc = accuracy(output, target)
+            #acc = accuracy(output, target)
 
-            # add accuracy and loss for each epoch
-            accuracies.append(acc)
-            losses.append(loss)
+        # add accuracy and loss for each epoch
+        #accuracies.append(acc)
+        losses.append(loss)
     
     # return averages of lists here?
     return losses, accuracies
@@ -99,17 +99,20 @@ def test(test_loader, network, criterion):
 
             # compute accuracy
             accuracy = MultilabelAccuracy(num_labels=6, average = 'micro', multidim_average = 'global')
-            acc = accuracy(output, target)
+            #acc = accuracy(output, target)
 
-            # add accuracy and loss
-            accuracies.append(acc)
-            losses.append(loss)
+    # add accuracy and loss
+    #accuracies.append(acc)
+    losses.append(loss)
     
     return losses, accuracies
               
-train_losses, train_accuracies = train(train_loader, vis_module, criterion, optimizer, epochs = 5)
+train_losses, train_accuracies = train(train_loader, vis_module, criterion, optimizer, epochs = 3)
 
 test_losses, test_accuracies = test(test_loader, vis_module, criterion)
 
-print('these are the losses: ', train_losses)
-print('these are the accuracies: ', train_accuracies)
+print('these are the train losses: ', train_losses)
+print('these are the train accuracies: ', train_accuracies)
+
+print('these are the test losses: ', test_losses)
+print('these are the test accuracies: ', test_accuracies)
