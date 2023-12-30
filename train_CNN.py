@@ -2,7 +2,7 @@ from vis_module import vision_module
 import img_dataset
 import torch
 from tqdm import tqdm
-from torchmetrics.classification import MultilabelAccuracy
+from torchmetrics.classification import MulticlassAccuracy
 
 dataset = img_dataset.shapes3d(path_to_dataset = '3dshapes/3dshapes.h5', transform = None)
 # does not work because numpy arrays are too large?
@@ -54,6 +54,8 @@ def train(train_loader, network, criterion, optimizer, epochs):
     # train for given nr of epochs
     for epoch in range(epochs):
         print("starting epoch ", epoch+1)
+        temp_losses = []
+        temp_accs = []
         
         for i, (input, target) in tqdm(enumerate(train_loader)):
             if torch.cuda.is_available():
@@ -70,14 +72,16 @@ def train(train_loader, network, criterion, optimizer, epochs):
             optimizer.step()
 
             # compute accuracy for 1 epoch
-            accuracy = MultilabelAccuracy(num_labels=6, average = 'micro', multidim_average = 'global')
-            #acc = accuracy(output, target)
+            accuracy = MulticlassAccuracy(num_classes=10*10*10*8*4*15, average = 'micro', top_k = 1, multidim_average = 'global')
+            acc = accuracy(output, target)
+
+            temp_losses.append(loss)
+            temp_accs.append(acc)
 
         # add accuracy and loss for each epoch
-        #accuracies.append(acc)
-        losses.append(loss)
+        accuracies.append(sum(temp_accs)/len(temp_accs))
+        losses.append(sum(temp_losses)/len(temp_losses))
     
-    # return averages of lists here?
     return losses, accuracies
 
 def test(test_loader, network, criterion):    
@@ -89,6 +93,8 @@ def test(test_loader, network, criterion):
 
     with torch.no_grad():
          print('starting test run')
+         temp_losses = []
+         temp_accs = []
          for i, (input, target) in tqdm(enumerate(test_loader)):
             if torch.cuda.is_available():
                 input.cuda()
@@ -97,17 +103,20 @@ def test(test_loader, network, criterion):
             output = network(input)
             loss = criterion(output, target)
 
-            # compute accuracy
-            accuracy = MultilabelAccuracy(num_labels=6, average = 'micro', multidim_average = 'global')
-            #acc = accuracy(output, target)
+            # compute accuracy  10*10*10*8*4*15
+            accuracy = MulticlassAccuracy(num_classes=10*10*10*8*4*15, average = 'micro', top_k = 1, multidim_average = 'global')
+            acc = accuracy(output, target)
+
+            temp_losses.append(loss.float)
+            temp_accs.append(acc.float)
 
     # add accuracy and loss
-    #accuracies.append(acc)
-    losses.append(loss)
+    accuracies.append(sum(temp_accs)/len(temp_accs))
+    losses.append(sum(temp_losses)/len(temp_losses))
     
     return losses, accuracies
               
-train_losses, train_accuracies = train(train_loader, vis_module, criterion, optimizer, epochs = 3)
+train_losses, train_accuracies = train(train_loader, vis_module, criterion, optimizer, epochs = 5)
 
 test_losses, test_accuracies = test(test_loader, vis_module, criterion)
 
