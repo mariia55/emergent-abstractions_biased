@@ -29,9 +29,10 @@ class Concept:
         for fixed_tuple_intger, concept_tensor, other_concept_tensor in zip(
             self.fixed_tuple, self.concept_object, other_concept_object
         ):
-            
             if fixed_tuple_intger == 1:
-                if not torch.equal(concept_tensor, other_concept_tensor):  #todo: check which equality check is really needed here
+                if not torch.equal(
+                    concept_tensor, other_concept_tensor
+                ):  # todo: check which equality check is really needed here
                     return False
                 same_counter += 1
 
@@ -450,7 +451,7 @@ class FloatDataSet(torch.utils.data.Dataset):
             target_objects = list()
             for obj in all_objects:
                 concept = Concept(concept_object=object, fixed_tuple=fixed_vector)
-                if concept.fits_other_concept_object(other_concept_object=obj)
+                if concept.fits_other_concept_object(other_concept_object=obj):
                     if obj not in target_objects:
                         target_objects.append(obj)
             # concepts are tuples of fixed attributes and all target objects that satisfy the concept
