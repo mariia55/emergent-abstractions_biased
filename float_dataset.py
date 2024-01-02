@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Tuple
+from typing import List, Tuple
 import torch
 import torch.nn.functional as F
 import itertools
@@ -8,6 +8,22 @@ from tqdm import tqdm
 
 SPLIT = (0.6, 0.2, 0.2)
 SPLIT_ZERO_SHOT = (0.75, 0.25)
+
+
+def generate_all_non_zero_binary_vectors(length: int) -> List[Tuple[int, ...]]:
+    """
+    Generates all possible binary vectors of a given length, excluding the all-zero vector.
+
+    :param length: The length of the binary vectors.
+    :return: A list of tuples, each representing a binary vector.
+    """
+    # Generate all combinations of 0s and 1s for vectors of the given length
+    all_vectors = list(itertools.product([0, 1], repeat=length))
+
+    # Remove the all-zero vector
+    all_vectors.remove((0,) * length)
+
+    return all_vectors
 
 
 @dataclass(frozen=True)
@@ -443,22 +459,22 @@ class FloatDataSet(torch.utils.data.Dataset):
         # create all possible concepts
         all_fixed_object_pairs = list(itertools.product(all_objects, fixed_vectors))
 
-        concepts = list()
+        concepts_list = list()
         # go through all concepts (i.e. fixed, objects pairs)
         for object, fixed_vector in all_fixed_object_pairs:
             # treat each fixed_object pair as a target concept once
             # e.g. target concept (_, _, 0) (i.e. fixed = (0,0,1) and objects e.g. (0,0,0), (1,0,0))
             # go through all objects and check whether they satisfy the target concept (in this example have 0 as 3rd attribute)
-            target_objects = list()
+            target_objects = set()
             for obj in all_objects:
                 concept = Concept(concept_object=object, fixed_tuple=fixed_vector)
                 if concept.fits_other_concept_object(other_concept_object=obj):
-                    if obj not in target_objects:
-                        target_objects.append(obj)
+                    target_objects.add(obj)
             # concepts are tuples of fixed attributes and all target objects that satisfy the concept
-            if (target_objects, fixed_vector) not in concepts:
-                concepts.append((target_objects, fixed_vector))
-        return concepts
+            target_objects = list(target_objects)
+            if (target_objects, fixed_vector) not in concepts_list:
+                concepts_list.append((target_objects, fixed_vector))
+        return concepts_list
 
     def get_shared_vectors(self, fixed):
         """
@@ -474,8 +490,7 @@ class FloatDataSet(torch.utils.data.Dataset):
                 shared_vectors.append(shared)
         return shared_vectors
 
-    @staticmethod
-    def get_fixed_vectors(properties_dim):
+    def get_fixed_vectors(self):
         """
         Returns all possible fixed vectors for a given dataset size.
         Fixed vectors are vectors of length len(properties_dim), where 1 denotes that an attribute is fixed, 0 that it isn't.
@@ -485,13 +500,8 @@ class FloatDataSet(torch.utils.data.Dataset):
         # concrete: [(1,1,0), (0,1,1), (1,0,1)]
         # most concrete: [(1,1,1)]
         # for variable dataset sizes
-
-        # range(0,2) because I want [0,1] values for whether an attribute is fixed or not
-        list_of_dim = [range(0, 2) for dim in properties_dim]
-        fixed_vectors = list(itertools.product(*list_of_dim))
-        # remove first element (0,..,0) as one attribute always has to be fixed
-        fixed_vectors.pop(0)
-        return fixed_vectors
+        vector_length = len(self.properties_dim)
+        return generate_all_non_zero_binary_vectors(length=vector_length)
 
     @staticmethod
     def get_all_objects_for_a_concept(properties_dim, features, fixed):
