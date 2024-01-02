@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Tuple
 import torch
 import torch.nn.functional as F
@@ -7,6 +8,32 @@ from tqdm import tqdm
 
 SPLIT = (0.6, 0.2, 0.2)
 SPLIT_ZERO_SHOT = (0.75, 0.25)
+
+
+@dataclass(frozen=True)
+class Concept:
+    """Representation of a Concept."""
+
+    concept_object: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+    fixed_tuple: Tuple[int, int, int]
+
+    def fits_other_concept_object(
+        self, other_concept_object: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+    ) -> bool:
+        if not 1 in self.fixed_tuple:
+            return False
+
+        same_counter = 0
+
+        for fixed_tuple_intger, concept_tensor, other_concept_tensor in zip(
+            self.fixed_tuple, self.concept_object, other_concept_object
+        ):
+            if fixed_tuple_intger == 1 and concept_tensor == other_concept_tensor:
+                same_counter += 1
+
+        if same_counter == sum(self.fixed_tuple):
+            return True
+        return False
 
 
 class FloatDataSet(torch.utils.data.Dataset):
@@ -420,7 +447,8 @@ class FloatDataSet(torch.utils.data.Dataset):
             # go through all objects and check whether they satisfy the target concept (in this example have 0 as 3rd attribute)
             target_objects = list()
             for obj in all_objects:
-                if self.satisfies(obj, (object, fixed_vector)):
+                concept = Concept(concept_object=object, fixed_tuple=fixed_vector)
+                if self.satisfies(object=obj, concept=concept):
                     if obj not in target_objects:
                         target_objects.append(obj)
             # concepts are tuples of fixed attributes and all target objects that satisfy the concept
@@ -445,32 +473,13 @@ class FloatDataSet(torch.utils.data.Dataset):
     @staticmethod
     def satisfies(
         object: Tuple[torch.Tensor, torch.Tensor, torch.Tensor],
-        concept: Tuple[
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor], Tuple[int, int, int]
-        ],
+        concept: Concept,
     ) -> bool:
         """
         Checks whether an object satisfies a target concept, returns a boolean value.
         Concept consists of an object vector and a fixed vector tuple.
         """
-        same_counter = 0
-        concept_object: Tuple[
-            torch.Tensor, torch.Tensor, torch.Tensor
-        ]  # each of these tensors are just a scalar value (e.g. tensor(0.1000))
-        fixed_tuple: Tuple[int, int, int]
-        concept_object, fixed_tuple = concept  # fixed_tuple = (0, 0, 1)
-        # an object satisfies a concept if fixed attributes are the same
-        # go through attributes an check whether they are fixed
-        for index, integer_attribute in enumerate(fixed_tuple):
-            # if an attribute is fixed
-            if integer_attribute == 1:
-                # compare object with concept object
-                if object[index] == concept_object[index]:
-                    same_counter = same_counter + 1
-        # the number of shared attributes should match the number of fixed attributes
-        if same_counter == sum(fixed_tuple):
-            return True
-        return False
+        return concept.fits_other_concept_object(other_concept_object=object)
 
     @staticmethod
     def get_fixed_vectors(properties_dim):
