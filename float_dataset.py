@@ -16,7 +16,6 @@ class Concept:
 
     concept_object: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
     fixed_tuple: Tuple[int, int, int]
-    required_matches = sum(fixed_tuple)
 
     def fits_other_concept_object(
         self, other_concept_object: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
@@ -26,6 +25,7 @@ class Concept:
             return False
 
         same_counter = 0
+        required_matches = sum(self.fixed_tuple)
 
         for fixed_tuple_intger, concept_tensor, other_concept_tensor in zip(
             self.fixed_tuple, self.concept_object, other_concept_object
@@ -37,7 +37,7 @@ class Concept:
                     return False
                 same_counter += 1
 
-        return same_counter == self.required_matches
+        return same_counter == required_matches
 
 
 class FloatDataSet(torch.utils.data.Dataset):
