@@ -454,7 +454,7 @@ class FloatDataSet(torch.utils.data.Dataset):
                 objects: a list with all object-tuples that satisfy the concept
                 fixed: a tuple that denotes how many and which attributes are fixed
         """
-        fixed_vectors = self.get_fixed_vectors(self.properties_dim)
+        fixed_vectors = self.get_fixed_vectors()
         all_objects = self._get_all_possible_objects(self.properties_dim)
         # create all possible concepts
         all_fixed_object_pairs = list(itertools.product(all_objects, fixed_vectors))
