@@ -489,7 +489,7 @@ class FloatDataSet(torch.utils.data.Dataset):
         fixed: Defines how many and which attributes are fixed
         """
         # Generate all possible combinations of attribute-feature values as float lists
-        list_of_dim = [torch.linspace(0, 1, dim) for dim in properties_dim]
+        list_of_dim = [torch.linspace(0.1, 0.9, dim) for dim in properties_dim]
         all_objects = list(itertools.product(*list_of_dim))
 
         # Filter objects based on fixed attributes and features
@@ -516,7 +516,7 @@ class FloatDataSet(torch.utils.data.Dataset):
         Returns all possible combinations of attribute-feature values as a list of lists.
         """
         list_of_dim = [
-            torch.linspace(0, 1, dim) for dim in properties_dim
+            torch.linspace(0.1, 0.9, dim) for dim in properties_dim
         ]  # Generate float values between 0 and 1
         # Generate all possible combinations of floats for each dimension
         all_objects = list(itertools.product(*list_of_dim))
