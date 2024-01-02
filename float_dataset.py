@@ -1,3 +1,4 @@
+from typing import Tuple
 import torch
 import torch.nn.functional as F
 import itertools
@@ -26,6 +27,8 @@ class FloatDataSet(torch.utils.data.Dataset):
         properties_dim: vector that defines how many attributes and features per attributes the dataset should contain, defaults to a 3x3x3 dataset
         game_size: integer that defines how many targets and distractors a game consists of
         """
+
+        # Set default values if None was passed
         if properties_dim is None:
             properties_dim = [3, 3, 3]
         if device is None:
@@ -411,19 +414,18 @@ class FloatDataSet(torch.utils.data.Dataset):
 
         concepts = list()
         # go through all concepts (i.e. fixed, objects pairs)
-        for concept in all_fixed_object_pairs:
+        for object, fixed_vector in all_fixed_object_pairs:
             # treat each fixed_object pair as a target concept once
             # e.g. target concept (_, _, 0) (i.e. fixed = (0,0,1) and objects e.g. (0,0,0), (1,0,0))
-            fixed = concept[1]
             # go through all objects and check whether they satisfy the target concept (in this example have 0 as 3rd attribute)
             target_objects = list()
             for obj in all_objects:
-                if self.satisfies(obj, concept):
+                if self.satisfies(obj, (object, fixed_vector)):
                     if obj not in target_objects:
                         target_objects.append(obj)
             # concepts are tuples of fixed attributes and all target objects that satisfy the concept
-            if (target_objects, fixed) not in concepts:
-                concepts.append((target_objects, fixed))
+            if (target_objects, fixed_vector) not in concepts:
+                concepts.append((target_objects, fixed_vector))
         return concepts
 
     def get_shared_vectors(self, fixed):
@@ -441,26 +443,34 @@ class FloatDataSet(torch.utils.data.Dataset):
         return shared_vectors
 
     @staticmethod
-    def satisfies(object, concept):
+    def satisfies(
+        object: Tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        concept: Tuple[
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor], Tuple[int, int, int]
+        ],
+    ) -> bool:
         """
         Checks whether an object satisfies a target concept, returns a boolean value.
         Concept consists of an object vector and a fixed vector tuple.
         """
-        satisfied = False
         same_counter = 0
-        concept_object, fixed = concept
+        concept_object: Tuple[
+            torch.Tensor, torch.Tensor, torch.Tensor
+        ]  # each of these tensors are just a scalar value (e.g. tensor(0.1000))
+        fixed_tuple: Tuple[int, int, int]
+        concept_object, fixed_tuple = concept  # fixed_tuple = (0, 0, 1)
         # an object satisfies a concept if fixed attributes are the same
         # go through attributes an check whether they are fixed
-        for i, attr in enumerate(fixed):
+        for index, integer_attribute in enumerate(fixed_tuple):
             # if an attribute is fixed
-            if attr == 1:
+            if integer_attribute == 1:
                 # compare object with concept object
-                if object[i] == concept_object[i]:
+                if object[index] == concept_object[index]:
                     same_counter = same_counter + 1
         # the number of shared attributes should match the number of fixed attributes
-        if same_counter == sum(fixed):
-            satisfied = True
-        return satisfied
+        if same_counter == sum(fixed_tuple):
+            return True
+        return False
 
     @staticmethod
     def get_fixed_vectors(properties_dim):
