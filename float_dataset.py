@@ -24,16 +24,18 @@ class Concept:
             return False
 
         same_counter = 0
+        required_matches = sum(self.fixed_tuple)
 
         for fixed_tuple_intger, concept_tensor, other_concept_tensor in zip(
             self.fixed_tuple, self.concept_object, other_concept_object
         ):
-            if fixed_tuple_intger == 1 and concept_tensor == other_concept_tensor:
+            
+            if fixed_tuple_intger == 1:
+                if not torch.equal(concept_tensor, other_concept_tensor):  #todo: check which equality check is really needed here
+                    return False
                 same_counter += 1
 
-        if same_counter == sum(self.fixed_tuple):
-            return True
-        return False
+        return same_counter == required_matches
 
 
 class FloatDataSet(torch.utils.data.Dataset):
