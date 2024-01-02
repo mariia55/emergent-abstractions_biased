@@ -14,12 +14,12 @@ test_size = len(dataset) - train_size
 train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
 
 # init both dataloaders with corresponding datasets
-train_loader = torch.utils.data.DataLoader(train_dataset,
+train_loader = torch.utils.data.DataLoader(dataset,
                                            batch_size = 32, 
                                            shuffle = True,
                                            pin_memory = True)
 
-test_loader = torch.utils.data.DataLoader(test_dataset,
+test_loader = torch.utils.data.DataLoader(dataset,
                                           batch_size = 32, 
                                           shuffle = False,
                                           pin_memory = True)
@@ -35,7 +35,7 @@ if torch.cuda.is_available():
 criterion = torch.nn.CrossEntropyLoss()
 
 # define hyperparameters
-lr = 0.001
+lr = 0.01
 weight_decay = 0.0001
 
 # use adam as optimizer (maybe try SGD?)
@@ -44,10 +44,12 @@ optimizer = torch.optim.SGD(vis_module.parameters(),
                              weight_decay = weight_decay)
 
 # defined training loop
-def train(train_loader, network, criterion, optimizer, epochs):
+def train(train_loader, network, criterion, optimizer, epochs, test_loader):
     # save losses and accuracies as lists
     losses = []
     accuracies = []
+    test_losses = []
+    test_accuracies = []
 
     network.train()
     
@@ -65,6 +67,7 @@ def train(train_loader, network, criterion, optimizer, epochs):
             # compute network prediction and use it for loss
             output = network(input)
             loss = criterion(output, target)
+            temp_losses.append(loss.float())
 
             # optimization step
             optimizer.zero_grad()
@@ -75,19 +78,27 @@ def train(train_loader, network, criterion, optimizer, epochs):
             accuracy = MulticlassAccuracy(num_classes=10*10*10*8*4*15, average = 'micro', top_k = 1, multidim_average = 'global')
             acc = accuracy(output, target)
 
-            temp_losses.append(loss)
-            temp_accs.append(acc)
+            # loss = loss.float()
+            # acc = acc.float()
+            
+            temp_accs.append(acc.float())
 
         # add accuracy and loss for each epoch
         accuracies.append(sum(temp_accs)/len(temp_accs))
         losses.append(sum(temp_losses)/len(temp_losses))
+        print("Epoch ", epoch+1, " had training loss: ", losses[-1], " and training accuracy: ", accuracies[-1])
+
+        if epoch+1 % 2 == 0:
+            test_loss, test_acc = test(test_loader, network, criterion)
+            test_losses.append(test_loss)
+            test_accuracies.append(test_acc)
     
-    return losses, accuracies
+    return losses, accuracies, test_losses, test_accuracies
 
 def test(test_loader, network, criterion):    
     # save losses and accuracies as lists
-    losses = []
-    accuracies = []
+    # losses = []
+    # accuracies = []
 
     network.eval()
 
@@ -107,18 +118,21 @@ def test(test_loader, network, criterion):
             accuracy = MulticlassAccuracy(num_classes=10*10*10*8*4*15, average = 'micro', top_k = 1, multidim_average = 'global')
             acc = accuracy(output, target)
 
-            temp_losses.append(loss.float)
-            temp_accs.append(acc.float)
+            temp_losses.append(loss.float())
+            temp_accs.append(acc.float())
 
     # add accuracy and loss
-    accuracies.append(sum(temp_accs)/len(temp_accs))
-    losses.append(sum(temp_losses)/len(temp_losses))
+    # accuracies.append(sum(temp_accs)/len(temp_accs))
+    # losses.append(sum(temp_losses)/len(temp_losses))
+    loss = sum(temp_losses)/len(temp_losses)
+    acc = sum(temp_accs)/len(temp_accs)
+    print("test loss was: ", loss, "and test accuracy was: ", acc)
     
-    return losses, accuracies
+    return loss, acc
               
-train_losses, train_accuracies = train(train_loader, vis_module, criterion, optimizer, epochs = 5)
+train_losses, train_accuracies, test_losses, test_accuracies = train(train_loader, vis_module, criterion, optimizer, epochs = 3, test_loader=test_loader)
 
-test_losses, test_accuracies = test(test_loader, vis_module, criterion)
+#test_losses, test_accuracies = test(test_loader, vis_module, criterion)
 
 print('these are the train losses: ', train_losses)
 print('these are the train accuracies: ', train_accuracies)
