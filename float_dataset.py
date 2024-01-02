@@ -448,7 +448,7 @@ class FloatDataSet(torch.utils.data.Dataset):
             target_objects = list()
             for obj in all_objects:
                 concept = Concept(concept_object=object, fixed_tuple=fixed_vector)
-                if self.satisfies(object=obj, concept=concept):
+                if concept.fits_other_concept_object(other_concept_object=obj)
                     if obj not in target_objects:
                         target_objects.append(obj)
             # concepts are tuples of fixed attributes and all target objects that satisfy the concept
@@ -469,17 +469,6 @@ class FloatDataSet(torch.utils.data.Dataset):
                 shared[i] = 1.0
                 shared_vectors.append(shared)
         return shared_vectors
-
-    @staticmethod
-    def satisfies(
-        object: Tuple[torch.Tensor, torch.Tensor, torch.Tensor],
-        concept: Concept,
-    ) -> bool:
-        """
-        Checks whether an object satisfies a target concept, returns a boolean value.
-        Concept consists of an object vector and a fixed vector tuple.
-        """
-        return concept.fits_other_concept_object(other_concept_object=object)
 
     @staticmethod
     def get_fixed_vectors(properties_dim):
