@@ -20,7 +20,7 @@ class Concept:
     def fits_other_concept_object(
         self, other_concept_object: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
     ) -> bool:
-        if not 1 in self.fixed_tuple:
+        if 1 not in self.fixed_tuple:
             return False
 
         same_counter = 0
