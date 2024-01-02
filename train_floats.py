@@ -22,6 +22,8 @@ from archs_mu_goodman import Speaker, Listener
 import feature
 import itertools
 
+from pathlib import Path
+
 
 SPLIT = (0.6, 0.2, 0.2)
 SPLIT_ZERO_SHOT = (0.75, 0.25)
@@ -40,8 +42,8 @@ def get_params(params):
         "This makes sense if running several runs with the exact same dataset.",
     )
     parser.add_argument("--dimensions", nargs="+", type=int, default=[3, 3, 3])
-    parser.add_argument("--attributes", type=int, default=3)
-    parser.add_argument("--values", type=int, default=4)
+    parser.add_argument("--attributes", type=float, default=3)
+    parser.add_argument("--values", type=float, default=4)
     parser.add_argument("--game_size", type=int, default=10)
     parser.add_argument(
         "--vocab_size_factor",
@@ -309,6 +311,7 @@ def train(opts, datasets, verbose_callbacks=False):
         ),
         core.TemperatureUpdater(agent=sender, decay=opts.temp_update, minimum=0.5),
     ]
+    print(f"saving results to {opts.save_path=}")
     if opts.save:
         callbacks.extend(
             [
@@ -367,7 +370,13 @@ def main(params):
     """
     opts = get_params(params)
 
-    # NOTE: I checked and the default device seems to be cuda
+    print(f"{params=}")
+    print(f"{opts=}")
+    vanessas_path = Path(
+        r"C:\Users\rvver\Documents\CodeThesis\emergent-abstractions\results"
+    )
+
+    # Nnt(OTE: I checked and the default device seems to be cuda
     # Otherwise there is an option in a later pytorch version (don't know about compatibility with egg):
     # torch.set_default_device(opts.device)
 
@@ -405,7 +414,7 @@ def main(params):
         data_set = torch.load(opts.path + "data/" + opts.load_dataset)
         print("data loaded from: " + "data/" + opts.load_dataset)
         if not opts.zero_shot:
-            # create subfolder if necessary
+            print("we're in 1")  # create subfolder if necessary
             opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
             if not os.path.exists(opts.save_path) and opts.save:
                 os.makedirs(opts.save_path)
@@ -413,11 +422,16 @@ def main(params):
     for _ in range(opts.num_of_runs):
         # otherwise generate data set (new for each run for the small datasets)
         if not opts.load_dataset and not opts.zero_shot:
+            print("we're in 2")
             data_set = float_dataset.FloatDataSet(
                 opts.dimensions, game_size=opts.game_size, device=opts.device
             )
             # create subfolder if necessary
             opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
+            opts.save_path = os.path.join(
+                str(vanessas_path), folder_name, opts.game_setting
+            )
+            print(f"results should be saved to {opts.save_path}")
             if not os.path.exists(opts.save_path) and opts.save:
                 os.makedirs(opts.save_path)
 
@@ -425,7 +439,7 @@ def main(params):
         if opts.zero_shot:
             # either the zero-shot test condition is given (with pre-generated dataset)
             if opts.zero_shot_test is not None:
-                # create subfolder if necessary
+                print("we're in 3")  # create subfolder if necessary
                 opts.save_path = os.path.join(
                     opts.path,
                     folder_name,
@@ -443,10 +457,12 @@ def main(params):
                         zero_shot=True,
                         zero_shot_test=opts.zero_shot_test,
                     )
+                print("we're in 4")
             # or both test conditions are generated
             else:
                 # implement two zero-shot conditions: test on most generic vs. test on most specific dataset
                 for cond in ["generic", "specific"]:
+                    print("we're in 5")
                     print("Zero-shot condition:", cond)
                     # create subfolder if necessary
                     opts.save_path = os.path.join(
