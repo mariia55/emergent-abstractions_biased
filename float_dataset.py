@@ -22,7 +22,6 @@ def generate_all_non_zero_binary_vectors(length: int) -> List[Tuple[int, ...]]:
 
     # Remove the all-zero vector
     all_vectors.remove((0,) * length)
-    print(all_vectors)
 
     return all_vectors
 
@@ -456,7 +455,7 @@ class FloatDataSet(torch.utils.data.Dataset):
                 fixed: a tuple that denotes how many and which attributes are fixed
         """
         fixed_vectors = self.get_fixed_vectors()
-        all_objects = self._get_all_possible_objects(self.properties_dim)
+        all_objects = self._get_all_possible_objects()
         # create all possible concepts
         all_fixed_object_pairs = list(itertools.product(all_objects, fixed_vectors))
 
@@ -533,13 +532,12 @@ class FloatDataSet(torch.utils.data.Dataset):
 
         return concept_objects
 
-    @staticmethod
-    def _get_all_possible_objects(properties_dim):
+    def _get_all_possible_objects(self):
         """
         Returns all possible combinations of attribute-feature values as a list of lists.
         """
         list_of_dim = [
-            torch.linspace(0.1, 0.9, dim) for dim in properties_dim
+            range(0, dim) for dim in self.properties_dim
         ]  # Generate float values between 0 and 1
         # Generate all possible combinations of floats for each dimension
         all_objects = list(itertools.product(*list_of_dim))
