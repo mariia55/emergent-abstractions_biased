@@ -22,6 +22,7 @@ def generate_all_non_zero_binary_vectors(length: int) -> List[Tuple[int, ...]]:
 
     # Remove the all-zero vector
     all_vectors.remove((0,) * length)
+    print(all_vectors)
 
     return all_vectors
 
