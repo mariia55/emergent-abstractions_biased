@@ -2,7 +2,7 @@
 Feature processing backbones
 """
 
-
+import torch
 import torch.nn as nn
 import math
 
@@ -38,8 +38,11 @@ class FeatureMLP(nn.Module):
         self.output_size = output_size
         self.final_feat_dim = self.output_size
 
-    def forward(self, x):
-        return self.trunk(x)
+    def forward(self, x, threshold=0.09):
+        output = self.trunk(x)
+        # apply threshold
+        activated_output = torch.where(output > threshold, 1.0, 0.0)
+        return activated_output
 
     def reset_parameters(self):
         reset_sequential(self.trunk)
