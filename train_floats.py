@@ -2,6 +2,7 @@
 # and https://github.com/jayelm/emergent-generalization/blob/master/code/train.py
 
 import argparse
+import pickle
 import torch
 
 # print(torch.__version__)
@@ -14,7 +15,6 @@ from egg.core.language_analysis import TopographicSimilarity
 # copy language_analysis_local from hierarchical_reference_game
 from language_analysis_local import *
 import os
-import pickle
 
 import float_dataset
 from archs import Sender, Receiver
