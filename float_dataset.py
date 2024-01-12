@@ -47,9 +47,7 @@ class Concept:
             self.fixed_tuple, self.concept_object, other_concept_object
         ):
             if fixed_tuple_intger == 1:
-                if not torch.equal(
-                    concept_tensor, other_concept_tensor
-                ):  # todo: check which equality check is really needed here
+                if concept_tensor == other_concept_tensor:
                     return False
                 same_counter += 1
 
@@ -92,7 +90,7 @@ class FloatDataSet(torch.utils.data.Dataset):
         # get all concepts
         self.concepts = self.get_all_concepts()
         # get all objects
-        self.all_objects = self._get_all_possible_objects(properties_dim)
+        self.all_objects = self._get_all_possible_objects()
 
         # generate dataset
         if not testing and not zero_shot:
@@ -136,7 +134,7 @@ class FloatDataSet(torch.utils.data.Dataset):
                         self.get_item(
                             concept_idx,
                             context_condition,
-                            self._many_hot_encoding,
+                            self._float_range_encoding,
                             include_concept,
                         )
                     )
@@ -162,7 +160,7 @@ class FloatDataSet(torch.utils.data.Dataset):
                         self.get_item(
                             concept_idx,
                             context_condition,
-                            self._many_hot_encoding,
+                            self._float_range_encoding,
                             include_concept,
                         )
                     )
@@ -209,7 +207,7 @@ class FloatDataSet(torch.utils.data.Dataset):
                                 self.get_item(
                                     concept_idx,
                                     context_condition,
-                                    self._many_hot_encoding,
+                                    self._float_range_encoding,
                                     include_concept,
                                 )
                             )
@@ -218,7 +216,7 @@ class FloatDataSet(torch.utils.data.Dataset):
                                 self.get_item(
                                     concept_idx,
                                     context_condition,
-                                    self._many_hot_encoding,
+                                    self._float_range_encoding,
                                     include_concept,
                                 )
                             )
@@ -231,7 +229,7 @@ class FloatDataSet(torch.utils.data.Dataset):
                                 self.get_item(
                                     concept_idx,
                                     context_condition,
-                                    self._many_hot_encoding,
+                                    self._float_range_encoding,
                                     include_concept,
                                 )
                             )
@@ -240,7 +238,7 @@ class FloatDataSet(torch.utils.data.Dataset):
                                 self.get_item(
                                     concept_idx,
                                     context_condition,
-                                    self._many_hot_encoding,
+                                    self._float_range_encoding,
                                     include_concept,
                                 )
                             )
@@ -540,7 +538,9 @@ class FloatDataSet(torch.utils.data.Dataset):
             range(0, dim) for dim in self.properties_dim
         ]  # Generate float values between 0 and 1
         # Generate all possible combinations of floats for each dimension
-        all_objects = list(itertools.product(*list_of_dim))
+        all_objects = list(
+            itertools.product(*list_of_dim)
+        )  # todo: here, the all-zeros vector is not excluded, why? (in get_fixed_vectors it is excluded)
         return all_objects
 
     def _many_hot_encoding(self, input_list):
@@ -556,6 +556,31 @@ class FloatDataSet(torch.utils.data.Dataset):
             # Ensure the scaled value is within the valid range
             scaled_value = max(0, min(dim - 1, scaled_value))
             output[start + scaled_value] = 1
+            start += dim
+
+        return output
+
+    def _float_range_encoding(self, input_list, float_range=(0.1, 0.9)):
+        """
+        Outputs a vector where each attribute is represented by a random float from a specified range.
+        """
+        output = torch.zeros([sum(self.properties_dim)]).to(device=self.device)
+        start = 0
+        float_range_difference = float_range[1] - float_range[0]
+
+        for elem, dim in zip(input_list, self.properties_dim):
+            # Determines the range segment for the current attribute
+            segment_range = (float_range_difference) / dim
+            # Calculates the specific range for the current value
+            value_range_start = float_range[0] + elem * segment_range
+            value_range_end = value_range_start + segment_range
+
+            selected_float = random.uniform(value_range_start, value_range_end)
+
+            # Places the selected float in the corresponding position in the output vector
+            output[start : start + dim] = torch.tensor(
+                [selected_float if i == int(elem) else 0 for i in range(dim)]
+            )
             start += dim
 
         return output
