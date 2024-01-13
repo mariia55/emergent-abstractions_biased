@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 
-# Provided data (replace with your actual data)
 epochs = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 train_loss = [
     0.6936,
