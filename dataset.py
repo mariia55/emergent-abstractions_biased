@@ -152,64 +152,6 @@ class DataSet(torch.utils.data.Dataset):
 		return train, val, test
 
 
-	def get_zero_shot_datasets(self, split_ratio, test_cond='generic', include_concept=False):
-		"""
-        Note: Generates train, val and test data. 
-		Test and training set contain different concepts. There are two possible datasets:
-		1) 'generic': train on more specific concepts, test on most generic concepts
-		2) 'specific': train on more generic concepts, test on most specific concepts
-        :param split_ratio Tuple of ratios (train, val) of the samples should be in the training and validation sets.
-        """
-		
-		if sum(split_ratio) != 1:
-			raise ValueError
-
-        # For each category, one attribute will be chosen for zero shot
-        # The attributes will be taken from a random object
-		# zero_shot_object = pd.Series([0 for _ in self.properties_dim])  # self.objects.sample().iloc[0]
-
-		# split ratio applies only to train and validation datasets - size of test dataset depends on available concepts
-		train_ratio, val_ratio = split_ratio
-
-		train_and_val = []
-		test = []
-
-		print("Creating train_ds, val_ds and test_ds...")
-		for concept_idx in tqdm(range(len(self.concepts))):
-			for _ in range(self.game_size):
-				# for each concept, we consider all possible context conditions
-				# i.e. 1 for generic concepts, and up to len(properties_dim) for more specific concepts
-				nr_possible_contexts = sum(self.concepts[concept_idx][1])
-				#print("nr poss cont", nr_possible_contexts)
-				for context_condition in range(nr_possible_contexts):
-					# 1) 'generic'
-					if test_cond == 'generic':
-						# test dataset only contains most generic concepts
-						if nr_possible_contexts == 1:
-							test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
-						else:
-							train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
-
-					# 2) 'specific'
-					if test_cond == 'specific':
-						# test dataset only contains most specific concepts
-						if nr_possible_contexts == len(self.properties_dim):
-							test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
-						else:
-							train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
-
-        # Train val split
-		train_samples = int(len(train_and_val)*train_ratio)
-		val_samples = len(train_and_val) - train_samples
-		train, val = torch.utils.data.random_split(train_and_val, [train_samples, val_samples])
-
-        # Save information about train dataset
-		train.dimensions = self.properties_dim
-		print("Length of train and validation datasets:", len(train), "/", len(val))
-		print("Length of test dataset:", len(test))
-
-		return train, val, test
-
 
 	def get_item(self, concept_idx, context_condition, encoding_func, include_concept=False):
 		"""
@@ -520,9 +462,9 @@ class DataSet(torch.utils.data.Dataset):
 			
 		return output
 
-		
-		
-     
+
+
+
 def get_distractors_old(self, concept_idx):
 		"""
 		Returns all possible distractor objects for each context based on a given target concept.
@@ -531,11 +473,11 @@ def get_distractors_old(self, concept_idx):
 
 		target_objects, fixed = self.concepts[concept_idx]
 		fixed = list(fixed)
-		
+
 		def change_one_attribute(input_object, fixed):
 			"""
 			Returns a concept where one attribute is changed.
-			Input: A concept consisting of an (example) object and a fixed vector indicating which attributes are fixed in the concept. 
+			Input: A concept consisting of an (example) object and a fixed vector indicating which attributes are fixed in the concept.
 			Output: A list of concepts consisting of an (example) object that differs in one attribute from the input object and a new fixed vector.
 			"""
 			changed_concepts = []
@@ -556,16 +498,16 @@ def get_distractors_old(self, concept_idx):
 							# the new fixed values specify where the change took place: (1,1,0) means the change took place in 3rd attribute
 							changed_concepts.append((changed, new_fixed))
 			return changed_concepts
-		
+
 		def change_n_attributes(input_object, fixed, n_attributes):
 			"""
-			Changes a given number of attributes from a target object 
+			Changes a given number of attributes from a target object
 				given a fixed vector (specifiying the attributes that can and should be changed)
 				and a target object
 				and a number of how many attributes should be changed.
 			"""
 			changed_concepts = list()
-			# O(n_attributes), 
+			# O(n_attributes),
 			while(n_attributes > 0):
 				# if changed_concepts is empty, I consider the target_object
 				if not changed_concepts:
@@ -589,7 +531,7 @@ def get_distractors_old(self, concept_idx):
 			changed_concepts_final = []
 			[changed_concepts_final.append(x) for x in changed_concepts_flattened if x not in changed_concepts_final]
 			return changed_concepts_final
-			
+
 		# distractors: number and position of fixed attributes match target concept
 		# the more fixed attributes are shared, the finer the context
 		distractor_concepts = change_n_attributes(target_objects[0], fixed, sum(fixed))
@@ -600,5 +542,5 @@ def get_distractors_old(self, concept_idx):
 		for dist_concept in distractor_concepts:
 			# same fixed vector as for the target concept
 			distractor_objects.extend([(self.get_all_objects_for_a_concept(self.properties_dim, dist_concept[0], fixed), tuple(dist_concept[1]))])
-			
+
 		return distractor_objects

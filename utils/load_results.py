@@ -1,12 +1,15 @@
 import pickle
 import numpy as np
 
+
 def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=True, context_unaware=True):
     """ loads all accuracies into a dictionary, val_steps should be set to the same as val_frequency during training
     """
-    result_dict = {'train_acc': [], 'val_acc': [], 'test_acc': [], 'zs_specific_test_acc': [], 'zs_generic_test_acc': [],'zs_acc_objects': [], 'zs_acc_abstraction': [],
-                   'cu_train_acc': [], 'cu_val_acc': [], 'cu_test_acc': [], 'cu_zs_specific_test_acc': [], 'cu_zs_generic_test_acc': []}
-    
+    result_dict = {'train_acc': [], 'val_acc': [], 'test_acc': [], 'zs_specific_test_acc': [],
+                   'zs_generic_test_acc': [], 'zs_acc_objects': [], 'zs_acc_abstraction': [],
+                   'cu_train_acc': [], 'cu_val_acc': [], 'cu_test_acc': [], 'cu_zs_specific_test_acc': [],
+                   'cu_zs_generic_test_acc': []}
+
     for path_idx, path in enumerate(all_paths):
 
         train_accs = []
@@ -23,19 +26,19 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
         cu_zs_generic_test_accs = []
 
         for run in range(n_runs):
-            
+
             standard_path = path + '/standard/' + str(run) + '/'
             zero_shot_path = path + '/standard/zero_shot/'
             context_unaware_path = path + '/context_unaware/' + str(run) + '/'
             cu_zs_path = path + '/context_unaware/zero_shot/'
-            
+
             # train and validation accuracy
-            
+
             data = pickle.load(open(standard_path + 'loss_and_metrics.pkl', 'rb'))
             lists = sorted(data['metrics_train0'].items())
             _, train_acc = zip(*lists)
             train_accs.append(train_acc)
-            lists = sorted(data['metrics_test0'].items()) 
+            lists = sorted(data['metrics_test0'].items())
             _, val_acc = zip(*lists)
             if len(val_acc) > n_epochs // val_steps:  # old: we had some runs where we set val freq to 5 instead of 10
                 val_acc = val_acc[::2]
@@ -43,10 +46,11 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
             test_accs.append(data['final_test_acc'])
             if zero_shot:
                 for cond in ['specific', 'generic']:
-                # zs_accs_objects.append(data['final_test_acc']) # not sure what's the purpose of this
-            
+                    # zs_accs_objects.append(data['final_test_acc']) # not sure what's the purpose of this
+
                     # zero shot accuracy (standard)
-                    zs_data = pickle.load(open(zero_shot_path + str(cond) + '/' + str(run) + '/loss_and_metrics.pkl', 'rb'))
+                    zs_data = pickle.load(
+                        open(zero_shot_path + str(cond) + '/' + str(run) + '/loss_and_metrics.pkl', 'rb'))
                     if cond == 'specific':
                         zs_specific_test_accs.append(zs_data['final_test_acc'])
                     else:
@@ -54,12 +58,13 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
 
                     # zero-shot accuracy (context-unaware)
                     if context_unaware:
-                        cu_zs_data = pickle.load(open(cu_zs_path + str(cond) + '/' + str(run) + '/loss_and_metrics.pkl', 'rb'))
+                        cu_zs_data = pickle.load(
+                            open(cu_zs_path + str(cond) + '/' + str(run) + '/loss_and_metrics.pkl', 'rb'))
                         if cond == 'specific':
                             cu_zs_specific_test_accs.append(cu_zs_data['final_test_acc'])
                         else:
                             cu_zs_generic_test_accs.append(cu_zs_data['final_test_acc'])
-            
+
             # context-unaware accuracy
             if context_unaware:
                 cu_data = pickle.load(open(context_unaware_path + 'loss_and_metrics.pkl', 'rb'))
@@ -67,15 +72,19 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
                 _, cu_train_acc = zip(*lists)
                 if len(cu_train_acc) != n_epochs:
                     print(path, run, len(cu_train_acc))
-                    raise ValueError("The stored results don't match the parameters given to this function. Check the number of epochs in the above mentioned runs.")
+                    raise ValueError(
+                        "The stored results don't match the parameters given to this function. "
+                        "Check the number of epochs in the above mentioned runs.")
                 cu_train_accs.append(cu_train_acc)
-                lists = sorted(cu_data['metrics_test0'].items()) 
+                lists = sorted(cu_data['metrics_test0'].items())
                 _, cu_val_acc = zip(*lists)
                 # for troubleshooting in case the stored results don't match the parameters given to this function
                 if len(cu_val_acc) != n_epochs // val_steps:
                     print(context_unaware_path, len(cu_val_acc))
-                    raise ValueError("The stored results don't match the parameters given to this function. Check the above mentioned files for number of epochs and validation steps.")
-                if len(cu_val_acc) > n_epochs // val_steps:  # old: we had some runs where we set val freq to 5 instead of 10
+                    raise ValueError(
+                        "The stored results don't match the parameters given to this function. "
+                        "Check the above mentioned files for number of epochs and validation steps.")
+                if len(cu_val_acc) > n_epochs // val_steps:
                     cu_val_acc = cu_val_acc[::2]
                 cu_val_accs.append(cu_val_acc)
                 cu_test_accs.append(cu_data['final_test_acc'])
@@ -84,8 +93,8 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
         result_dict['val_acc'].append(val_accs)
         result_dict['test_acc'].append(test_accs)
         if zero_shot:
-            #result_dict['zs_acc_objects'].append(zs_accs_objects)
-            #result_dict['zs_acc_abstraction'].append(zs_accs_abstraction)
+            # result_dict['zs_acc_objects'].append(zs_accs_objects)
+            # result_dict['zs_acc_abstraction'].append(zs_accs_abstraction)
             result_dict['zs_specific_test_acc'].append(zs_specific_test_accs)
             result_dict['zs_generic_test_acc'].append(zs_generic_test_accs)
             if context_unaware:
@@ -98,7 +107,7 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
 
     for key in result_dict.keys():
         result_dict[key] = np.array(result_dict[key])
-        
+
     return result_dict
 
 
@@ -115,7 +124,8 @@ def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=0.001
     result_dict = {'NMI': [], 'effectiveness': [], 'consistency': [],
                    'NMI_hierarchical': [], 'effectiveness_hierarchical': [], 'consistency_hierarchical': [],
                    'NMI_context_dep': [], 'effectiveness_context_dep': [], 'consistency_context_dep': [],
-                   'NMI_concept_x_context': [], 'effectiveness_concept_x_context': [], 'consistency_concept_x_context': []}
+                   'NMI_concept_x_context': [], 'effectiveness_concept_x_context': [],
+                   'consistency_concept_x_context': []}
 
     for path_idx, path in enumerate(all_paths):
 
@@ -125,7 +135,6 @@ def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=0.001
         NMIs_conc_x_cont, effectiveness_conc_x_cont, consistency_conc_x_cont = [], [], []
 
         for run in range(n_runs):
-
             standard_path = path + '/' + setting + '/' + str(run) + '/'
             data = pickle.load(open(standard_path + 'entropy_scores.pkl', 'rb'))
             NMIs.append(data['normalized_mutual_info'])
@@ -153,6 +162,45 @@ def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=0.001
         result_dict['NMI_concept_x_context'].append(NMIs_conc_x_cont)
         result_dict['consistency_concept_x_context'].append(consistency_conc_x_cont)
         result_dict['effectiveness_concept_x_context'].append(effectiveness_conc_x_cont)
+
+    for key in result_dict.keys():
+        result_dict[key] = np.array(result_dict[key])
+
+    return result_dict
+
+
+# Mu and goodman:
+
+def load_accuracies_mu_and_goodman(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=True):
+    """ loads all mu and goodman accuracies into a dictionary, val_steps should be set to the same as val_frequency
+    during training
+    """
+    result_dict = {'zs_specific_test_acc': [],
+                   'zs_generic_test_acc': []}
+
+    for path_idx, path in enumerate(all_paths):
+
+        zs_specific_test_accs = []
+        zs_generic_test_accs = []
+
+        for run in range(n_runs):
+
+            mu_and_goodman_path = path + '/mu_and_goodman/zero_shot/'
+
+            if zero_shot:
+                for cond in ['specific', 'generic']:
+
+                    # zero shot accuracy (standard)
+                    zs_data = pickle.load(
+                        open(mu_and_goodman_path + str(cond) + '/' + str(run) + '/loss_and_metrics.pkl', 'rb'))
+                    if cond == 'specific':
+                        zs_specific_test_accs.append(zs_data['final_test_acc'])
+                    else:
+                        zs_generic_test_accs.append(zs_data['final_test_acc'])
+
+        if zero_shot:
+            result_dict['zs_specific_test_acc'].append(zs_specific_test_accs)
+            result_dict['zs_generic_test_acc'].append(zs_generic_test_accs)
 
     for key in result_dict.keys():
         result_dict[key] = np.array(result_dict[key])
