@@ -364,6 +364,20 @@ def train(opts, datasets, verbose_callbacks=False):
             )
 
 
+def get_dataset_name(dimensions: list[int]) -> str:
+    length_of_dimenasions = len(dimensions)
+    first_dimension = dimensions[0]
+    dataset_name = f"({length_of_dimenasions},{first_dimension})"
+    return dataset_name
+
+
+def get_folder_path_string(dataset_name: str, game_size: int, vocab_size_factor: float) -> str:
+    
+    folder_name = f"{dataset_name}_game_size_{game_size}_vsf_{vocab_size_factor}"
+    folder_path_str = os.path.join("results", folder_name)
+    return folder_path_str
+
+
 def main(params):
     """
     Dealing with parameters and loading dataset. Copied from hierarchical_reference_game and adapted.
@@ -372,9 +386,7 @@ def main(params):
 
     print(f"{params=}")
     print(f"{opts=}")
-    vanessas_path = Path(
-        r"C:\Users\rvver\Documents\CodeThesis\emergent-abstractions\results"
-    )
+
 
     # Nnt(OTE: I checked and the default device seems to be cuda
     # Otherwise there is an option in a later pytorch version (don't know about compatibility with egg):
@@ -388,18 +400,11 @@ def main(params):
         opts.dimensions = list(itertools.repeat(opts.values, opts.attributes))
 
     # if not opts.dimensions == [16, 16, 16, 16, 16]: # NOTE: just for hyperparameter search
+    data_set_name = get_dataset_name(dimensions=opts.dimensions)
+    print(f"{data_set_name=}")
+    folder_name = get_folder_path_string(dataset_name=data_set_name, game_size=opts.game_size, vocab_size_factor=opts.vocab_size_factor)
+    print(f"{folder_name=}")
 
-    data_set_name = (
-        "(" + str(len(opts.dimensions)) + "," + str(opts.dimensions[0]) + ")"
-    )
-    folder_name = (
-        data_set_name
-        + "_game_size_"
-        + str(opts.game_size)
-        + "_vsf_"
-        + str(opts.vocab_size_factor)
-    )
-    folder_name = os.path.join("results", folder_name)
 
     # define game setting from args
     if opts.context_unaware:
@@ -428,10 +433,8 @@ def main(params):
             )
             # create subfolder if necessary
             opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
-            opts.save_path = os.path.join(
-                str(vanessas_path), folder_name, opts.game_setting
-            )
-            print(f"results should be saved to {opts.save_path}")
+
+            print(f"results should be saved to {opts.save_path=}")
             if not os.path.exists(opts.save_path) and opts.save:
                 os.makedirs(opts.save_path)
 
@@ -486,4 +489,6 @@ def main(params):
 if __name__ == "__main__":
     import sys
 
-    main(sys.argv[1:])
+    params = sys.argv[1:]
+    print(f"{params=}")
+    main(params=params)
