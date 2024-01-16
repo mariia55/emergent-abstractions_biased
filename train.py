@@ -71,15 +71,13 @@ def get_params(params):
                         help="Allows user to specify a maximum message length. (defaults to the number of attributes in a dataset)")
     parser.add_argument('--mu_and_goodman', type=bool, default=False,
                         help="Use for baselining against Mu and Goodman (2021) setting.")
-    parser.add_argument("--speaker_hidden_size", default=1024, type=int,
+    parser.add_argument("--speaker_hidden_size", default=128, type=int,
                         help="Use for baselining against Mu and Goodman (2021) setting.")
-    parser.add_argument("--listener_hidden_size", default=1024, type=int,
+    parser.add_argument("--listener_hidden_size", default=128, type=int,
                         help="Use for baselining against Mu and Goodman (2021) setting.")
     parser.add_argument("--speaker_n_layers", default=2, type=int,
                         help="Use for baselining against Mu and Goodman (2021) setting.")
     parser.add_argument("--listener_n_layers", default=2, type=int,
-                        help="Use for baselining against Mu and Goodman (2021) setting.")
-    parser.add_argument("--embedding_size", default=500, type=int,
                         help="Use for baselining against Mu and Goodman (2021) setting.")
 
     args = core.init(parser, params)
@@ -101,7 +99,7 @@ def loss(_sender_input, _message, _receiver_input, receiver_output, labels, _aux
     loss_fn = nn.BCEWithLogitsLoss()
     loss = loss_fn(receiver_output, labels)
     receiver_pred = (receiver_output > 0).float()
-    per_game_acc = (receiver_pred == labels).float().mean(1).cpu().numpy()
+    per_game_acc = (receiver_pred == labels).float().mean(1).cpu().numpy()  # all labels have to be predicted correctly
     acc = per_game_acc.mean()
     return loss, {'acc': acc}
 
@@ -133,18 +131,14 @@ def train(opts, datasets, verbose_callbacks=False):
     if opts.mu_and_goodman:
         sender = Speaker(feature.FeatureMLP(
                 input_size=sum(dimensions),
-                output_size=opts.speaker_hidden_size,
+                output_size=int(opts.speaker_hidden_size/2),   # divide by 2 to allow for concatenating prototype embeddings
                 n_layers=opts.speaker_n_layers,
-            ),
-            nn.Embedding(opts.vocab_size + 3, opts.embedding_size),
-            tau=opts.temperature,
-            hidden_size=opts.speaker_hidden_size)
+            ), n_targets=opts.game_size)
         receiver = Listener(feature.FeatureMLP(
                             input_size=sum(dimensions),
                             output_size=opts.listener_hidden_size,
                             n_layers=opts.listener_n_layers,
-                            ),
-                            nn.Embedding(opts.vocab_size + 3, opts.embedding_size))
+                            ))
     else:
         sender = Sender(opts.hidden_size, sum(dimensions), opts.game_size, opts.context_unaware)
         receiver = Receiver(sum(dimensions), opts.hidden_size)

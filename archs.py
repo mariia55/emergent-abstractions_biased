@@ -16,6 +16,7 @@ class Sender(nn.Module):
     Sender gets as input targets and distractors in an ordered fashion (targets first).
     It embeds both targets and distractors and returns a joint embedding.
     """
+
     def __init__(self, n_hidden, n_features, n_targets, context_unaware=False):
         super(Sender, self).__init__()
         # embedding layers:
@@ -25,21 +26,20 @@ class Sender(nn.Module):
         self.context_unaware = context_unaware
 
     def forward(self, x, aux_input=None):
-        # NOTE: Mu & Goodman (2021) use MLP (with at least 2 layers) to encode features
         batch_size = x.shape[0]
         n_obj = x.shape[1]
         n_features = x.shape[2]
-        n_targets = int(n_obj/2)
+        n_targets = int(n_obj / 2)
 
         # embed target objects:
         targets = x[:, :n_targets]
         targets_flat = targets.reshape(batch_size, n_targets * n_features)
         target_feature_embedding = F.relu(self.fc1(targets_flat))
-        
+
         # context unaware speakers only process the targets
         if self.context_unaware:
             return target_feature_embedding
-        
+
         # context aware speakers process both targets and distractors
         else:
             # embed distractor objects:
@@ -48,9 +48,9 @@ class Sender(nn.Module):
             distractor_feature_embedding = F.relu(self.fc2(distractors_flat))
 
             # create joint embedding
-            joint_embedding = self.fc3(torch.cat([target_feature_embedding, distractor_feature_embedding], dim=1)).tanh()
+            joint_embedding = self.fc3(
+                torch.cat([target_feature_embedding, distractor_feature_embedding], dim=1)).tanh()
             return joint_embedding
-        
 
 
 class Receiver(nn.Module):
@@ -70,6 +70,6 @@ class Receiver(nn.Module):
     def forward(self, x, input, _aux_input=None):
         # from EGG: the rationale for the non-linearity here is that the RNN output will also be the 
         # outcome of a non-linearity
-        embedded_input = self.fc1(input).tanh() # [32, 20, 256]
+        embedded_input = self.fc1(input).tanh()  # [32, 20, 256]
         dots = torch.matmul(embedded_input, torch.unsqueeze(x, dim=-1))
-        return dots.squeeze() # [32, 20]
+        return dots.squeeze()  # [32, 20]
