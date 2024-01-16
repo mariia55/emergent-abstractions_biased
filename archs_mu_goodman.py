@@ -25,7 +25,7 @@ def _form_average_prototypes(feats_emb, n_targets):
     # The prototypes of the distractors are not calculated anywhere. Why are they missing? (See your to do)
     # What is 1 - targets supposed to be?
 
-    targets = torch.zeros(n_targets * 2)
+    targets = torch.zeros(n_targets * 2, device='cuda')
     targets[:n_targets] = 1.0
 
     rev_targets = 1 - targets  # calculate distractor indices
