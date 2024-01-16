@@ -159,7 +159,57 @@ def bosdis(interaction, n_dims, n_values, vocab_size):
     # Bosdis for each concept and context condition
     bosdis_concept_x_context = np.array([Disent.bosdis(concepts[concept_x_context], messages[concept_x_context], vocab_size) for concept_x_context in conceptxcontext_idx])  
 
-    return bosdis_concept_x_context  
+    return bosdis_concept_x_context
+
+
+def posdis(interaction, n_dims, n_values, vocab_size):
+    """
+    calculate positional disentanglement for all concept and context conditions
+    """
+    # Get relevant attributes
+    sender_input = interaction.sender_input
+    n_objects = sender_input.shape[1]
+    n_targets = int(n_objects/2)
+
+    # get target objects and fixed vectors to re-construct concepts
+    target_objects = sender_input[:, :n_targets]
+    target_objects = k_hot_to_attributes(target_objects, n_values)
+    # concepts are defined by a list of target objects (here one sampled target object) and a fixed vector
+    (objects, fixed) = retrieve_concepts_sampling(target_objects)
+    # add one such that zero becomes an empty attribute for the calculation (_)
+    objects = objects + 1
+    concepts = torch.from_numpy(objects * (np.array(fixed)))
+
+    # get distractor objects to re-construct context conditions
+    distractor_objects = sender_input[:, n_targets:]
+    distractor_objects = k_hot_to_attributes(distractor_objects, n_values)
+    distractor_objects = distractor_objects + 1
+    context_conds = retrieve_context_condition(objects, fixed, distractor_objects)
+
+    # get messages from interaction
+    messages = interaction.message.argmax(dim=-1)
+
+    # sum of fixed vectors gives the specificity of the concept (all attributes fixed means
+    # specific concept, one attribute fixed means generic concept)
+    # n_relevant_idx stores the indices of the concepts on a specific level of abstraction
+    n_relevant_idx = [np.where(np.sum(np.array(fixed), axis=1) == i)[0] for i in range(1, n_dims + 1)]
+
+    context_cond_idx = [np.where(np.array(context_conds) == i)[0] for i in range(0, n_dims)]
+
+    # Concept-context dependent Entropies:
+    # go through concept conditions
+    conceptxcontext_idx = []
+    for i in range(len(n_relevant_idx)):
+        # go through context conditions
+        for j in range(len(context_cond_idx)):
+            # only keep shared entries for each concept-context condition
+            shared_elements = [elem for elem in n_relevant_idx[i] if elem in context_cond_idx[j]]
+            conceptxcontext_idx.append(shared_elements)
+
+    # Posdis for each concept and context condition
+    posdis_concept_x_context = np.array([Disent.posdis(concepts[concept_x_context], messages[concept_x_context]) for concept_x_context in conceptxcontext_idx])
+
+    return posdis_concept_x_context
             
 
 
