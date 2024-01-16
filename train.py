@@ -129,6 +129,9 @@ def train(opts, datasets, verbose_callbacks=False):
 
     # initialize sender and receiver agents
     if opts.mu_and_goodman:
+        # use speaker hidden size also for listener (except explicitly given)
+        if not opts.listener_hidden_size:
+            opts.listener_hidden_size = opts.speaker_hidden_size
         sender = Speaker(feature.FeatureMLP(
                 input_size=sum(dimensions),
                 output_size=int(opts.speaker_hidden_size/2),   # divide by 2 to allow for concatenating prototype embeddings
@@ -232,8 +235,6 @@ def main(params):
     if not opts.dimensions:
         opts.dimensions = list(itertools.repeat(opts.values, opts.attributes))
 
-    # if not opts.dimensions == [16, 16, 16, 16, 16]: # NOTE: just for hyperparameter search
-
     data_set_name = '(' + str(len(opts.dimensions)) + ',' + str(opts.dimensions[0]) + ')'
     folder_name = (data_set_name + '_game_size_' + str(opts.game_size) 
                         + '_vsf_' + str(opts.vocab_size_factor))
@@ -244,6 +245,8 @@ def main(params):
         opts.game_setting = 'context_unaware'
     elif opts.length_cost:
         opts.game_setting = 'length_cost'
+    elif opts.mu_and_goodman:
+        opts.game_setting = 'mu_and_goodman'
     else:
         opts.game_setting = 'standard'
 
