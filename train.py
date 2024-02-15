@@ -243,12 +243,14 @@ def main(params):
     # define game setting from args
     if opts.context_unaware:
         opts.game_setting = 'context_unaware'
-    elif opts.length_cost:
-        opts.game_setting = 'length_cost'
+        if opts.length_cost:
+            opts.game_setting = 'length_cost/context_unaware'
     elif opts.mu_and_goodman:
         opts.game_setting = 'mu_and_goodman'
     else:
         opts.game_setting = 'standard'
+        if opts.length_cost:
+            opts.game_setting = 'length_cost/context_aware'
 
     # if name of precreated data set is given, load dataset
     if opts.load_dataset:
