@@ -35,6 +35,7 @@ def plot_metrics(pickle_path):
     ax1.set_xlabel("Epochs")
     ax1.set_ylabel("Loss")
     ax1.legend()
+    ax1.set_ylim(0, 1)
 
     # Plot accuracy curves
     ax2.plot(epochs, train_accuracy, label="Train Accuracy", marker="o")
@@ -42,6 +43,7 @@ def plot_metrics(pickle_path):
     ax2.set_xlabel("Epochs")
     ax2.set_ylabel("Accuracy")
     ax2.legend()
+    ax2.set_ylim(0, 1)
 
     # Display the plot
     plt.tight_layout()
@@ -50,5 +52,5 @@ def plot_metrics(pickle_path):
 
 # When calling the function, use r... pickle_path= r"relative_path"
 plot_metrics(
-    pickle_path=r"results\(3,4)_game_size_10_vsf_3\standard\4\loss_and_metrics.pkl"
+    pickle_path=r"results\(3,4)_game_size_10_vsf_3\standard\5\loss_and_metrics.pkl"
 )
