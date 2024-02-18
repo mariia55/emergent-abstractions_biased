@@ -29,3 +29,5 @@ commands.md
 optuna.py
 grid_search/parse_data,py
 floats_reults_vis.py
+grid_search/results_17-02.csv
+grid_search/17-02
