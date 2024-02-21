@@ -2,24 +2,18 @@ from torch.utils.data import Dataset
 import h5py
 
 class shapes3d(Dataset):
-    def __init__(self, path_to_dataset = '3dshapes/3dshapes.h5', transform = None):
-        print("loading 3dshapes dataset")
-        load_dataset = h5py.File(path_to_dataset, 'r')
-        self.images = load_dataset['images'][:]  # array shape [480000,64,64,3], uint8 in range(256)
-        self.labels = load_dataset['labels'][:]  # array shape [480000,6], float64
-        print("dataset loaded successfully")
-        self.transform = transform
+    """This class uses given image and label arrays or tensors to make a pytorch dataset out of them"""
+    def __init__(self, images, labels, transform = None):
+        self.images = images  # array shape originally [480000,64,64,3], uint8 in range(256)
+        self.labels = labels  # array shape originally [480000,6], float64
+        self.transform = transform # if transform should be applied
     
     def __len__(self):
         return len(self.labels)
     
     def __getitem__(self, index):
         img = self.images[index]
-        img.shape = (3,64,64)
         label = self.labels[index]
         if self.transform:
             img = self.transform(img)
         return (img, label)
-    
-    def one_hot_labels(self, index):
-        label = self.labels[index]

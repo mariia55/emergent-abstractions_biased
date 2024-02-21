@@ -20,6 +20,8 @@ from archs_mu_goodman import Speaker, Listener
 import feature
 import itertools
 
+from load import load_data
+from vis_module import vision_module
 
 SPLIT = (0.6, 0.2, 0.2)
 SPLIT_ZERO_SHOT = (0.75, 0.25)
@@ -69,6 +71,8 @@ def get_params(params):
                         help="If set to True, then the speakers will be trained context-unaware, i.e. without access to the distractors.")
     parser.add_argument('--max_mess_len', type=int, default=None,
                         help="Allows user to specify a maximum message length. (defaults to the number of attributes in a dataset)")
+    parser.add_argument('--shapes3d', type=bool, default=False,
+                        help="Determines whether 3dshapes dataset will be used or not")
     parser.add_argument('--mu_and_goodman', type=bool, default=False,
                         help="Use for baselining against Mu and Goodman (2021) setting.")
     parser.add_argument("--speaker_hidden_size", default=1024, type=int,
@@ -121,9 +125,59 @@ def train(opts, datasets, verbose_callbacks=False):
     else:
         save_epoch = None
 
-    train, val, test = datasets
-    #print("train", train)
-    dimensions = train.dimensions
+    if opts.shapes3d:
+        # try to load the dataset first
+        try:
+            train = torch.load('./dataset/training_dataset')
+            val = torch.load('./dataset/validation_dataset')
+            test = torch.load('./dataset/test_dataset')
+
+            print('3dshapes dataset was found and loaded successfully')
+
+        # otherwise create the dataset and save it to the foulder for later use
+        except:
+            print('3dshapes dataset was not found, creating it instead...')
+            input_shape = [3,64,64]
+            
+            train, val, test, target_names, full_labels, complete_data = load_data(input_shape, normalize=False,
+                                                                            subtract_mean=False,
+                                                                            trait_weights=None,
+                                                                            return_trait_weights=False,
+                                                                            return_full_labels=True,
+                                                                            datapath=None,
+                                                                            test_size=0.25) # train, val, test = 0.6, 0.2, 0.2
+            
+            torch.save(train, './dataset/training_dataset')
+            torch.save(val, './dataset/validation_dataset')
+            torch.save(test, './dataset/test_dataset')
+            torch.save(complete_data, './dataset/complete_dataset')
+        
+        # # if the train/test split of the currently saved dataset does not match 0.75 to 0.25 we correct it
+        # if (len(train)+len(val))*0.25 != len(val):
+        #     print("Found dataset's split did not match given test size of 0.25, creating new dataset accordingly...")
+        #     input_shape = [3,64,64]
+
+        #     train, val, test_data, target_names,  full_labels, complete_data = load_data(input_shape, normalize=False,
+        #                                                                 subtract_mean=False,
+        #                                                                 trait_weights=None,
+        #                                                                 return_trait_weights=False,
+        #                                                                 return_full_labels=True,
+        #                                                                 datapath=None,
+        #                                                                 test_size=0.25)
+            
+        #     # and overwrite the existing save
+        #     torch.save(train, './dataset/training_dataset')
+        #     torch.save(val, './dataset/validation_dataset')
+        
+        # load the trained model
+        model = vision_module(batch_size=32, num_classes=64)
+        model.load_state_dict(torch.load('./models/vision_module'))
+
+        dimensions = [10, 10, 4, 4, 4, 15] # just 64 bcs of 4*4*4?
+
+    else:
+        train, val, test = datasets
+        dimensions = train.dimensions
 
     train = torch.utils.data.DataLoader(train, batch_size=opts.batch_size, shuffle=True)
     val = torch.utils.data.DataLoader(val, batch_size=opts.batch_size, shuffle=False, drop_last=True)
@@ -145,6 +199,9 @@ def train(opts, datasets, verbose_callbacks=False):
                             n_layers=opts.listener_n_layers,
                             ),
                             nn.Embedding(opts.vocab_size + 3, opts.embedding_size))
+    elif opts.shapes3d:
+        sender = Sender(opts.hidden_size, sum(dimensions), opts.game_size, opts.context_unaware, model)
+        receiver = Receiver(sum(dimensions), opts.hidden_size, model)
     else:
         sender = Sender(opts.hidden_size, sum(dimensions), opts.game_size, opts.context_unaware)
         receiver = Receiver(sum(dimensions), opts.hidden_size)

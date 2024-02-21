@@ -51,6 +51,8 @@ class DataSet(torch.utils.data.Dataset):
 
 	def __getitem__(self, idx):
 		"""Returns the i-th sample (and label?) given an index (idx)."""
+		#print("this is one sample: ", self.dataset[idx])
+		return 1
 		return self.dataset[idx]
 
 
@@ -67,6 +69,8 @@ class DataSet(torch.utils.data.Dataset):
 		concept_indices = torch.randperm(len(self.concepts)).tolist()
 		# Split is based on how many distinct concepts there are (regardless context conditions)
 		ratio = int(len(self.concepts)*(train_ratio + val_ratio))
+		concept_indices.sort()
+		print("concept indeces", concept_indices[0])
 
 		train_and_val = []
 		print("Creating train_ds and val_ds...")
@@ -227,7 +231,7 @@ class DataSet(torch.utils.data.Dataset):
 		
 		for idx,label in enumerate(self.labels):
 			if (label == object_label).all():
-				print("this is pbject label: " + str(object_label))
+				print("this is object label: " + str(object_label))
 				print("this is label: " + str(label))
 				# assign corresponding image to label accordingly
 				image = self.images[idx]
@@ -247,6 +251,10 @@ class DataSet(torch.utils.data.Dataset):
 		# get all possible distractors for a given concept (for all possible context conditions)
 		context = self.get_distractors(concept_idx, context_condition)
 		context_sampled = self.sample_distractors(context, context_condition)
+		print("this is target_objects: ", target_objects)
+		print("this is fixed: ", fixed)
+		print("this is context_condition: ", context_condition)
+		print("this is corresponding context: ", context_sampled)
 		# return target concept, context (distractor objects + context_condition) for each context
 		return [target_objects, fixed], context_sampled
 		
