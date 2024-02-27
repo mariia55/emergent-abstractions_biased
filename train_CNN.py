@@ -167,14 +167,30 @@ def train(args):
 
 def generate_dataset(save = True):
     model = vision_module(batch_size=32, num_classes=64)
-    model.load_state_dict(torch.load('./models/vision_module'))
+    model.load_state_dict(torch.load('./models/vision_module', map_location=torch.device('cpu')))
 
     if torch.cuda.is_available():
             model.cuda()
     
     model.eval()
-
-    data = torch.load('./dataset/complete_dataset')
+    try:
+        data = torch.load('./dataset/complete_dataset')
+    except:
+        print('Dataset not found, creating it instead...')
+        input_shape = [3,64,64]
+        
+        train_data, validation_data, test_data, target_names, full_labels, complete_data = load_data(input_shape, normalize=False,
+                                                                        subtract_mean=False,
+                                                                        trait_weights=None,
+                                                                        return_trait_weights=False,
+                                                                        return_full_labels=True,
+                                                                        datapath=None)
+        
+        torch.save(train_data, './dataset/training_dataset')
+        torch.save(validation_data, './dataset/validation_dataset')
+        torch.save(test_data, './dataset/test_dataset')
+        torch.save(complete_data, './dataset/complete_dataset')
+        data = complete_data
 
     data_loader = torch.utils.data.DataLoader(data,
                                             batch_size = 32, 
@@ -203,11 +219,14 @@ def generate_dataset(save = True):
             # print("target flattened: ", target_flat)
             # print("target flat len: ", len(target_flat))
 
+            # this is where input and generated labels "become" tensors
             for input in input_flat:
-                inputs.append(input)
+                inputs.append(input.numpy())
             for output in output_flat:
-                generated_labels.append(output)
+                generated_labels.append(output.numpy())
     if save:
+        # generated labels are tensors while original labels were numpy arrays
+        # could lead to problems?
         generated_dataset_full = shapes3d(inputs, generated_labels)
         torch.save(generated_dataset_full, './dataset/generated_dataset')
 
@@ -231,6 +250,7 @@ def test(test_loader, model, criterion):
             loss = criterion(output, target)
 
             # compute accuracy
+            # is accuracy wrong????
             if np.argmax(output.cpu().detach().numpy()[1]) == np.argmax(target.cpu().detach().numpy()[1]):
                 temp_accs.append(1.0)
             else:
@@ -249,7 +269,23 @@ def test(test_loader, model, criterion):
 
 
 if __name__ == "__main__":
-    generate_dataset()
+    #generate_dataset()
+    data = torch.load('./dataset/complete_dataset')
+    generated_data = torch.load('./dataset/generated_dataset')
+
+    test = []
+
+    for (original, generated) in zip(data,generated_data):
+        #print('original: ', np.argmax(original[1]))
+        #print('generated: ', np.argmax(generated[1]))
+
+        if np.argmax(original[1]) == np.argmax(generated[1]):
+            test.append(1)
+        else:
+            test.append(0)
+
+    print(sum(test))
+    print(len(test))
 
     # args = get_params()
 
