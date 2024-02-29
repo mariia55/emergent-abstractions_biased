@@ -17,7 +17,7 @@ import os
 import pickle
 
 import dataset
-from archs import Sender, Receiver
+from archs_linear import Sender, Receiver
 from archs_mu_goodman import Speaker, Listener
 import feature
 import itertools
@@ -256,14 +256,14 @@ def train(opts, datasets, verbose_callbacks=False):
     vocab_size = (
         minimum_vocab_size * opts.vocab_size_factor + 1
     )  # multiply by factor plus add one for eos-symbol
-    print("vocab size", vocab_size)
+    # print("vocab size", vocab_size)
     # allow user to specify a maximum message length
     if opts.max_mess_len:
         max_len = opts.max_mess_len
     # default: number of attributes
     else:
         max_len = len(dimensions)
-    print("message length", max_len)
+    # print("message length", max_len)
 
     # initialize game
     if opts.mu_and_goodman:
