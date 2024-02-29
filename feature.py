@@ -26,7 +26,6 @@ class FeatureMLP(nn.Module):
         assert n_layers >= 2, "Need at least 2 layers"
 
         layers = [nn.Linear(input_size, output_size)]
-        print("feature MLP", input_size, output_size)
 
         for _ in range(n_layers - 1):
             layers.append(nn.ReLU())
@@ -46,3 +45,4 @@ class FeatureMLP(nn.Module):
 
     def reset_parameters(self):
         reset_sequential(self.trunk)
+
