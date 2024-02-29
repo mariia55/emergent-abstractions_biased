@@ -24,7 +24,6 @@ class Sender(nn.Module):
         self.fc2 = nn.Linear(n_features * n_targets, n_hidden)
         self.fc3 = nn.Linear(2 * n_hidden, n_hidden)
         self.context_unaware = context_unaware
-        self.threshold = 0.09  # Threshold value for active features
 
     def forward(self, x, aux_input=None):
         # NOTE: Mu & Goodman (2021) use MLP (with at least 2 layers) to encode features
@@ -37,10 +36,7 @@ class Sender(nn.Module):
         targets = x[:, :n_targets]
         targets_flat = targets.reshape(batch_size, n_targets * n_features)
 
-        # Apply thresholding
-        active_targets = torch.where(targets_flat > self.threshold, 1.0, 0.0)
-
-        target_feature_embedding = F.relu(self.fc1(active_targets))
+        target_feature_embedding = F.relu(self.fc1(targets_flat))
 
         # context unaware speakers only process the targets
         if self.context_unaware:
@@ -52,11 +48,7 @@ class Sender(nn.Module):
             distractors = x[:, n_targets:]
             distractors_flat = distractors.reshape(batch_size, n_targets * n_features)
 
-            # Apply thresholding
-            active_distractors = torch.where(
-                distractors_flat > self.threshold, 1.0, 0.0
-            )
-            distractor_feature_embedding = F.relu(self.fc2(active_distractors))
+            distractor_feature_embedding = F.relu(self.fc2(distractors_flat))
 
             # create joint embedding
             joint_embedding = self.fc3(
@@ -86,9 +78,5 @@ class Receiver(nn.Module):
         # outcome of a non-linearity
         embedded_input = self.fc1(input).tanh()  # [32, 20, 256]
 
-        # Implement thresholding
-        threshold = 0.09
-        active_features = torch.where(embedded_input > threshold, 1.0, 0.0)
-
-        dots = torch.matmul(active_features, torch.unsqueeze(x, dim=-1))
+        dots = torch.matmul(embedded_input, torch.unsqueeze(x, dim=-1))
         return dots.squeeze()  # [32, 20]
