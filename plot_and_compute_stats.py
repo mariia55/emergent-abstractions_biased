@@ -1,6 +1,6 @@
 import pickle
-import numpy as np
 from pathlib import Path
+import numpy as np
 import matplotlib.pyplot as plt
 
 
@@ -11,7 +11,7 @@ def compute_stats(metric_values):
     return np.mean(metric_values, axis=1)[-1], np.std(metric_values, axis=1)[-1]
 
 
-def plot_and_compute_statistics(path, n_runs=5):
+def plot_and_compute_statistics(path, start_run=25, end_run=30):
     """
     Opens metrics and loss pickle files for given dataset. Parses data into
     train_losses, test_losses, train_accs, test_accs lists and uses these
@@ -19,7 +19,7 @@ def plot_and_compute_statistics(path, n_runs=5):
     """
     train_losses, test_losses, train_accs, test_accs = [], [], [], []
 
-    for run in range(n_runs):
+    for run in range(start_run, end_run):
         data_path = path / "standard" / f"{run}" / "loss_and_metrics.pkl"
         with open(data_path, "rb") as f:
             data = pickle.load(f)
@@ -31,7 +31,7 @@ def plot_and_compute_statistics(path, n_runs=5):
         test_accs.append([data["metrics_test0"][epoch] for epoch in epochs])
 
     fig, axes = plt.subplots(2, 1, figsize=(10, 10))
-    for i in range(n_runs):
+    for i, run in enumerate(range(start_run, end_run)):
         axes[0].plot(
             epochs,
             train_losses[i],
