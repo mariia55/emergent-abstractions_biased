@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 # try out different senders:
 # 1) a sender who only sees the targets
@@ -36,7 +37,7 @@ class Sender(nn.Module):
         targets_flat = targets.reshape(batch_size, n_targets * n_features)
         # Apply the thresholding layer
         targets_flat = self.fc_threshold(targets_flat)
-        target_feature_embedding = torch.sigmoid(self.fc1(targets_flat))
+        target_feature_embedding = F.leaky_relu(self.fc1(targets_flat))
 
         if self.context_unaware:
             return target_feature_embedding
@@ -46,12 +47,13 @@ class Sender(nn.Module):
         distractors_flat = distractors.reshape(batch_size, n_targets * n_features)
         # Apply the thresholding layer
         distractors_flat = self.fc_threshold(distractors_flat)
-        distractor_feature_embedding = torch.sigmoid(self.fc2(distractors_flat))
+        distractor_feature_embedding = F.leaky_relu(self.fc2(distractors_flat))
 
         # Combine target and distractor embeddings
         joint_embedding = self.fc3(
             torch.cat([target_feature_embedding, distractor_feature_embedding], dim=1)
         ).tanh()
+
         return joint_embedding
 
 
@@ -74,7 +76,7 @@ class Receiver(nn.Module):
     def forward(self, x, input, _aux_input=None):
         # from EGG: the rationale for the non-linearity here is that the RNN output will also be the
         # outcome of a non-linearity
-        input = torch.sigmoid(self.fc_threshold(input))
+        input = self.fc_threshold(input)
         embedded_input = self.fc1(input).tanh()  # [32, 20, 256]
 
         dots = torch.matmul(embedded_input, torch.unsqueeze(x, dim=-1))
