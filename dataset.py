@@ -7,7 +7,7 @@ import random
 from tqdm import tqdm
 
 import numpy as np
-import h5py
+from load import load_data
 
 SPLIT = (0.6, 0.2, 0.2)
 SPLIT_ZERO_SHOT = (0.75, 0.25)
@@ -27,12 +27,34 @@ class DataSet(torch.utils.data.Dataset):
 		self.game_size = game_size
 		self.device = device
 
-		if self.properties_dim == [10, 10, 10, 8, 4, 15] or self.properties_dim == [10, 10, 4, 4, 4, 15]:
-			print("Loading 3dshapes dataset...")
-			load_dataset = h5py.File('3dshapes/3dshapes.h5', 'r')
-			self.images = np.asarray(load_dataset['images'])  # array shape [480000,64,64,3], uint8 in range(256)
-			self.labels = np.asarray(load_dataset['labels'])  # array shape [480000,6], float64
-			print("3dshapes loaded successfully")
+		# if self.properties_dim == [10, 10, 4, 4, 4, 15]:
+		# 	print("Loading 3dshapes dataset...")
+		# 	# first load the dataset and define all parts necessary for the training
+		# 	# try to load the dataset if it was saved before
+		# 	try:
+		# 		train_data = torch.load('./dataset/training_dataset')
+		# 		validation_data = torch.load('./dataset/validation_dataset')
+		# 		test_data = torch.load('./dataset/test_dataset')
+
+		# 		print('Dataset was found and loaded successfully')
+
+		# 	# otherwise create the dataset and save it to the foulder for use in later runs
+		# 	except:
+		# 		print('Dataset not found, creating it instead...')
+		# 		input_shape = [3,64,64]
+				
+		# 		train_data, validation_data, test_data, target_names, full_labels, complete_data = load_data(input_shape, normalize=False,
+		# 																		subtract_mean=False,
+		# 																		trait_weights=None,
+		# 																		return_trait_weights=False,
+		# 																		return_full_labels=True,
+		# 																		datapath=None)
+				
+		# 		torch.save(train_data, './dataset/training_dataset')
+		# 		torch.save(validation_data, './dataset/validation_dataset')
+		# 		torch.save(test_data, './dataset/test_dataset')
+		# 		torch.save(complete_data, './dataset/complete_dataset')
+			
 
 		# get all concepts
 		self.concepts = self.get_all_concepts()
@@ -51,8 +73,6 @@ class DataSet(torch.utils.data.Dataset):
 
 	def __getitem__(self, idx):
 		"""Returns the i-th sample (and label?) given an index (idx)."""
-		#print("this is one sample: ", self.dataset[idx])
-		return 1
 		return self.dataset[idx]
 
 
@@ -159,7 +179,6 @@ class DataSet(torch.utils.data.Dataset):
 		return train, val, test
 
 
-
 	def get_item(self, concept_idx, context_condition, encoding_func, include_concept=False):
 		"""
 		Receives concept-context pairs and an encoding function.
@@ -215,27 +234,27 @@ class DataSet(torch.utils.data.Dataset):
 		#return torch.cat([sender_input, sender_label]), receiver_label, receiver_input
 		return sender_input, receiver_label, receiver_input
 
-	def find_image(self, object):
-		# create lists with all possible label values
-		floors = [0.0, 0.1, 0.2, 0.30000000000000004, 0.4, 0.5, 0.6000000000000001, 0.7000000000000001, 0.8, 0.9]
-		walls = [0.0, 0.1, 0.2, 0.30000000000000004, 0.4, 0.5, 0.6000000000000001, 0.7000000000000001, 0.8, 0.9]
-		colors = [0.0, 0.1, 0.2, 0.30000000000000004, 0.4, 0.5, 0.6000000000000001, 0.7000000000000001, 0.8, 0.9]
-		scales = [0.75, 0.8214285714285714, 0.8928571428571428, 0.9642857142857143, 1.0357142857142856, 1.1071428571428572, 1.1785714285714286, 1.25]
-		shapes = [0.0, 1.0, 2.0, 3.0]
-		orientations = [-30.0, -25.714285714285715, -21.42857142857143, -17.142857142857142, -12.857142857142858, -8.571428571428573, -4.285714285714285, 
-						0.0, 4.285714285714285, 8.57142857142857, 12.857142857142854, 17.14285714285714, 21.42857142857143, 25.714285714285715, 30.0]
-		# translate symbolic labels to their real value counterparts
-		object_label = np.asarray([floors[object[0]], walls[object[1]], colors[object[2]],
-				scales[object[3]], shapes[object[4]], orientations[object[5]]])
-		# search the labels for it's index in all labels
+	# def find_image(self, object):
+	# 	# create lists with all possible label values
+	# 	floors = [0.0, 0.1, 0.2, 0.30000000000000004, 0.4, 0.5, 0.6000000000000001, 0.7000000000000001, 0.8, 0.9]
+	# 	walls = [0.0, 0.1, 0.2, 0.30000000000000004, 0.4, 0.5, 0.6000000000000001, 0.7000000000000001, 0.8, 0.9]
+	# 	colors = [0.0, 0.1, 0.2, 0.30000000000000004, 0.4, 0.5, 0.6000000000000001, 0.7000000000000001, 0.8, 0.9]
+	# 	scales = [0.75, 0.8214285714285714, 0.8928571428571428, 0.9642857142857143, 1.0357142857142856, 1.1071428571428572, 1.1785714285714286, 1.25]
+	# 	shapes = [0.0, 1.0, 2.0, 3.0]
+	# 	orientations = [-30.0, -25.714285714285715, -21.42857142857143, -17.142857142857142, -12.857142857142858, -8.571428571428573, -4.285714285714285, 
+	# 					0.0, 4.285714285714285, 8.57142857142857, 12.857142857142854, 17.14285714285714, 21.42857142857143, 25.714285714285715, 30.0]
+	# 	# translate symbolic labels to their real value counterparts
+	# 	object_label = np.asarray([floors[object[0]], walls[object[1]], colors[object[2]],
+	# 			scales[object[3]], shapes[object[4]], orientations[object[5]]])
+	# 	# search the labels for it's index in all labels
 		
-		for idx,label in enumerate(self.labels):
-			if (label == object_label).all():
-				print("this is object label: " + str(object_label))
-				print("this is label: " + str(label))
-				# assign corresponding image to label accordingly
-				image = self.images[idx]
-			return (image, label)
+	# 	for idx,label in enumerate(self.labels):
+	# 		if (label == object_label).all():
+	# 			print("this is object label: " + str(object_label))
+	# 			print("this is label: " + str(label))
+	# 			# assign corresponding image to label accordingly
+	# 			image = self.images[idx]
+	# 		return (image, label)
 
 	def get_sample(self, concept_idx, context_condition):
 		"""
