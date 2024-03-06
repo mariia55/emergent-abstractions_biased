@@ -32,7 +32,7 @@ def get_params(params):
     parser.add_argument('--load_dataset', type=str, default=None,
                         help='If provided that data set is loaded. Datasets can be generated with pickle.ds'
                             'This makes sense if running several runs with the exact same dataset.')
-    parser.add_argument('--dimensions', nargs='+', type=int, default= [3, 3, 3])
+    parser.add_argument('--dimensions', nargs='+', type=int, default=None)
     parser.add_argument('--attributes', type=int, default=3)
     parser.add_argument('--values', type=int, default=4)
     parser.add_argument('--game_size', type=int, default=10)
@@ -243,14 +243,17 @@ def main(params):
     # define game setting from args
     if opts.context_unaware:
         opts.game_setting = 'context_unaware'
-        if opts.length_cost:
+        if opts.length_cost != 0.0:
             opts.game_setting = 'length_cost/context_unaware'
+        else:
+            opts.game_setting = 'length_cost/no_cost_context_unaware'
     elif opts.mu_and_goodman:
         opts.game_setting = 'mu_and_goodman'
     else:
         opts.game_setting = 'standard'
-        if opts.length_cost:
+        if opts.length_cost != 0.0:
             opts.game_setting = 'length_cost/context_aware'
+        else: 'length_cost/no_cost_context_aware'
 
     # if name of precreated data set is given, load dataset
     if opts.load_dataset:
