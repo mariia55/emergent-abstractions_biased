@@ -32,4 +32,6 @@ floats_reults_vis.py
 grid_search/results_17-02.csv
 grid_search/17-02
 grid_search/results_18-02.csv
-grid_search/18-02/0.err
+grid_search/18-02
+archs_attention.py
+archs_concept_based_thresholds.py
