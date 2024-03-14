@@ -86,7 +86,9 @@ def plot_heatmap_concept_x_context(result_list,
                                     n_runs=5,
                                     matrix_indices=None,
                                     fontsize=18,
-                                    inner_fontsize_fctr=0):
+                                    inner_fontsize_fctr=0,
+                                    one_dataset=False,
+                                    attributes=4):
     """ Plot heatmaps in matrix arrangement for single values (e.g. final accuracies).
     Allows for plotting multiple matrices according to plot_dims, and allows different modes:
     'max', 'min', mean', 'median', each across runs. """
@@ -114,6 +116,8 @@ def plot_heatmap_concept_x_context(result_list,
             matrix_indices = sorted(list(itertools.product(range(4), repeat=2)), key=lambda x: x[1])
         else:
             matrix_indices = sorted(list(itertools.product(range(5), repeat=2)), key=lambda x: x[1])
+        if one_dataset:
+            matrix_indices = sorted(list(itertools.product(range(attributes), repeat=2)), key=lambda x: x[1])
 
         if different_ylims:
             y_lim = ylims[i]
@@ -169,6 +173,85 @@ def plot_heatmap_concept_x_context(result_list,
             plt.suptitle(suptitle, fontsize=fontsize+1, y=suptitle_position)
 
     plt.tight_layout()
+
+
+def plot_heatmap_concept_x_context_errors(result_list,
+                                          plot_dims=(2, 3),
+                                          heatmap_size=(3, 3),
+                                          figsize=(7, 7),
+                                          ylims=(0.6, 1.0),
+                                          titles=('D(3,4)', 'D(3,8)', 'D(3,16)', 'D(4,4)', 'D(4,8)', 'D(5,4)'),
+                                          datasets = ['(3,4)', '(3,8)', '(3,16)', '(4,4)', '(4,8)', '(5,4)'],
+                                          suptitle=None,
+                                          suptitle_position=1.03,
+                                          different_ylims=False,
+                                          n_runs=5,
+                                          matrix_indices=None,
+                                          fontsize=18,
+                                          inner_fontsize_fctr=0,
+                                          one_dataset=False,
+                                          attributes=4):
+    """ Plot heatmaps in matrix arrangement for single values (e.g. final accuracies).
+    Allows for plotting multiple matrices according to plot_dims.
+    This function has been adapted to the use of displaying errors for each concept x context condition"""
+
+    plt.figure(figsize=figsize)
+
+    # 6 datasets
+    for i in range(np.prod(plot_dims)):
+        # D(3,4), D(3,8), D(3,16)
+        if i < 3:
+            matrix_indices = sorted(list(itertools.product(range(3), repeat=2)), key=lambda x: x[1])
+        # D(4,4), D(4,8)
+        elif i == 3 or i == 4:
+            matrix_indices = sorted(list(itertools.product(range(4), repeat=2)), key=lambda x: x[1])
+        else:
+            matrix_indices = sorted(list(itertools.product(range(5), repeat=2)), key=lambda x: x[1])
+        if one_dataset:
+            matrix_indices = sorted(list(itertools.product(range(attributes), repeat=2)), key=lambda x: x[1])
+
+        if different_ylims:
+            y_lim = ylims[i]
+        else:
+            y_lim = ylims
+
+        heatmap = np.empty(heatmap_size)
+        heatmap[:] = np.nan
+
+        plt.subplot(plot_dims[0], plot_dims[1], i + 1)
+
+        for p, pos in enumerate(matrix_indices):
+            try:
+                if one_dataset:
+                    heatmap[pos] = result_list[pos]
+                else:
+                    results = result_list[datasets[i]]
+                    heatmap[pos] = results[pos]
+            except:
+                IndexError
+
+        im = plt.imshow(heatmap, vmin=y_lim[0], vmax=y_lim[1])
+        plt.title(titles[i], fontsize=fontsize)
+        plt.xlabel('# Fixed Attributes', fontsize=fontsize)
+        plt.ylabel('# Shared Attributes', fontsize=fontsize)
+        plt.xticks(ticks=list(range(len(heatmap))), labels=list(range(1, len(heatmap) + 1)), fontsize=fontsize - 1)
+        plt.yticks(ticks=list(range(len(heatmap))), labels=list(range(len(heatmap))), fontsize=fontsize - 1)
+        cbar = plt.colorbar(im, fraction=0.046, pad=0.04)
+        cbar.ax.get_yaxis().set_ticks(y_lim)
+        cbar.ax.tick_params(labelsize=fontsize - 2)
+
+        for col in range(len(heatmap)):
+            for row in range(len(heatmap[0])):
+                if not np.isnan(heatmap[row, col]):
+                    ax = plt.gca()
+                    _ = ax.text(col, row, np.round(heatmap[row, col], 2), ha="center", va="center", color="k",
+                                fontsize=fontsize + inner_fontsize_fctr)
+
+        if suptitle:
+            plt.suptitle(suptitle, fontsize=fontsize + 1, y=suptitle_position)
+
+    plt.tight_layout()
+
 
 
 def plot_heatmap_different_vs(result_list,
