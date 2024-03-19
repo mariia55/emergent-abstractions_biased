@@ -196,7 +196,9 @@ def loss(_sender_input, _message, _receiver_input, receiver_output, labels, _aux
     loss_fn = nn.BCEWithLogitsLoss()
     loss = loss_fn(receiver_output, labels)
     receiver_pred = (receiver_output > 0).float()
-    per_game_acc = (receiver_pred == labels).float().mean(1).cpu().numpy()  # all labels have to be predicted correctly
+    per_game_acc = (
+        (receiver_pred == labels).float().mean(1).cpu().numpy()
+    )  # all labels have to be predicted correctly
     acc = per_game_acc.mean()
     return loss, {"acc": acc}
 
@@ -231,16 +233,23 @@ def train(opts, datasets, verbose_callbacks=False):
         # use speaker hidden size also for listener (except explicitly given)
         if not opts.listener_hidden_size:
             opts.listener_hidden_size = opts.speaker_hidden_size
-        sender = Speaker(feature.FeatureMLP(
+        sender = Speaker(
+            feature.FeatureMLP(
                 input_size=sum(dimensions),
-                output_size=int(opts.speaker_hidden_size/2),   # divide by 2 to allow for concatenating prototype embeddings
+                output_size=int(
+                    opts.speaker_hidden_size / 2
+                ),  # divide by 2 to allow for concatenating prototype embeddings
                 n_layers=opts.speaker_n_layers,
-            ), n_targets=opts.game_size)
-        receiver = Listener(feature.FeatureMLP(
-                            input_size=sum(dimensions),
-                            output_size=opts.listener_hidden_size,
-                            n_layers=opts.listener_n_layers,
-                            ))
+            ),
+            n_targets=opts.game_size,
+        )
+        receiver = Listener(
+            feature.FeatureMLP(
+                input_size=sum(dimensions),
+                output_size=opts.listener_hidden_size,
+                n_layers=opts.listener_n_layers,
+            )
+        )
     else:
         sender = Sender(
             opts.hidden_size, sum(dimensions), opts.game_size, opts.context_unaware
@@ -389,15 +398,15 @@ def main(params):
 
     # define game setting from args
     if opts.context_unaware:
-        opts.game_setting = 'context_unaware'
+        opts.game_setting = "context_unaware"
         if opts.length_cost:
-            opts.game_setting = 'length_cost/context_unaware'
+            opts.game_setting = "length_cost/context_unaware"
     elif opts.mu_and_goodman:
-        opts.game_setting = 'mu_and_goodman'
+        opts.game_setting = "mu_and_goodman"
     else:
-        opts.game_setting = 'standard'
+        opts.game_setting = "standard"
         if opts.length_cost:
-            opts.game_setting = 'length_cost/context_aware'
+            opts.game_setting = "length_cost/context_aware"
 
     # if name of precreated data set is given, load dataset
     if opts.load_dataset:
