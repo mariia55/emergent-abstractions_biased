@@ -512,7 +512,10 @@ def obtain_concept_x_context_counts(sender_input, n_values):
 
 
 def error_analysis(datasets, paths, setting, n_epochs, n_values, validation=True):
-    """"""
+    """
+    goes through interactions, retrieves concept and context conditions and counts errors,
+    i.e. incorrectly classified objects (by the receiver)
+    """
     all_error_concepts = {}
     all_error_contexts = {}
     all_error_concept_x_context = {}
