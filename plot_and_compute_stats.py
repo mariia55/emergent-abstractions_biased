@@ -11,7 +11,7 @@ def compute_stats(metric_values):
     return np.mean(metric_values, axis=1)[-1], np.std(metric_values, axis=1)[-1]
 
 
-def plot_and_compute_statistics(path, start_run=25, end_run=30):
+def plot_and_compute_statistics(path, start_run=0, end_run=5):
     """
     Opens metrics and loss pickle files for given dataset. Parses data into
     train_losses, test_losses, train_accs, test_accs lists and uses these

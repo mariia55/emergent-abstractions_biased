@@ -17,7 +17,7 @@ from language_analysis_local import *
 import os
 
 import float_dataset
-from archs import Sender, Receiver
+from archs_threshold import Sender, Receiver
 from archs_mu_goodman import Speaker, Listener
 import feature
 import itertools
