@@ -167,7 +167,7 @@ def load_data(input_shape, normalize=True,
         data = np.array([data[idx] for idx in keeper_idxs])
 
     (train_data, test_data, train_labels, test_labels) = train_test_split(data, labels_reg,
-                                                                          test_size=0.2) # 0.2 to get 0.2 to 0.8 train and test split
+                                                                          test_size=0.8) # 0.2 to get 0.2 to 0.8 train and test split
     
     (train_data, val_data, train_labels, val_labels) = train_test_split(train_data, train_labels,
                                                                           test_size=0.25) # 0.25 from the 0.8 training data to achieve overall split of 0.6 train, 0.2 val, 0.2 test

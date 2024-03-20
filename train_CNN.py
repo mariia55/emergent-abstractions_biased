@@ -281,8 +281,8 @@ if __name__ == "__main__":
     torch.save(test_data, './dataset/test_dataset')
     torch.save(complete_data, './dataset/complete_dataset')
 
-    data = torch.load('./dataset/complete_dataset')
-    concepts = data.get_all_concepts()
+    #data = torch.load('./dataset/complete_dataset')
+    #concepts = data.get_all_concepts()
     # args = get_params()
 
     # train_losses, train_accuracies, test_losses, test_accuracies = train(args)
