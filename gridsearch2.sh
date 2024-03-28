@@ -11,6 +11,6 @@ source $HOME/.bashrc
 spack load miniconda3@4.10.3
 conda activate emergab 
 
-srun python $HOME/emergent-abstractions/ -m egg.nest.nest_local --game train --sweep grid_search/parameters.json --n_workers=25 --root_dir "grid_search/28-03b" --name "emergent-abstractions"
+srun python $HOME/emergent-abstractions/ -m egg.nest.nest_local --game train --sweep grid_search/parameters.json --n_workers=25 --root_dir "grid_search/28-03mw" --name "emergent-abstractions"
 #just make sure system got time to save all the models and stuff...
 srun sleep 10
