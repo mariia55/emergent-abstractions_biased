@@ -19,7 +19,7 @@ export CONDA_PREFIX="/home/student/r/rverdugo/miniconda3/envs/emergab"
 source $HOME/.bashrc
 
 # Activate the emergab environment using conda
-conda activate emergab
+source "/home/student/r/rverdugo/miniconda3/bin/activate" emergab
 
 # Set the PYTHONPATH to include the egg module directory
 export PYTHONPATH="/home/student/r/rverdugo/miniconda3/envs/emergab/lib/python3.9/site-packages:$PYTHONPATH"
