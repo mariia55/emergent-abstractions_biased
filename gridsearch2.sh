@@ -18,11 +18,7 @@ export CONDA_PREFIX="/home/student/r/rverdugo/miniconda3/envs/emergab"
 # Source the .bashrc file
 source $HOME/.bashrc
 
-# Add the Conda installation in your home directory to the PATH
-export PATH="/home/student/r/rverdugo/miniconda3/bin:$PATH"
-
-# Activate the emergab environment
-source "/home/student/r/rverdugo/miniconda3/etc/profile.d/conda.sh"
+# Activate the emergab environment using conda
 conda activate emergab
 
 # Set the PYTHONPATH to include the egg module directory
