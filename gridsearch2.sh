@@ -4,7 +4,7 @@
 export PATH="/home/student/r/rverdugo/miniconda3/bin:$PATH"
 
 # Set the CONDA_PREFIX for the Slurm job environment
-export CONDA_PREFIX="/home/student/r/rverdugo/miniconda3/envs/emergab"
+export CONDA_PREFIX="/home/student/r/rverdugo/miniconda3/envs/myenv"
 
 #SBATCH -J standard-grid-search
 #SBATCH --time=35:00:00
@@ -19,16 +19,16 @@ export CONDA_PREFIX="/home/student/r/rverdugo/miniconda3/envs/emergab"
 source $HOME/.bashrc
 
 # Activate the emergab environment using conda
-source "/home/student/r/rverdugo/miniconda3/bin/activate" emergab
+source "/home/student/r/rverdugo/miniconda3/bin/activate" myenv
 
 # Set the PYTHONPATH to include the egg module directory
-export PYTHONPATH="/home/student/r/rverdugo/miniconda3/envs/emergab/lib/python3.9/site-packages:$PYTHONPATH"
+export PYTHONPATH="/home/student/r/rverdugo/miniconda3/envs/myenv/lib/python3.11/site-packages:$PYTHONPATH"
 
 # Navigate to the emergent-abstractions directory
 cd "$HOME/emergent-abstractions/"
 
 # Run the Python script using srun with the absolute path to nest_local.py
-srun python /home/student/r/rverdugo/miniconda3/envs/emergab/lib/python3.9/site-packages/egg/nest/nest_local.py --game train --sweep grid_search/parameters.json --n_workers=25 --root_dir "grid_search/29-03-2-sv" --name "emergent-abstractions"
+srun python /home/student/r/rverdugo/miniconda3/envs/myenv/lib/python3.11/site-packages/egg/nest/nest_local.py --game train --sweep grid_search/parameters.json --n_workers=25 --root_dir "grid_search/29-03-2-sv" --name "emergent-abstractions"
 
 # Make sure the system has time to save all the models and stuff
 srun sleep 10
