@@ -15,11 +15,11 @@ source $HOME/.bashrc
 export PATH="/home/student/r/rverdugo/miniconda3/bin:$PATH"
 
 # Activate the emergab environment
-source /home/student/r/rverdugo/miniconda3/etc/profile.d/conda.sh
+source "/home/student/r/rverdugo/miniconda3/etc/profile.d/conda.sh"
 conda activate emergab
 
 # Navigate to the emergent-abstractions directory
-cd $HOME/emergent-abstractions/
+cd "$HOME/emergent-abstractions/"
 
 # Run the Python script using srun
 srun python -m egg.nest.nest_local --game train --sweep grid_search/parameters.json --n_workers=25 --root_dir "grid_search/29-03-2" --name "emergent-abstractions"
