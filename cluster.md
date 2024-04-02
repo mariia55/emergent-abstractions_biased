@@ -123,21 +123,6 @@ squeue -u <your_username> -t R
 squeue -u your_username -t PD,R
 ```
 
-By default, squeue displays a set of default columns. However, you can customize the output format using the `-o` or `--format` option to include specific information that you're interested in.
-
-For example, to display the job ID, job name, state, and time used:
-
-```bash
-squeue -u <your_username> -o "%.10i %.30j %.2t %.10M"
-```
-
-Here's what each format specifier represents:
-
-- `%.10i`: Job ID, right-justified, 10 characters wide
-- `%.30j`: Job name, left-justified, 30 characters wide
-- `%.2t`: Job state, right-justified, 2 characters wide
-- `%.10M`: Time used by the job, right-justified, 10 characters wide
-
 By default, `squeue` provides a snapshot of the job queue at the moment you run the command. To get real-time updates, you can use the `-i` or `--iterate` option followed by the update interval in seconds.
 
 For example, to update the queue information every 5 seconds
@@ -252,3 +237,87 @@ If you encounter the error message "ModuleNotFoundError: No module named 'your_m
     ```
     Replace `<module_name>` by your concrete module's name.
     If this passes without an error, the module is correctly installed.
+
+### Example: egg not found
+You might also see the following error:
+```bash
+Error while finding module specification for 'egg.nest.nest_local' (ModuleNotFoundError: No module named 'egg')
+srun: error: hpc3-41: task 0: Exited with exit code 1
+```
+
+1. activate `emergab` environment:
+   ```bash
+   conda activate emergab
+   ```
+2. start a interactive python shell
+   ```bash
+   python
+   ```
+3. find the location of the module
+   ```python
+   import egg
+   print(egg.__file__)
+   ```
+   this should output something like this:
+   ```bash
+   /home/student/<letter>/<username>/miniconda3/envs/emergab/lib/python3.9/site-packages/egg/__init__.py
+   ```
+   exit the interactive pyton shell:
+
+   ```python
+   exit()
+   ```
+4. The directory containing the `egg` module is the path up to the egg folder. In this example, it would be:
+   ```bash
+   /home/student/<letter>/<username>/miniconda3/envs/emergab/lib/python3.9/site-packages/
+   ```
+   Use this path to set the `PYTHONPATH` environment variable in the script that is used for the job:
+   ```sh
+   export PYTHONPATH="/home/student/r/rverdugo/miniconda3/envs/emergab/lib/python3.9/site-packages:$PYTHONPATH"
+   ```
+5. To use the absolute path for the egg module in your script, replace the srun command with
+   ```sh
+   srun python /home/student/<letter>/<username>/miniconda3/envs/emergab/lib/python3.9/site-packages/egg/nest/nest_local.py <rest of the command>
+   ```
+
+### Issue with loading the PyTorch C
+```bash
+Traceback (most recent call last):
+  File "/home/student/r/rverdugo/miniconda3/envs/emergab/lib/python3.9/site-packages/egg/nest/nest_local.py", line 13, in <module>
+    from egg.nest.wrappers import ConcurrentWrapper
+  File "/home/student/r/rverdugo/miniconda3/envs/emergab/lib/python3.9/site-packages/egg/nest/wrappers.py", line 10, in <module>
+    import torch
+  File "/home/student/r/rverdugo/miniconda3/envs/emergab/lib/python3.9/site-packages/torch/__init__.py", line 451, in <module>
+    raise ImportError(textwrap.dedent('''
+ImportError: Failed to load PyTorch C extensions:
+    It appears that PyTorch has loaded the `torch/_C` folder
+    of the PyTorch repository rather than the C extensions which
+    are expected in the `torch._C` namespace. This can occur when
+    using the `install` workflow. e.g.
+        $ python setup.py install && python -c "import torch"
+
+    This error can generally be solved using the `develop` workflow
+        $ python setup.py develop && python -c "import torch"  # This should succeed
+    or by running Python from a different directory.
+srun: error: hpc3-4: task 0: Exited with exit code 1
+```
+This error indicates a problem with the torch installation. To fix it, we will uninstall torch and re-install it using the `conda` package manager instead of pip.
+
+1. uninstalling
+```bash
+conda activate emergab
+pip uninstall torch
+```
+2. reinstall
+```bash
+conda install pytorch torchvision -c pytorch
+```
+3. verify correct installation
+```
+python -c "import torch; print(torch.__version__)"
+```
+This should print the version of pytorch, for example:
+```bash
+2.2.2
+```
+
