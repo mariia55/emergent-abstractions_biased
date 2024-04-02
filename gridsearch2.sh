@@ -1,11 +1,5 @@
 #!/bin/bash
 
-# Set the PATH for the Slurm job environment
-export PATH="/home/student/r/rverdugo/miniconda3/bin:$PATH"
-
-# Set the CONDA_PREFIX for the Slurm job environment
-export CONDA_PREFIX="/home/student/r/rverdugo/miniconda3/envs/myenv"
-
 #SBATCH -J standard-grid-search
 #SBATCH --time=35:00:00
 #SBATCH --mem=400gb
@@ -14,6 +8,12 @@ export CONDA_PREFIX="/home/student/r/rverdugo/miniconda3/envs/myenv"
 #SBATCH --cpus-per-task=30
 #SBATCH --partition=gpu
 #SBATCH --gpu-bind=single:1
+
+# Set the PATH for the Slurm job environment
+export PATH="/home/student/r/rverdugo/miniconda3/bin:$PATH"
+
+# Set the CONDA_PREFIX for the Slurm job environment
+export CONDA_PREFIX="/home/student/r/rverdugo/miniconda3/envs/myenv"
 
 # Source the .bashrc file
 source $HOME/.bashrc
@@ -28,7 +28,7 @@ conda activate emergab2
 cd "$HOME/emergent-abstractions/"
 
 # Run the Python script using srun with the absolute path to nest_local.py
-srun python -m egg.nest.nest_local --game train --sweep grid_search/parameters.json --n_workers=25 --root_dir "grid_search/02-04" --name "emergent-abstractions"
+srun python -m egg.nest.nest_local --game train --sweep grid_search/parameters.json --n_workers=25 --root_dir "grid_search/02-04b" --name "emergent-abstractions"
 
 # Make sure the system has time to save all the models and stuff
 srun sleep 10
