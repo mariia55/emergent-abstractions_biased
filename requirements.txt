@@ -4,7 +4,6 @@ scipy
 numpy
 pytest
 editdistance
-dataclasses
 rich
 scikit-learn
 wandb
