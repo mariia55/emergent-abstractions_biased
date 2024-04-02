@@ -79,6 +79,13 @@ def get_params(params):
                         help="Use for baselining against Mu and Goodman (2021) setting.")
     parser.add_argument("--listener_n_layers", default=2, type=int,
                         help="Use for baselining against Mu and Goodman (2021) setting.")
+    parser.add_argument("--early_stopping", type=bool, default=False,
+                        help="Use for early stopping with loss, specify patience and min_delta for correct usage.")
+    parser.add_argument("--patience", type=int, default=10,
+                        help="How many epochs to wait for a significant improvement of loss before early stopping.")
+    parser.add_argument("--min_delta", type=float, default=0.001,
+                        help="How much of an improvement to consider a significant improvement of loss before early "
+                             "stopping.")
 
     args = core.init(parser, params)
 
@@ -184,21 +191,24 @@ def train(opts, datasets, verbose_callbacks=False):
 
     # setup training and callbacks
     # results/ data set name/ kind_of_dataset/ run/
-    callbacks = [SavingConsoleLogger(print_train_loss=True, as_json=True,
-                                     save_path=opts.save_path, save_epoch=save_epoch),
-                 core.TemperatureUpdater(agent=sender, decay=opts.temp_update, minimum=0.5)]
+    if opts.early_stopping:
+        callbacks = [SavingConsoleLogger(print_train_loss=True, as_json=True,
+                                         save_path=opts.save_path, save_epoch=save_epoch),
+                     core.TemperatureUpdater(agent=sender, decay=opts.temp_update, minimum=0.5),
+                     EarlyStopperLossWithPatience(patience=opts.patience, min_delta=opts.min_delta)]
+    else:
+        callbacks = [SavingConsoleLogger(print_train_loss=True, as_json=True,
+                                         save_path=opts.save_path, save_epoch=save_epoch),
+                     core.TemperatureUpdater(agent=sender, decay=opts.temp_update, minimum=0.5)]
     if opts.save:
         callbacks.extend([core.callbacks.InteractionSaver([opts.n_epochs],
                                                           test_epochs=[opts.n_epochs],
                                                           checkpoint_dir=opts.save_path),
-                          core.callbacks.CheckpointSaver(opts.save_path, checkpoint_freq=0)]) # TODO
+                          core.callbacks.CheckpointSaver(opts.save_path, checkpoint_freq=0)])
     if verbose_callbacks:
         callbacks.extend([
             TopographicSimilarityConceptLevel(dimensions, is_gumbel=True,
-                                              save_path=opts.save_path, save_epoch=save_epoch),
-            #MessageLengthHierarchical(len(dimensions),
-            #                          print_train=True, print_test=True, is_gumbel=True,
-            #                          save_path=opts.save_path, save_epoch=save_epoch)
+                                              save_path=opts.save_path, save_epoch=save_epoch)
         ])
 
     trainer = core.Trainer(game=game, optimizer=optimizer,
@@ -276,7 +286,7 @@ def main(params):
             # create subfolder if necessary
             opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
             if not os.path.exists(opts.save_path) and opts.save:
-                os.makedirs(opts.save_path)             
+                os.makedirs(opts.save_path)
 
         # zero-shot                
         if opts.zero_shot:
