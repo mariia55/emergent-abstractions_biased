@@ -21,7 +21,7 @@ conda activate eggfix
 cd "$HOME/emergent-abstractions/"
 
 # Run the Python script using srun with the absolute path to nest_local.py
-srun python -m egg.nest.nest_local --game train --sweep grid_search/parameters.json --n_workers=29 --root_dir "grid_search/03-04b" --name "emergent-abstractions"
+srun /home/student/r/rverdugo/miniconda3/envs/eggfix/bin/python -m egg.nest.nest_local --game train --sweep grid_search/parameters.json --n_workers=29 --root_dir "grid_search/03-04b" --name "emergent-abstractions"
 
 # Make sure the system has time to save all the models and stuff
 srun sleep 10
