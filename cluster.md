@@ -43,23 +43,49 @@ To submit a job using `slurm`, create a script specifying the job. Here's an exa
 #SBATCH --partition=partition_name
 #SBATCH --gpu-bind=single:1
 
+source $HOME/.bashrc
+
+# Activate the emergab environment using conda
+spack load miniconda3
+conda activate <env_name>
+
+# Navigate to the emergent-abstractions directory
+cd "$HOME/emergent-abstractions/"
+
+# Run the Python script using srun 
+srun python -m egg.nest.nest_local --game train --sweep grid_search/parameters.json --n_workers=25 --root_dir "grid_search/02-04b" --name "emergent-abstractions"
+
+# Make sure the system has time to save all the models and stuff
+srun sleep 10
+```
+Alternatively, if you encounter errors regarding the activation of your environment, provide the env path. 
+```sh
+#!/bin/bash
+
+#SBATCH -J standard-grid-search
+#SBATCH --time=35:00:00
+#SBATCH --mem=400gb
+#SBATCH --gpus=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=30
+#SBATCH --partition=gpu
+#SBATCH --gpu-bind=single:1
+
+
 # Source the .bashrc file
 source $HOME/.bashrc
 
-# Add the Conda installation to the PATH
-export PATH="/path/to/miniconda3/bin:$PATH"
+# Activate the emergab environment using conda
+spack load miniconda3
+conda activate <env_name>
 
-# Activate the Conda environment
-source /path/to/miniconda3/etc/profile.d/conda.sh
-conda activate environment_name
+# Navigate to the emergent-abstractions directory
+cd "$HOME/emergent-abstractions/"
 
-# Navigate to the project directory
-cd /path/to/project/directory
+# Add the path to YOUR environment before command line to run
+srun /home/student/r/rverdugo/miniconda3/envs/<env_name>/bin/python -m egg.nest.nest_local --game train --sweep grid_search/parameters.json --n_workers=29 --root_dir "grid_search/03-04b" --name "emergent-abstractions"
 
-# Run the Python script using srun
-srun python script.py --arg1 value1 --arg2 value2
-
-# Optional: Add a sleep command to allow time for saving output files
+# Make sure the system has time to save all the models and stuff
 srun sleep 10
 ```
 
@@ -142,6 +168,17 @@ Replace `<jobid>` with your actual `JOBID` assigned by Slurm.
 ### Cancel a job
 ```bash
 scancel <jobid>
+```
+
+### Transfer a folder from the cluster to your local machine
+
+```bash
+scp -r <username>@hpc3.rz.uos.de:/home/student/r/<username>/some_path/some_folder <local_target_folder>
+```
+
+example (copy to current folder on local machine):
+```bash
+scp -r user123@hpc3.rz.uos.de:/home/student/r/123/some_path/some_folder .
 ```
 
 ## Dealing with conda environments
@@ -279,6 +316,43 @@ srun: error: hpc3-41: task 0: Exited with exit code 1
    ```sh
    srun python /home/student/<letter>/<username>/miniconda3/envs/emergab/lib/python3.9/site-packages/egg/nest/nest_local.py <rest of the command>
    ```
+
+### installation of egg via pip fails
+```bash
+(emergab2) [rverdugo@mgmt01 emergent-abstractions]$ pip install git+https://github.com/facebookresearch/EGG.git
+Collecting git+https://github.com/facebookresearch/EGG.git
+  Cloning https://github.com/facebookresearch/EGG.git to /tmp/pip-req-build-rg__c10k
+  Running command git clone --filter=blob:none --quiet https://github.com/facebookresearch/EGG.git /tmp/pip-req-build-rg__c10k
+  /usr/libexec/git-core/git-remote-https: symbol lookup error: /lib64/libk5crypto.so.3: undefined symbol: EVP_KDF_ctrl, version OPENSSL_1_1_1b
+  error: subprocess-exited-with-error
+
+  × git clone --filter=blob:none --quiet https://github.com/facebookresearch/EGG.git /tmp/pip-req-build-rg__c10k did not run successfully.
+  │ exit code: 128
+  ╰─> See above for output.
+
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+error: subprocess-exited-with-error
+
+× git clone --filter=blob:none --quiet https://github.com/facebookresearch/EGG.git /tmp/pip-req-build-rg__c10k did not run successfully.
+│ exit code: 128
+╰─> See above for output.
+
+note: This error originates from a subprocess, and is likely not a problem with pip.
+```
+
+Download the [egg repo from github](https://github.com/facebookresearch/EGG)  and navigate to the EGG folder. Activate the desired (conda) environment you would like to install egg to, then run:
+
+```bash
+pip install .
+```
+
+To check that `egg` was installed correctly as a module, run:
+
+```
+python -c "import egg"
+```
+
+If this executes without an error, it means the `egg` was installed succesfully.
 
 ### Issue with loading the PyTorch C
 ```bash
