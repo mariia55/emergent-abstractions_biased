@@ -13,7 +13,7 @@
 export PATH="/home/student/r/rverdugo/miniconda3/bin:$PATH"
 
 # Set the CONDA_PREFIX for the Slurm job environment
-# export CONDA_PREFIX="/home/student/r/rverdugo/miniconda3/envs/myenv"
+export CONDA_PREFIX="/home/student/r/rverdugo/miniconda3/envs/eggfix"
 
 # Source the .bashrc file
 source $HOME/.bashrc
