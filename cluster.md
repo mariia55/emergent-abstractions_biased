@@ -171,12 +171,14 @@ scancel <jobid>
 ```
 
 ### Transfer a folder from the cluster to your local machine
-
+ 
 ```bash
 scp -r <username>@hpc3.rz.uos.de:/home/student/r/<username>/some_path/some_folder <local_target_folder>
 ```
 
-example (copy to current folder on local machine):
+Example (copy to current folder on local machine):
+
+Navigate to the folder in your local machine you wish to store the file in. Right click and open a terminal within that folder.
 ```bash
 scp -r user123@hpc3.rz.uos.de:/home/student/r/123/some_path/some_folder .
 ```
