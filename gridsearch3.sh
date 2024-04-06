@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#SBATCH -J gs_DS_3_16
-#SBATCH --time=48:00:00
+#SBATCH -J gs_DS_5_4
+#SBATCH --time=40:00:00
 #SBATCH --mem=400gb
 #SBATCH --gpus=1
 #SBATCH --ntasks=1
@@ -21,7 +21,7 @@ conda activate eggfix
 cd "$HOME/emergent-abstractions/"
 
 # Run the Python script using srun with the absolute path to nest_local.py
-srun /home/student/r/rverdugo/miniconda3/envs/eggfix/bin/python -m egg.nest.nest_local --game train --sweep grid_search/parameters_by_DS.json --n_workers=25 --root_dir "grid_search/DS_3_16" --name "emergent-abstractions"
+srun /home/student/r/rverdugo/miniconda3/envs/eggfix/bin/python -m egg.nest.nest_local --game train --sweep grid_search/params_DS_5_4.json --n_workers=20 --root_dir "grid_search/DS_5_4" --name "emergent-abstractions"
 
 # Make sure the system has time to save all the models and stuff
 srun sleep 10
