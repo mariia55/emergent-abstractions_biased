@@ -1,4 +1,15 @@
-## Grid search for #82
+## Grid search for #120-143
+
+```
+python -m egg.nest.nest_local --game train --sweep grid_search/params_120_143.json --n_workers=3 --root_dir "grid_search/120-143" --name "emergent-abstractions"
+```
+
+## Grid search for #108-119
+
+```
+python -m egg.nest.nest_local --game train --sweep grid_search/params_108_119.json --n_workers=3 --root_dir "grid_search/108-119" --name "emergent-abstractions"
+```
+## Grid search for #82: D
 
 ```
 python -m egg.nest.nest_local --game train --sweep grid_search/parameters_by_DS.json --n_workers=1 --root_dir "grid_search/82" --name "emergent-abstractions"
