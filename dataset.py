@@ -13,22 +13,31 @@ class DataSet(torch.utils.data.Dataset):
 	""" 
 	This class provides the torch.Dataloader-loadable dataset.
 	"""
-	def __init__(self, properties_dim=[3,3,3], game_size=10, device='cuda', testing=False, zero_shot=False, zero_shot_test='generic'):
+    ################### I added the granularity attribute #########################
+	def __init__(self, granularity = "mixed", properties_dim=[3,3,3], game_size=10, device='cuda', testing=False, zero_shot=False, zero_shot_test='generic'):
 		"""
+		granularity: can be "mixed", "fine" or "coarse". It defines the context granularity for that dataset.
 		properties_dim: vector that defines how many attributes and features per attributes the dataset should contain, defaults to a 3x3x3 dataset
 		game_size: integer that defines how many targets and distractors a game consists of
 		"""
 		super().__init__()
-		
+
 		self.properties_dim = properties_dim
 		self.game_size = game_size
 		self.device = device
+		self.granularity = granularity
+
+
+        #### CHECK if granularity has one of the allowed values
+		if granularity not in ["mixed", "fine", "coarse"]:
+			raise ValueError("Granularity must be one of: 'mixed', 'fine', or 'coarse'.")
+
 		
 		# get all concepts
 		self.concepts = self.get_all_concepts()
 		# get all objects
 		self.all_objects = self._get_all_possible_objects(properties_dim)
-
+         
 		# generate dataset
 		if not testing and not zero_shot:
 			self.dataset = self.get_datasets(split_ratio=SPLIT)
@@ -60,14 +69,28 @@ class DataSet(torch.utils.data.Dataset):
 
 		train_and_val = []
 		print("Creating train_ds and val_ds...")
+
+        ###### we choose the distractors depending on the context condition. The original code here is left untouched for the mixed context condition ####
 		for concept_idx in tqdm(concept_indices[:ratio]):
 			for _ in range(self.game_size):
 				# for each concept, we consider all possible context conditions
 				# i.e. 1 for generic concepts, and up to len(properties_dim) for more specific concepts
 				nr_possible_contexts = sum(self.concepts[concept_idx][1])
-				for context_condition in range(nr_possible_contexts):
+
+				if self.granularity == "mixed":
+					for context_condition in range(nr_possible_contexts):
+						train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+				else:
+					### coarse context condition has no shared attributes between targets and distractors ###	
+					if self.granularity == "coarse":
+						context_condition = 0
+					### fine context condition has dim-1 shared attribytes between targets and distractors 
+					## n.b. the non-shared attributes is *not* fixed #
+					elif self.granularity == "fine":
+						context_condition = nr_possible_contexts-1
+					### append possible distractors to list
 					train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
-		
+				
 		# Calculating how many train
 		train_samples = int(len(train_and_val)*(train_ratio/(train_ratio+val_ratio)))
 		val_samples = len(train_and_val) - train_samples
@@ -77,11 +100,22 @@ class DataSet(torch.utils.data.Dataset):
 
 		test = []
 		print("\nCreating test_ds...")
+		### same idea as before to create test set for the three context conditions ###
 		for concept_idx in tqdm(concept_indices[ratio:]):
 			for _ in range(self.game_size):
 				nr_possible_contexts = sum(self.concepts[concept_idx][1])
-				for context_condition in range(nr_possible_contexts):
+
+				if self.granularity == "mixed":
+					for context_condition in range(nr_possible_contexts):
+						test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+				else:
+					if self.granularity == "coarse":
+						context_condition = 0
+					elif self.granularity == "fine":
+						context_condition = nr_possible_contexts-1
+					# append possible distractors to list
 					test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+					### question: no size limit on test set?
 
 		return train, val, test
 	
@@ -209,11 +243,12 @@ class DataSet(torch.utils.data.Dataset):
 		"""
 		all_target_objects, fixed = self.concepts[concept_idx]
 		# sample target objects for given game size (if possible, get unique choices)
+        ###no need to change this ####
 		try:
 			target_objects = random.sample(all_target_objects, self.game_size)
 		except ValueError:
 			target_objects = random.choices(all_target_objects, k=self.game_size)
-		# get all possible distractors for a given concept (for all possible context conditions)
+		# get all possible distractors for a given concept (for A SPECIFIC context condition)
 		context = self.get_distractors(concept_idx, context_condition)
 		context_sampled = self.sample_distractors(context, context_condition)
 		# return target concept, context (distractor objects + context_condition) for each context
@@ -239,6 +274,8 @@ class DataSet(torch.utils.data.Dataset):
 		for obj in poss_dist:
 			# find out how many attributes are shared between the possible distractor object and the target concept
 			# (by only comparing fixed attributes because only these are relevant for defining the context)
+            # context condition 0 is the coarse condition, context condition dim-1 is the finest
+
 			shared = sum(1 for idx in fixed_attr_indices if obj[idx] == all_target_objects[0][idx])
 			if shared == context_condition:
 				context.append(obj)
@@ -454,6 +491,7 @@ class DataSet(torch.utils.data.Dataset):
 			start += dim
 			
 		return output
+	
 
 
 

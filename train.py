@@ -32,6 +32,9 @@ def get_params(params):
     parser.add_argument('--load_dataset', type=str, default=None,
                         help='If provided that data set is loaded. Datasets can be generated with pickle.ds'
                             'This makes sense if running several runs with the exact same dataset.')
+    ######## I added here the granularity argument ###########
+    parser.add_argument('--granularity', type = str, default = 'mixed',
+                        help='Granularity of the context. Possible values are: mixed, coarse and fine')
     parser.add_argument('--dimensions', nargs='+', type=int, default=None)
     parser.add_argument('--attributes', type=int, default=3)
     parser.add_argument('--values', type=int, default=4)
@@ -270,9 +273,11 @@ def main(params):
 
         # otherwise generate data set (new for each run for the small datasets)
         if not opts.load_dataset and not opts.zero_shot:
+            ### get the granularity from the args list ####
             data_set = dataset.DataSet(opts.dimensions,
                                         game_size=opts.game_size,
-                                        device=opts.device)
+                                        device=opts.device,
+                                        granularity = opts.granularity)
             # create subfolder if necessary
             opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
             if not os.path.exists(opts.save_path) and opts.save:
@@ -287,9 +292,11 @@ def main(params):
                 if not os.path.exists(opts.save_path) and opts.save:
                     os.makedirs(opts.save_path)
                 if not opts.load_dataset:
+                    ### get gramularity from args list ####
                     data_set = dataset.DataSet(opts.dimensions,
                                                 game_size=opts.game_size,
                                                 device=opts.device,
+                                                granularity= opts.granularity,
                                                 zero_shot=True,
                                                 zero_shot_test=opts.zero_shot_test)
             # or both test conditions are generated        
@@ -297,13 +304,15 @@ def main(params):
                 # implement two zero-shot conditions: test on most generic vs. test on most specific dataset
                 for cond in ['generic', 'specific']:
                     print("Zero-shot condition:", cond)
-                    # create subfolder if necessary
+                    # create Asubfolder if necessary
                     opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting, 'zero_shot', cond)
                     if not os.path.exists(opts.save_path) and opts.save:
                         os.makedirs(opts.save_path)
+                    ### get gramularity from args list #### 
                     data_set = dataset.DataSet(opts.dimensions,
                                                 game_size=opts.game_size,
                                                 device=opts.device,
+                                                granularity= opts.granularity,
                                                 zero_shot=True,
                                                 zero_shot_test=cond)
                     train(opts, data_set, verbose_callbacks=False)

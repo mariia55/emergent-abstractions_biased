@@ -9,6 +9,9 @@ SPLIT_ZERO_SHOT = (0.75, 0.25)
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--path", type=str, default=None)
+##### add the granularity argument ######
+parser.add_argument('--granularity', type=str, default='mixed',
+                    help='Granularity of the context. Possible values: mixed, coarse and fine')
 parser.add_argument('--dimensions', nargs="*", type=int, default=[3, 3, 3],
                     help='Number of features for every perceptual dimension')
 parser.add_argument('--game_size', type=int, default=10,
@@ -28,15 +31,19 @@ else:
         os.makedirs('data/')
 
 # for normal dataset (not zero-shot)
+### I added the granularity argument ###
 if not args.zero_shot:
-    data_set = DataSet(args.dimensions,
+    data_set = DataSet(args.granularity,
+                        args.dimensions,
                         game_size=args.game_size,
                         device='cpu')
-    
+    ### I added the granularity to file name to identify dataset ###
     if args.path:
-        path = (args.path + 'data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ').ds')
+        path = (args.path + 'data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ')_granularity_' + str(args.granularity) + '.ds')
+        #path = (args.path + 'data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ').ds')
     else:
-        path = ('data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ').ds')
+        path = ('data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ')_granularity_' + str(args.granularity) + '.ds')
+        #path = ('data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ').ds')
 
     if args.save:
         with open(path, "wb") as f:
@@ -46,16 +53,19 @@ if not args.zero_shot:
 # for zero-shot datasets
 else:    
     for cond in ['generic', 'specific']:
-        data_set = DataSet(args.dimensions,
+        data_set = DataSet(args.granularity,
+                           args.dimensions,
                            game_size=args.game_size,
                            testing=True, 
                            device='cpu')
         data_set = data_set.get_zero_shot_datasets(split_ratio=SPLIT_ZERO_SHOT, test_cond=cond)
-        
+        ### I added the granularity to file name do identify dataset ###
         if args.path:
-            path = (args.path + 'data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ')_' + str(cond) + '.ds')
+            path = (args.path + 'data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ')_' + str(args.granularity) + '_' + str(cond) + '.ds')
+            #path = (args.path + 'data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ')_' + str(cond) + '.ds')
         else:
-            path = ('data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ')_' + str(cond) + '.ds')
+            #path = ('data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ')_' + str(cond) + '.ds')
+            path = ('data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ')_' + str(args.granularity) + '_' + str(cond) + '.ds')
 
         if args.save:
             with open(path, "wb") as f:

@@ -15,11 +15,16 @@ class TestDataset(unittest.TestCase):
                                     [3, 3, 3],
                                     [4, 4, 4, 4]]
         self.game_sizes = [1, 3, 10]
+        
+        ### test granularity ######
+        self.granularities = ["mixed", "fine", "coarse"]
 
         self.datasets = []
         for props in self.possible_properties:
             for size in self.game_sizes:
-                self.datasets.append(DataSet(props, size, 'cpu', testing=True))
+                 for gran in self.granularities:
+                     self.datasets.append(DataSet(gran, props, size, 'cpu', testing=True))
+                     #print(gran)
 
     def test_get_all_concepts(self):
         """
