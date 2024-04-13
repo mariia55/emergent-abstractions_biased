@@ -2,11 +2,11 @@ import pickle
 from egg.core.language_analysis import Disent
 from utils.analysis_from_interaction import *
 
-datasets = ("(3,4)", "(3,8)", "(3,16)", "(4,4)", "(4,8)", "(5,4)")
-n_attributes = (3, 3, 3, 4, 4, 5)
-n_values = (4, 8, 16, 4, 8, 4)
+datasets = ("(3,4)", "(3,8)", "(4,4)", "(4,8)", "(5,4)")
+n_attributes = (3, 3, 4, 4, 5)
+n_values = (4, 8, 4, 8, 4)
 n_epochs = 300
-paths = [f"results/vague_ds_results/{d}_game_size_10_vsf_3/" for d in datasets]
+paths = [f"results/vague_ds_results/results/{d}_game_size_10_vsf_3/" for d in datasets]
 
 context_unaware = False  # whether original or context_unaware simulations are evaluated
 length_cost = False
