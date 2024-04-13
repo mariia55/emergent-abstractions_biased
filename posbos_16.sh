@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -J pos_b_316
+#SBATCH -J posbos_316
 #SBATCH --time=10:00:00
 #SBATCH --mem=400gb
 #SBATCH --gpus=1
@@ -21,7 +21,7 @@ conda activate eggfix
 cd "$HOME/emergent-abstractions/"
 
 # Run the Python script using srun with the absolute path to nest_local.py
-srun /home/student/r/rverdugo/miniconda3/envs/eggfix/bin/python pos_bos_3_16.py "$HOME/emergent-abstractions/results/additional_runs"
+srun /home/student/r/rverdugo/miniconda3/envs/eggfix/bin/python posbos_16.py "$HOME/emergent-abstractions/results/additional_runs"
 
 # Make sure the system has time to save all the models and stuff
 srun sleep 10
