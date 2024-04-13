@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#SBATCH -J pos_b_316
-#SBATCH --time=10:00:00
+#SBATCH -J pos_341
+#SBATCH --time=5:00:00
 #SBATCH --mem=400gb
 #SBATCH --gpus=1
 #SBATCH --ntasks=1
