@@ -1,8 +1,9 @@
 import os
 import re
 import pandas as pd
-    
-def get_grid_search_results(directory, len_lines=125):
+
+
+def get_grid_search_results(directory, n_lines=125):
 
     # results should be stored in a pandas dataframe and exported as csv
     data = pd.DataFrame()
@@ -13,17 +14,19 @@ def get_grid_search_results(directory, len_lines=125):
         if filename.endswith(".out"):
             with open(os.path.join(directory, filename), "r") as file:
                 lines = file.readlines()
-                
-                if len(lines) == len_lines: # if files have less lines, the search did not run for 100 epochs
+
+                if (
+                    len(lines) == n_lines
+                ):  # if files have less lines, the search did not run for 100 epochs
                     header = lines[0].strip()
-                    if header == "ndevices 0":
-                        header = lines[1].strip()
 
                     # create a dictionary with parameters
                     parameters = {}
                     matches = re.findall(r"--(.+?)=(.+?)\"", header)
                     for match in matches:
                         parameters[match[0]] = match[1]
+
+                    # print(parameters)
 
                     # get results
                     final_train = lines[-3].strip()
@@ -48,9 +51,21 @@ def get_grid_search_results(directory, len_lines=125):
 
     # sort and save as csv
     data = data.astype(float)
+    print(data)
+    data[["attributes", "values", "game_size", "batch_size", "hidden_size"]] = data[
+        ["attributes", "values", "game_size", "batch_size", "hidden_size"]
+    ].astype(int)
+    data = data.sort_values(
+        by=[
+            "attributes",
+            "values",
+            "game_size",
+            "batch_size",
+            "learning_rate",
+            "hidden_size",
+            "temperature",
+            "temp_update",
+        ]
+    )
 
-    data[['attributes', 'values', 'game_size', 'batch_size', 'speaker_hidden_size']] = data[['attributes', 'values', 'game_size', 'batch_size', 'speaker_hidden_size']].astype(int)
-    data = data.sort_values(by=['attributes', 'values', 'game_size', 'batch_size', 'learning_rate', 'speaker_hidden_size', 'temperature', 'temp_update'])
-
-    data.to_csv('results_' + directory + '.csv', index=False)
-    print("Saved data as " + 'results_' + directory + '.csv')
+    data.to_csv("results_" + directory + ".csv", index=False)
