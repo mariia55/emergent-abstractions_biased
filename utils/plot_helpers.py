@@ -9,22 +9,12 @@ def plot_heatmap(
     plot_dims=(2, 2),
     figsize=(7, 7),
     ylims=(0.6, 1.0),
-    titles=("context-aware \ntrain", "context-aware \nvalidation"),
-    suptitle=None,
-    suptitle_position=1.03,
-    different_ylims=False,
-    n_runs=5,
-    matrix_indices=((0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (2, 0)),
-    fontsize=18,
-):
-    """Plot heatmaps in matrix arrangement for single values (e.g. final accuracies).
-def plot_heatmap(
-    result_list,
-    mode,
-    plot_dims=(2, 2),
-    figsize=(7, 7),
-    ylims=(0.6, 1.0),
-    titles=("context-aware \ntrain", "context-aware \nvalidation"),
+    titles=(
+        "context-aware \ntrain",
+        "context-aware \nvalidation",
+        "context-unaware \ntrain",
+        "context-unaware \nvalidation",
+    ),
     suptitle=None,
     suptitle_position=1.03,
     different_ylims=False,
@@ -34,7 +24,6 @@ def plot_heatmap(
 ):
     """Plot heatmaps in matrix arrangement for single values (e.g. final accuracies).
     Allows for plotting multiple matrices according to plot_dims, and allows different modes:
-    'max', 'min', mean', 'median', each across runs."""
     'max', 'min', mean', 'median', each across runs."""
 
     plt.figure(figsize=figsize)
@@ -50,21 +39,16 @@ def plot_heatmap(
         heatmap[:] = np.nan
         results = result_list[i]
         if results.shape[-1] > n_runs:
-            results = results[:, :]
-            results = results[:, :]
+            results = results[:, :, -1]
 
         plt.subplot(plot_dims[0], plot_dims[1], i + 1)
 
         if mode == "mean":
-        if mode == "mean":
             values = np.nanmean(results, axis=-1)
-        elif mode == "max":
         elif mode == "max":
             values = np.nanmax(results, axis=-1)
         elif mode == "min":
-        elif mode == "min":
             values = np.nanmin(results, axis=-1)
-        elif mode == "median":
         elif mode == "median":
             values = np.nanmedian(results, axis=-1)
 
@@ -77,13 +61,8 @@ def plot_heatmap(
         plt.ylabel("# attributes", fontsize=fontsize)
         plt.xticks(ticks=[0, 1, 2], labels=[4, 8, 16], fontsize=fontsize - 1)
         plt.yticks(ticks=[0, 1, 2], labels=[3, 4, 5], fontsize=fontsize - 1)
-        plt.xlabel("# values", fontsize=fontsize)
-        plt.ylabel("# attributes", fontsize=fontsize)
-        plt.xticks(ticks=[0, 1, 2], labels=[4, 8, 16], fontsize=fontsize - 1)
-        plt.yticks(ticks=[0, 1, 2], labels=[3, 4, 5], fontsize=fontsize - 1)
         cbar = plt.colorbar(im, fraction=0.046, pad=0.04)
         cbar.ax.get_yaxis().set_ticks(y_lim)
-        cbar.ax.tick_params(labelsize=fontsize - 2)
         cbar.ax.tick_params(labelsize=fontsize - 2)
 
         for k in range(3):
@@ -99,18 +78,8 @@ def plot_heatmap(
                         color="k",
                         fontsize=fontsize,
                     )
-                    _ = ax.text(
-                        l,
-                        k,
-                        np.round(heatmap[k, l], 2),
-                        ha="center",
-                        va="center",
-                        color="k",
-                        fontsize=fontsize,
-                    )
 
         if suptitle:
-            plt.suptitle(suptitle, fontsize=fontsize + 1, y=suptitle_position)
             plt.suptitle(suptitle, fontsize=fontsize + 1, y=suptitle_position)
 
     plt.tight_layout()
@@ -132,46 +101,22 @@ def plot_heatmap_concept_x_context(
     matrix_indices=None,
     fontsize=18,
     inner_fontsize_fctr=0,
-):
-    """Plot heatmaps in matrix arrangement for single values (e.g. final accuracies).
-def plot_heatmap_concept_x_context(
-    result_list,
-    mode,
-    score,
-    plot_dims=(2, 3),
-    heatmap_size=(3, 3),
-    figsize=(7, 7),
-    ylims=(0.6, 1.0),
-    titles=("D(3,4)", "D(3,8)", "D(3,16)", "D(4,4)", "D(4,8)", "D(5,4)"),
-    suptitle=None,
-    suptitle_position=1.03,
-    different_ylims=False,
-    n_runs=5,
-    matrix_indices=None,
-    fontsize=18,
-    inner_fontsize_fctr=0,
+    one_dataset=False,
+    attributes=4,
 ):
     """Plot heatmaps in matrix arrangement for single values (e.g. final accuracies).
     Allows for plotting multiple matrices according to plot_dims, and allows different modes:
     'max', 'min', mean', 'median', each across runs."""
-    'max', 'min', mean', 'median', each across runs."""
 
-    if score == "NMI":
     if score == "NMI":
         score_idx = 0
     elif score == "effectiveness":
-    elif score == "effectiveness":
         score_idx = 1
-    elif score == "consistency":
     elif score == "consistency":
         score_idx = 2
     elif score == "bosdis" or score == "posdis":
-    elif score == "bosdis" or score == "posdis":
         pass
     else:
-        raise AssertionError(
-            "Score should be one of the following: 'NMI','effectiveness', 'consistency'."
-        )
         raise AssertionError(
             "Score should be one of the following: 'NMI','effectiveness', 'consistency'."
         )
@@ -185,18 +130,8 @@ def plot_heatmap_concept_x_context(
             matrix_indices = sorted(
                 list(itertools.product(range(3), repeat=2)), key=lambda x: x[1]
             )
-            print(f"matrix indices : {matrix_indices}")
-
-            matrix_indices = sorted(
-                list(itertools.product(range(3), repeat=2)), key=lambda x: x[1]
-            )
-            print(f"matrix indices : {matrix_indices}")
-
         # D(4,4), D(4,8)
         elif i == 3 or i == 4:
-            matrix_indices = sorted(
-                list(itertools.product(range(4), repeat=2)), key=lambda x: x[1]
-            )
             matrix_indices = sorted(
                 list(itertools.product(range(4), repeat=2)), key=lambda x: x[1]
             )
@@ -204,9 +139,10 @@ def plot_heatmap_concept_x_context(
             matrix_indices = sorted(
                 list(itertools.product(range(5), repeat=2)), key=lambda x: x[1]
             )
-            matrix_indices = sorted(list(itertools.product(range(5), repeat=2)), key=lambda x: x[1])
         if one_dataset:
-            matrix_indices = sorted(list(itertools.product(range(attributes), repeat=2)), key=lambda x: x[1])
+            matrix_indices = sorted(
+                list(itertools.product(range(attributes), repeat=2)), key=lambda x: x[1]
+            )
 
         if different_ylims:
             y_lim = ylims[i]
@@ -216,34 +152,24 @@ def plot_heatmap_concept_x_context(
         heatmap = np.empty(heatmap_size)
         heatmap[:] = np.nan
         if score == "bosdis" or score == "posdis":
-        if score == "bosdis" or score == "posdis":
             results = result_list[i]
         else:
             results = result_list[score_idx][i]
-            print(f"results after result list indexing: {results}")
-        #            if results.shape[-1] > n_runs:
-        #                results = results[:, :, -1]
-        #                print(f"results after [:,:,-1]:{results}")
-
-            print(f"results after result list indexing: {results}")
-        #            if results.shape[-1] > n_runs:
-        #                results = results[:, :, -1]
-        #                print(f"results after [:,:,-1]:{results}")
+            if isinstance(results, list):
+                results = np.array(results)
+            if results.shape[-2] > n_runs:
+                results = results[:, :, -1]
 
         plt.subplot(plot_dims[0], plot_dims[1], i + 1)
 
         results_ls = [res.tolist() for res in results]
 
         if mode == "mean":
-        if mode == "mean":
             values = np.nanmean(results_ls, axis=0)
-        elif mode == "max":
         elif mode == "max":
             values = np.nanmax(results, axis=-1)
         elif mode == "min":
-        elif mode == "min":
             values = np.nanmin(results, axis=-1)
-        elif mode == "median":
         elif mode == "median":
             values = np.nanmedian(results, axis=-1)
 
@@ -289,28 +215,30 @@ def plot_heatmap_concept_x_context(
             plt.suptitle(suptitle, fontsize=fontsize + 1, y=suptitle_position)
 
     plt.tight_layout()
-    plt.show()
 
 
-def plot_heatmap_concept_x_context_errors(result_list,
-                                          plot_dims=(2, 3),
-                                          heatmap_size=(3, 3),
-                                          figsize=(7, 7),
-                                          ylims=(0.6, 1.0),
-                                          titles=('D(3,4)', 'D(3,8)', 'D(3,16)', 'D(4,4)', 'D(4,8)', 'D(5,4)'),
-                                          datasets = ['(3,4)', '(3,8)', '(3,16)', '(4,4)', '(4,8)', '(5,4)'],
-                                          suptitle=None,
-                                          suptitle_position=1.03,
-                                          different_ylims=False,
-                                          n_runs=5,
-                                          matrix_indices=None,
-                                          fontsize=18,
-                                          inner_fontsize_fctr=0,
-                                          one_dataset=False,
-                                          attributes=4):
-    """ Plot heatmaps in matrix arrangement for single values (e.g. final accuracies).
+def plot_heatmap_concept_x_context_errors(
+    result_list,
+    plot_dims=(2, 3),
+    heatmap_size=(3, 3),
+    figsize=(7, 7),
+    ylims=(0.6, 1.0),
+    titles=("D(3,4)", "D(3,8)", "D(3,16)", "D(4,4)", "D(4,8)", "D(5,4)"),
+    datasets=["(3,4)", "(3,8)", "(3,16)", "(4,4)", "(4,8)", "(5,4)"],
+    suptitle=None,
+    suptitle_position=1.03,
+    different_ylims=False,
+    n_runs=5,
+    matrix_indices=None,
+    fontsize=18,
+    inner_fontsize_fctr=0,
+    one_dataset=False,
+    attributes=4,
+):
+    """Plot heatmaps in matrix arrangement for single values (e.g. final accuracies).
     Allows for plotting multiple matrices according to plot_dims.
-    This function has been adapted to the use of displaying errors for each concept x context condition"""
+    This function has been adapted to the use of displaying errors for each concept x context condition
+    """
 
     plt.figure(figsize=figsize)
 
@@ -318,14 +246,22 @@ def plot_heatmap_concept_x_context_errors(result_list,
     for i in range(np.prod(plot_dims)):
         # D(3,4), D(3,8), D(3,16)
         if i < 3:
-            matrix_indices = sorted(list(itertools.product(range(3), repeat=2)), key=lambda x: x[1])
+            matrix_indices = sorted(
+                list(itertools.product(range(3), repeat=2)), key=lambda x: x[1]
+            )
         # D(4,4), D(4,8)
         elif i == 3 or i == 4:
-            matrix_indices = sorted(list(itertools.product(range(4), repeat=2)), key=lambda x: x[1])
+            matrix_indices = sorted(
+                list(itertools.product(range(4), repeat=2)), key=lambda x: x[1]
+            )
         else:
-            matrix_indices = sorted(list(itertools.product(range(5), repeat=2)), key=lambda x: x[1])
+            matrix_indices = sorted(
+                list(itertools.product(range(5), repeat=2)), key=lambda x: x[1]
+            )
         if one_dataset:
-            matrix_indices = sorted(list(itertools.product(range(attributes), repeat=2)), key=lambda x: x[1])
+            matrix_indices = sorted(
+                list(itertools.product(range(attributes), repeat=2)), key=lambda x: x[1]
+            )
 
         if different_ylims:
             y_lim = ylims[i]
@@ -364,7 +300,6 @@ def plot_heatmap_concept_x_context_errors(result_list,
         cbar = plt.colorbar(im, fraction=0.046, pad=0.04)
         cbar.ax.get_yaxis().set_ticks(y_lim)
         cbar.ax.tick_params(labelsize=fontsize - 2)
-        cbar.ax.tick_params(labelsize=fontsize - 2)
 
         for col in range(len(heatmap)):
             for row in range(len(heatmap[0])):
@@ -379,42 +314,13 @@ def plot_heatmap_concept_x_context_errors(result_list,
                         color="k",
                         fontsize=fontsize + inner_fontsize_fctr,
                     )
-                    _ = ax.text(
-                        col,
-                        row,
-                        np.round(heatmap[row, col], 2),
-                        ha="center",
-                        va="center",
-                        color="k",
-                        fontsize=fontsize + inner_fontsize_fctr,
-                    )
 
         if suptitle:
             plt.suptitle(suptitle, fontsize=fontsize + 1, y=suptitle_position)
-            plt.suptitle(suptitle, fontsize=fontsize + 1, y=suptitle_position)
 
     plt.tight_layout()
-    plt.show()
-    plt.show()
 
 
-def plot_heatmap_different_vs(
-    result_list,
-    mode,
-    plot_dims=(2, 2),
-    figsize=(7, 9),
-    ylims=(0.6, 1.0),
-    titles=("train", "validation", "zero shot objects", "zero shot abstractions"),
-    suptitle=None,
-    suptitle_position=1.03,
-    n_runs=5,
-    matrix_indices=((0, 0), (0, 1), (1, 0), (1, 1), (2, 0), (2, 1), (3, 0), (3, 1)),
-    different_ylims=False,
-    fontsize=18,
-):
-    """Plot heatmaps in matrix arrangement for single values (e.g. final accuracies).
-    Allows for plotting multiple matrices according to plot_dims, and allows different modes:
-    'max', 'min', mean', 'median', each across runs.
 def plot_heatmap_different_vs(
     result_list,
     mode,
@@ -452,15 +358,11 @@ def plot_heatmap_different_vs(
         plt.subplot(plot_dims[0], plot_dims[1], i + 1)
 
         if mode == "mean":
-        if mode == "mean":
             values = np.nanmean(results, axis=-1)
-        elif mode == "max":
         elif mode == "max":
             values = np.nanmax(results, axis=-1)
         elif mode == "min":
-        elif mode == "min":
             values = np.nanmin(results, axis=-1)
-        elif mode == "median":
         elif mode == "median":
             values = np.nanmedian(results, axis=-1)
 
@@ -476,13 +378,8 @@ def plot_heatmap_different_vs(
         plt.ylabel("vocab size factor", fontsize=fontsize)
         plt.xticks(ticks=[0, 1], labels=["True", "False"], fontsize=fontsize - 1)
         plt.yticks(ticks=[0, 1, 2, 3], labels=[1, 2, 3, 4], fontsize=fontsize - 1)
-        plt.xlabel("balanced", fontsize=fontsize)
-        plt.ylabel("vocab size factor", fontsize=fontsize)
-        plt.xticks(ticks=[0, 1], labels=["True", "False"], fontsize=fontsize - 1)
-        plt.yticks(ticks=[0, 1, 2, 3], labels=[1, 2, 3, 4], fontsize=fontsize - 1)
         cbar = plt.colorbar(im, fraction=0.05, pad=0.04)
         cbar.ax.get_yaxis().set_ticks(ylim)
-        cbar.ax.tick_params(labelsize=fontsize - 2)
         cbar.ax.tick_params(labelsize=fontsize - 2)
 
         for k in range(4):
@@ -498,17 +395,7 @@ def plot_heatmap_different_vs(
                         color="k",
                         fontsize=fontsize,
                     )
-                    _ = ax.text(
-                        l,
-                        k,
-                        np.round(heatmap[k, l], 2),
-                        ha="center",
-                        va="center",
-                        color="k",
-                        fontsize=fontsize,
-                    )
         if suptitle:
-            plt.suptitle(suptitle, fontsize=fontsize + 1, x=0.51, y=suptitle_position)
             plt.suptitle(suptitle, fontsize=fontsize + 1, x=0.51, y=suptitle_position)
     plt.tight_layout()
 
@@ -524,29 +411,11 @@ def plot_training_trajectory(
     xlim=None,
     plot_indices=(1, 2, 3, 4, 5, 7),
     plot_shape=(3, 3),
-    n_epochs=400,
+    n_epochs=300,
     train_only=False,
     loss_plot=False,
     message_length_plot=False,
-    titles=("D(3,4)",),
-):
-    """Plot the training trajectories for training and validation data"""
-def plot_training_trajectory(
-    results_train,
-    results_val,
-    message_length_train=None,
-    message_length_val=None,
-    steps=(1, 5),
-    figsize=(10, 7),
-    ylim=None,
-    xlim=None,
-    plot_indices=(1, 2, 3, 4, 5, 7),
-    plot_shape=(3, 3),
-    n_epochs=400,
-    train_only=False,
-    loss_plot=False,
-    message_length_plot=False,
-    titles=("D(3,4)",),
+    titles=("D(3,4)", "D(3,8)", "D(3,16)", "D(4,4)", "D(4,8)", "D(5,4)"),
 ):
     """Plot the training trajectories for training and validation data"""
     plt.figure(figsize=figsize)
@@ -559,17 +428,7 @@ def plot_training_trajectory(
                 np.transpose(message_length_train[i]),
                 color="green",
             )
-            plt.plot(
-                range(0, n_epochs, steps[0]),
-                np.transpose(message_length_train[i]),
-                color="green",
-            )
         else:
-            plt.plot(
-                range(0, n_epochs, steps[0]),
-                np.transpose(results_train[i]),
-                color="blue",
-            )
             plt.plot(
                 range(0, n_epochs, steps[0]),
                 np.transpose(results_train[i]),
@@ -583,24 +442,13 @@ def plot_training_trajectory(
             leg = plt.legend(["train", "val"], fontsize=12)
             leg.legendHandles[0].set_color("blue")
             leg.legendHandles[1].set_color("red")
-            plt.plot(
-                range(0, n_epochs, steps[1]), np.transpose(results_val[i]), color="red"
-            )
-            plt.legend(["train", "val"])
-            leg = plt.legend(["train", "val"], fontsize=12)
-            leg.legendHandles[0].set_color("blue")
-            leg.legendHandles[1].set_color("red")
         plt.title(titles[i], fontsize=13)
-        plt.xlabel("epoch", fontsize=12)
         plt.xlabel("epoch", fontsize=12)
         if loss_plot:
             plt.ylabel("loss", fontsize=12)
-            plt.ylabel("loss", fontsize=12)
         elif message_length_plot:
             plt.ylabel("message length", fontsize=12)
-            plt.ylabel("message length", fontsize=12)
         else:
-            plt.ylabel("accuracy", fontsize=12)
             plt.ylabel("accuracy", fontsize=12)
         if ylim:
             plt.ylim(ylim)
@@ -609,11 +457,8 @@ def plot_training_trajectory(
 
     if loss_plot:
         plt.suptitle("loss", x=0.53, fontsize=15)
-        plt.suptitle("loss", x=0.53, fontsize=15)
     elif message_length_plot:
         plt.suptitle("message length", x=0.53, fontsize=15)
-        plt.suptitle("message length", x=0.53, fontsize=15)
     else:
-        plt.suptitle("accuracy", x=0.53, fontsize=15)
         plt.suptitle("accuracy", x=0.53, fontsize=15)
     plt.tight_layout()
