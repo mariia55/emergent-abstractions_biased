@@ -15,10 +15,12 @@ import os
 import pickle
 
 import dataset
-from archs import Sender, Receiver
+from archs import Sender, Receiver, RSASender
 from archs_mu_goodman import Speaker, Listener
+from rsa_tools import get_utterances
 import feature
 import itertools
+import time
 
 
 SPLIT = (0.6, 0.2, 0.2)
@@ -86,6 +88,15 @@ def get_params(params):
     parser.add_argument("--min_delta", type=float, default=0.001,
                         help="How much of an improvement to consider a significant improvement of loss before early "
                              "stopping.")
+    parser.add_argument("--test_rsa", type=bool, default=False,
+                        help="Use for testing the RSA speaker after training.")
+    parser.add_argument("--load_interaction", type=str, default=None,
+                        help="Use for RSA speaker. It will load unique messages from previous interactions. Example:"
+                             " '5/interactions/train/epoch_300/interaction_gpu0'")
+    parser.add_argument("--load_checkpoint", type=str, default=None,
+                        help="Skip training and load pretrained models from checkpoint. Example: '1/final.tar'")
+    parser.add_argument("--cost-factor", type=float, default=0.01,
+                        help="Used for RSA test. Factor for the message length cost in utility.")
 
     args = core.init(parser, params)
 
@@ -213,7 +224,12 @@ def train(opts, datasets, verbose_callbacks=False):
 
     trainer = core.Trainer(game=game, optimizer=optimizer,
                            train_data=train, validation_data=val, callbacks=callbacks)
-    trainer.train(n_epochs=opts.n_epochs)
+
+    # if checkpoint path is given, load checkpoint and skip training
+    if opts.load_checkpoint:
+        trainer.load_from_checkpoint(opts.load_checkpoint)
+    else:
+        trainer.train(n_epochs=opts.n_epochs)
 
     # after training evaluate performance on the test data set
     if len(test):
@@ -221,11 +237,29 @@ def train(opts, datasets, verbose_callbacks=False):
         eval_loss, interaction = trainer.eval()
         acc = torch.mean(interaction.aux['acc']).item()
         print("test accuracy: " + str(acc))
-        if opts.save:
+        if opts.save and not opts.test_rsa:  # TODO save does not work when test_rsa is True
             loss_and_metrics = pickle.load(open(opts.save_path + '/loss_and_metrics.pkl', 'rb'))
             loss_and_metrics['final_test_loss'] = eval_loss
             loss_and_metrics['final_test_acc'] = acc
             pickle.dump(loss_and_metrics, open(opts.save_path + '/loss_and_metrics.pkl', 'wb'))
+        if opts.test_rsa:
+            with torch.no_grad():
+                # Load or generate utterances
+                if opts.load_interaction:
+                    interaction_path = opts.load_interaction
+                else:
+                    interaction_path = None
+                utterances = get_utterances(vocab_size, max_len, interaction_path)
+
+                rsa_sender = RSASender(receiver, utterances, opts.cost_factor)
+
+                rsa_game = core.SenderReceiverRnnGS(rsa_sender, receiver, loss, length_cost=opts.length_cost)
+                trainer.game = rsa_game
+                start = time.time()
+                eval_loss, interaction = trainer.eval()
+                print("RSA evaluation time: " + str(time.time() - start))
+                acc = torch.mean(interaction.aux['acc']).item()
+                print("RSA test accuracy: " + str(acc))
 
 
 def main(params):
@@ -273,7 +307,15 @@ def main(params):
             # create subfolder if necessary
             opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
             if not os.path.exists(opts.save_path) and opts.save:
-                os.makedirs(opts.save_path)  
+                os.makedirs(opts.save_path)
+
+    # if interaction path is given, set interactions path
+    if opts.load_interaction:
+        opts.load_interaction = os.path.join(opts.path, folder_name, opts.game_setting, opts.load_interaction)
+
+    # if checkpoint path is given, set checkpoint path
+    if opts.load_checkpoint:
+        opts.load_checkpoint = os.path.join(opts.path, folder_name, opts.game_setting, opts.load_checkpoint)
 
 
     for _ in range(opts.num_of_runs):
