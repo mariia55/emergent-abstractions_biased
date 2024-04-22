@@ -237,7 +237,7 @@ def main(params):
     # dimensions calculated from attribute-value pairs:
     if not opts.dimensions:
         opts.dimensions = list(itertools.repeat(opts.values, opts.attributes))
-
+    
     data_set_name = '(' + str(len(opts.dimensions)) + ',' + str(opts.dimensions[0]) + ')'
     folder_name = (data_set_name + '_game_size_' + str(opts.game_size) 
                         + '_vsf_' + str(opts.vocab_size_factor))
@@ -263,8 +263,13 @@ def main(params):
         data_set = torch.load(opts.path + 'data/' + opts.load_dataset)
         print('data loaded from: ' + 'data/' + opts.load_dataset)
         if not opts.zero_shot:
-            # create subfolder if necessary
-            opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
+            # create subfolders if necessary
+            # The granularity subfolders are created only when the granularity is not 'mixed' for easier integration with the previous code
+            if data_set.granularity != 'mixed':
+                granularity_subfolder = f"granularity_{opts.granularity}"
+                opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting, granularity_subfolder)
+            else: opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
+
             if not os.path.exists(opts.save_path) and opts.save:
                 os.makedirs(opts.save_path)  
 
@@ -274,12 +279,16 @@ def main(params):
         # otherwise generate data set (new for each run for the small datasets)
         if not opts.load_dataset and not opts.zero_shot:
             ### get the granularity from the args list ####
-            data_set = dataset.DataSet(opts.dimensions,
+            data_set = dataset.DataSet( opts.granularity,
+                                        opts.dimensions,
                                         game_size=opts.game_size,
-                                        device=opts.device,
-                                        granularity = opts.granularity)
-            # create subfolder if necessary
-            opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
+                                        device=opts.device,)
+            # create subfolder if necessary for granularity
+            if data_set.granularity != 'mixed':
+                granularity_subfolder = f"granularity_{opts.granularity}"
+                opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting, granularity_subfolder)
+                
+            else: opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
             if not os.path.exists(opts.save_path) and opts.save:
                 os.makedirs(opts.save_path)             
 
@@ -287,16 +296,20 @@ def main(params):
         if opts.zero_shot:
             # either the zero-shot test condition is given (with pre-generated dataset)
             if opts.zero_shot_test is not None:
-                # create subfolder if necessary
-                opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting, 'zero_shot', opts.zero_shot_test)
+                # create subfolder if necessary for granularity if not mixed (default value)
+                if data_set.granularity != 'mixed':
+                    granularity_subfolder = f"granularity_{opts.granularity}"
+                    opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting, 'zero_shot', opts.zero_shot_test, granularity_subfolder)
+                else: opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting, 'zero_shot', opts.zero_shot_test)
+
                 if not os.path.exists(opts.save_path) and opts.save:
                     os.makedirs(opts.save_path)
                 if not opts.load_dataset:
                     ### get gramularity from args list ####
-                    data_set = dataset.DataSet(opts.dimensions,
+                    data_set = dataset.DataSet( opts.granularity,
+                                                opts.dimensions,
                                                 game_size=opts.game_size,
                                                 device=opts.device,
-                                                granularity= opts.granularity,
                                                 zero_shot=True,
                                                 zero_shot_test=opts.zero_shot_test)
             # or both test conditions are generated        
@@ -305,14 +318,19 @@ def main(params):
                 for cond in ['generic', 'specific']:
                     print("Zero-shot condition:", cond)
                     # create Asubfolder if necessary
-                    opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting, 'zero_shot', cond)
+                    # added granularity
+                    if data_set.granularity != 'mixed':
+                        granularity_subfolder =  f"granularity_{opts.granularity}"
+                        opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting, 'zero_shot', cond, granularity_subfolder )
+
+                    else: opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting, 'zero_shot', cond)
                     if not os.path.exists(opts.save_path) and opts.save:
                         os.makedirs(opts.save_path)
                     ### get gramularity from args list #### 
-                    data_set = dataset.DataSet(opts.dimensions,
+                    data_set = dataset.DataSet( opts.granularity,
+                                                opts.dimensions,
                                                 game_size=opts.game_size,
                                                 device=opts.device,
-                                                granularity= opts.granularity,
                                                 zero_shot=True,
                                                 zero_shot_test=cond)
                     train(opts, data_set, verbose_callbacks=False)

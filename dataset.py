@@ -80,17 +80,17 @@ class DataSet(torch.utils.data.Dataset):
 				if self.granularity == "mixed":
 					for context_condition in range(nr_possible_contexts):
 						train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+				### I decided to hard-code the context conditions for granularities 
 				else:
 					### coarse context condition has no shared attributes between targets and distractors ###	
 					if self.granularity == "coarse":
-						context_condition = 0
-					### fine context condition has dim-1 shared attribytes between targets and distractors 
+						train_and_val.append(self.get_item(concept_idx, 0, self._many_hot_encoding, include_concept))
+					### fine context condition has n_fixed-1 shared attributes between targets and distractors 
 					## n.b. the non-shared attributes is *not* fixed #
 					elif self.granularity == "fine":
-						context_condition = nr_possible_contexts-1
-					### append possible distractors to list
-					train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
-				
+						train_and_val.append(self.get_item(concept_idx, nr_possible_contexts-1 , self._many_hot_encoding, include_concept))
+					
+
 		# Calculating how many train
 		train_samples = int(len(train_and_val)*(train_ratio/(train_ratio+val_ratio)))
 		val_samples = len(train_and_val) - train_samples
@@ -110,12 +110,11 @@ class DataSet(torch.utils.data.Dataset):
 						test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
 				else:
 					if self.granularity == "coarse":
-						context_condition = 0
+						test.append(self.get_item(concept_idx, 0, self._many_hot_encoding, include_concept))
+
 					elif self.granularity == "fine":
-						context_condition = nr_possible_contexts-1
-					# append possible distractors to list
-					test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
-					### question: no size limit on test set?
+						test.append(self.get_item(concept_idx, nr_possible_contexts-1 , self._many_hot_encoding, include_concept))
+		
 
 		return train, val, test
 	
@@ -149,18 +148,43 @@ class DataSet(torch.utils.data.Dataset):
             # i.e. 1 for generic concepts, and up to len(properties_dim) for more specific concepts
 				nr_possible_contexts = sum(self.concepts[concept_idx][1])
                 #print("nr poss cont", nr_possible_contexts)
-				for context_condition in range(nr_possible_contexts):
+				if self.granularity == 'mixed':
+					for context_condition in range(nr_possible_contexts):
                 	# 1) 'generic'
+						if test_cond == 'generic':
+							# test dataset only contains most generic concepts
+							if nr_possible_contexts == 1:
+								test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+							else:
+								train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+
+						# 2) 'specific'
+						if test_cond == 'specific':
+							# test dataset only contains most specific concepts
+							if nr_possible_contexts == len(self.properties_dim):
+								test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+							else:
+								train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+
+
+				else:
+					if self.granularity == 'coarse':
+						context_condition = 0
+					elif self.granularity == 'fine':
+						context_condition = nr_possible_contexts-1
+
 					if test_cond == 'generic':
-                        # test dataset only contains most generic concepts
+						# test dataset only contains most generic concepts
+						### this line is to identify generic concepts, since they have only one context condition possibile
 						if nr_possible_contexts == 1:
+							## generic concepts only have one possible context condition --> test set does not change depending on granularity
 							test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
 						else:
 							train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
 
-                    # 2) 'specific'
 					if test_cond == 'specific':
                     	# test dataset only contains most specific concepts
+					    ## create different datasets depending on granularity value
 						if nr_possible_contexts == len(self.properties_dim):
 							test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
 						else:
@@ -274,7 +298,7 @@ class DataSet(torch.utils.data.Dataset):
 		for obj in poss_dist:
 			# find out how many attributes are shared between the possible distractor object and the target concept
 			# (by only comparing fixed attributes because only these are relevant for defining the context)
-            # context condition 0 is the coarse condition, context condition dim-1 is the finest
+            # context condition 0 is the coarse condition, context condition n_fixed-1 is the finest
 
 			shared = sum(1 for idx in fixed_attr_indices if obj[idx] == all_target_objects[0][idx])
 			if shared == context_condition:

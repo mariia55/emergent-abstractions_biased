@@ -160,6 +160,7 @@ class TestDataset(unittest.TestCase):
 
                     for g, l in enumerate(receiver_label):
                         count_mismatch = 0
+                        #distratcors in receiver label?
                         if l == 0:
                             for i, idx in enumerate(relevant_indices):
                                 if relevant_values[i] != np.argmax(receiver_input[g][idx * dim:(idx + 1) * dim]):
@@ -167,10 +168,11 @@ class TestDataset(unittest.TestCase):
                             self.assertEqual(len(relevant_indices) - n_same, count_mismatch)
 
 
+
 #    def test_get_dataset(self):
 #        pass
 
-
+#create function to test gran
 if __name__ == '__main__':
 
     unittest.main()
