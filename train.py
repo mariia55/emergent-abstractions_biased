@@ -88,14 +88,10 @@ def get_params(params):
     parser.add_argument("--min_delta", type=float, default=0.001,
                         help="How much of an improvement to consider a significant improvement of loss before early "
                              "stopping.")
-    parser.add_argument("--load_checkpoint", type=bool, default=False,
-                        help="Skip training and load pretrained models from checkpoint.")
+    parser.add_argument("--load_checkpoint", type=str, default=False,
+                        help="Skip training and load pretrained models from checkpoint. Specify run folder eg. 5")
     parser.add_argument("--test_rsa", type=str, default=None,
                         help="Use for testing the RSA speaker after training. Can be 'train', 'validation' or 'test'.")
-    parser.add_argument("--generate_utterances", type=bool, default=False,
-                        help="Use for RSA speaker, to generate all possible utterances. Increases runtime drastically!")
-    parser.add_argument("--load_run", type=str, default=None,
-                        help="Load interaction and/or checkpoints from the specified run.")
     parser.add_argument("--cost-factor", type=float, default=0.01,
                         help="Used for RSA test. Factor for the message length cost in utility.")
 
@@ -228,7 +224,7 @@ def train(opts, datasets, verbose_callbacks=False):
 
     # if checkpoint path is given, load checkpoint and skip training
     if opts.load_checkpoint:
-        trainer.load_from_checkpoint(opts.load_checkpoint)
+        trainer.load_from_checkpoint(opts.checkpoint_path)
     else:
         trainer.train(n_epochs=opts.n_epochs)
 
@@ -250,15 +246,11 @@ def train(opts, datasets, verbose_callbacks=False):
             loss_and_metrics['final_test_acc'] = acc
             pickle.dump(loss_and_metrics, open(opts.save_path + '/loss_and_metrics.pkl', 'wb'))
         if opts.test_rsa:
-            # Load or generate utterances
-            if opts.generate_utterances:
-                utterances = get_utterances(vocab_size, max_len)
+            if opts.interaction_path:
+                opts.interaction = torch.load(opts.interaction_path)
             else:
-                if opts.interaction_path:
-                    opts.interaction = torch.load(opts.interaction_path)
-                else:
-                    opts.interaction = interaction
-                utterances = get_utterances(vocab_size, max_len, opts.interaction)
+                opts.interaction = interaction
+            utterances = get_utterances(vocab_size, max_len, opts.interaction)
 
             # Set data split
             if opts.test_rsa == 'train':
@@ -333,34 +325,29 @@ def main(params):
             if not os.path.exists(opts.save_path) and opts.save:
                 os.makedirs(opts.save_path)
 
-    # if load_run is not given, set load_run to the latest run for loading checkpoint/interaction
-    if (opts.load_checkpoint or not opts.generate_utterances) and not opts.load_run:
-        if not os.path.exists(opts.save_path):
-            os.makedirs(opts.save_path)
-        runs = [int(run) for run in os.listdir(opts.save_path) if
-                run.isdigit() and os.path.isdir(os.path.join(opts.save_path, run))]
-        runs.sort()
-        opts.load_run = str(runs[-1]) if runs else "0"
-
     # if given, set checkpoint path
     if opts.load_checkpoint:
-        if not opts.load_run:
-            raise ValueError("--load_checkpoint was given, but no run folder specified or found")
-        opts.load_checkpoint = os.path.join(opts.save_path, opts.load_run, 'final.tar')
-        if not os.path.exists(opts.load_checkpoint):
-            raise ValueError(f"Checkpoint file {opts.load_checkpoint} not found. Use --load_run to try another run.")
+        opts.checkpoint_path = os.path.join(opts.save_path, opts.load_checkpoint, 'final.tar')
+        if not os.path.exists(opts.checkpoint_path):
+            raise ValueError(f"Checkpoint file {opts.checkpoint_path} not found. Use --load_run to try another run.")
 
     # if test_rsa is given, validate and setup interactions
-    if opts.generate_utterances:
-        opts.interaction = None
-    if opts.test_rsa and not opts.generate_utterances:
+    if opts.test_rsa:
         if opts.test_rsa == 'train' or opts.test_rsa == 'validation':
-            opts.interaction_path = os.path.join(opts.save_path, opts.load_run, 'interactions', opts.test_rsa,
-                                                 'epoch_' + str(opts.n_epochs),
-                                                 'interaction_gpu0')
+            if opts.load_checkpoint:
+                run_folder = opts.load_checkpoint
+            else:
+                if not os.path.exists(opts.save_path):
+                    os.makedirs(opts.save_path)
+                run_folder = str(len(os.listdir(opts.save_path)))
+                opts.save = True
+                if not os.path.exists(opts.save_path):
+                    os.makedirs(opts.save_path)
+            opts.interaction_path = os.path.join(opts.save_path, run_folder, 'interactions',
+                                                 opts.test_rsa, 'epoch_' + str(opts.n_epochs), 'interaction_gpu0')
             print(f'Interaction from {opts.interaction_path} will be loaded for RSA utterances')
         elif opts.test_rsa == 'test':
-            print(f'Interaction from test run will be used for RSA utterances')
+            print(f'Interaction from current test run will be used for RSA utterances')
             opts.interaction_path = None
         else:
             raise ValueError("--test_rsa must be 'train', 'validation', or 'test'")
