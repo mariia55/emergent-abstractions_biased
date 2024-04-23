@@ -2,10 +2,9 @@ import itertools
 import torch
 
 
-def get_utterances(vocab_size, max_length, interaction_path=None):
-    if interaction_path:
-        print(f'Loading utterances from {interaction_path}')
-        utterances = get_unique_utterances(interaction_path)
+def get_utterances(vocab_size, max_length, interaction=None):
+    if interaction:
+        utterances = get_unique_utterances(interaction)
     else:
         print(f'Generating utterances with vocab size {vocab_size} and max length {max_length}')
         utterances = generate_utterances(vocab_size, max_length)
@@ -39,17 +38,11 @@ def generate_utterances(vocab_size, max_length):
     return torch.tensor(all_possible_utterances)
 
 
-def get_unique_utterances(interaction_path):
+def get_unique_utterances(interaction):
     """
     Get unique utterances from interaction data
     """
-    interaction_train = torch.load(interaction_path)
-    messages_train = interaction_train.message.argmax(dim=-1)
-
-    interaction_val = torch.load(interaction_path.replace('train', 'validation'))
-    messages_val = interaction_val.message.argmax(dim=-1)
-
-    messages = torch.cat((messages_train, messages_val), dim=0)
+    messages = interaction.message.argmax(dim=-1)
     messages = [msg.tolist() for msg in messages]
     unique_messages = [list(x) for x in set(tuple(x) for x in messages)]
 
