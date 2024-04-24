@@ -90,6 +90,8 @@ def get_params(params):
                              "stopping.")
     parser.add_argument("--load_checkpoint", type=str, default=False,
                         help="Skip training and load pretrained models from checkpoint. Specify run folder eg. 5")
+    parser.add_argument("--load_interactions", type=str, default=None,
+                        help="Load interaction files up to the given run.")
     parser.add_argument("--test_rsa", type=str, default=None,
                         help="Use for testing the RSA speaker after training. Can be 'train', 'validation' or 'test'.")
     parser.add_argument("--cost-factor", type=float, default=0.01,
@@ -119,7 +121,7 @@ def loss(_sender_input, _message, _receiver_input, receiver_output, labels, _aux
     return loss, {'acc': acc}
 
 
-def train(opts, datasets, verbose_callbacks=False): 
+def train(opts, datasets, verbose_callbacks=False):
     """
     Train function completely copied from hierarchical_reference_game.
     """
@@ -246,11 +248,27 @@ def train(opts, datasets, verbose_callbacks=False):
             loss_and_metrics['final_test_acc'] = acc
             pickle.dump(loss_and_metrics, open(opts.save_path + '/loss_and_metrics.pkl', 'wb'))
         if opts.test_rsa:
-            if opts.interaction_path:
-                opts.interaction = torch.load(opts.interaction_path)
+            rank = str(trainer.distributed_context.rank)
+            if opts.test_rsa == 'test':
+                # Use the latest interactions from the test run
+                utterances = get_utterances(vocab_size, max_len, [interaction])
+            elif opts.load_interactions:
+                # Use all interactions up to the given run
+                interactions = []
+                for i in range(int(opts.load_interactions)):
+                    interaction_path = os.path.join(opts.game_path, str(i), 'interactions',
+                                                    opts.test_rsa, 'epoch_' + str(opts.n_epochs),
+                                                    'interaction_gpu' + rank)
+                    if os.path.exists(interaction_path):
+                        interaction = torch.load(interaction_path)
+                        interactions.append(interaction)
+                utterances = get_utterances(vocab_size, max_len, interactions)
             else:
-                opts.interaction = interaction
-            utterances = get_utterances(vocab_size, max_len, opts.interaction)
+                # Use the interactions from the latest run
+                interaction_path = os.path.join(opts.save_path, 'interactions', opts.test_rsa,
+                                                'epoch_' + str(opts.n_epochs), 'interaction_gpu' + rank)
+                interaction = torch.load(interaction_path)
+                utterances = get_utterances(vocab_size, max_len, [interaction])
 
             # Set data split
             if opts.test_rsa == 'train':
@@ -271,6 +289,13 @@ def train(opts, datasets, verbose_callbacks=False):
                 print("RSA test accuracy: " + str(acc))
 
                 if opts.save:
+                    # Save interaction
+                    save_path = os.path.join(opts.save_path, 'interactions', 'rsa_test')
+                    if not os.path.exists(save_path):
+                        os.makedirs(save_path)
+                    torch.save(interaction, os.path.join(save_path, 'interaction_gpu' + rank))
+
+                    # Save loss and metrics
                     loss_and_metrics = pickle.load(open(opts.save_path + '/loss_and_metrics.pkl', 'rb'))
                     loss_and_metrics['rsa_test_loss'] = eval_loss
                     loss_and_metrics['rsa_test_acc'] = acc
@@ -314,7 +339,8 @@ def main(params):
             opts.game_setting = 'length_cost/context_aware'
         else: 'length_cost/no_cost_context_aware'
 
-    opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
+    opts.game_path = os.path.join(opts.path, folder_name, opts.game_setting)
+    opts.save_path = opts.game_path  # Used later to load all runs
 
     # if name of precreated data set is given, load dataset
     if opts.load_dataset:
@@ -334,22 +360,10 @@ def main(params):
     # if test_rsa is given, validate and setup interactions
     if opts.test_rsa:
         if opts.test_rsa == 'train' or opts.test_rsa == 'validation':
-            if opts.load_checkpoint:
-                run_folder = opts.load_checkpoint
-            else:
-                if not os.path.exists(opts.save_path):
-                    os.makedirs(opts.save_path)
-                run_folder = str(len(os.listdir(opts.save_path)))
-                opts.save = True
-                if not os.path.exists(opts.save_path):
-                    os.makedirs(opts.save_path)
-            opts.interaction_path = os.path.join(opts.save_path, run_folder, 'interactions',
-                                                 opts.test_rsa, 'epoch_' + str(opts.n_epochs), 'interaction_gpu0')
-            print(f'Interaction from {opts.interaction_path} will be loaded for RSA utterances')
-        elif opts.test_rsa == 'test':
-            print(f'Interaction from current test run will be used for RSA utterances')
-            opts.interaction_path = None
-        else:
+            if not os.path.exists(opts.save_path):
+                os.makedirs(opts.save_path)
+            opts.save = True  # Needed to be able to load interactions later
+        elif opts.test_rsa != 'test':
             raise ValueError("--test_rsa must be 'train', 'validation', or 'test'")
 
     for _ in range(opts.num_of_runs):
