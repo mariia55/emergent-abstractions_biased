@@ -72,6 +72,82 @@ def plot_heatmap(result_list,
     plt.tight_layout()
 
 
+def plot_grans_heatmap(result_list,
+                 mode,
+                 plot_dims=(3, 2),
+                 figsize=(7, 7),
+                 ylims=(0.6, 1.0),
+                 granularity_list = ['mixed',],
+                 suptitle=None,
+                 suptitle_position=1.03,
+                 different_ylims=False,
+                 n_runs=5,
+                 matrix_indices=((0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2)),  # Adjust the indices
+                 fontsize=18):
+    """ Plot heatmaps in matrix arrangement for single values (e.g. final accuracies).
+    Allows for plotting multiple matrices according to plot_dims, and allows different modes:
+    'max', 'min', mean', 'median', each across runs. """
+
+    plt.figure(figsize=figsize)
+
+    plot_dims = (len(granularity_list), 2)
+
+    titles = []
+    for g in granularity_list:
+        titles.append(str(g + ' \ntrain'))
+        titles.append(str(g + ' \nvalidation'))
+        
+
+    for i in range(np.prod(plot_dims)):
+
+        if different_ylims:
+            y_lim = ylims[i]
+        else:
+            y_lim = ylims
+
+        heatmap = np.empty((3, 3))
+        heatmap[:] = np.nan
+        results = result_list[i]
+        if results.shape[-1] > n_runs:
+            results = results[:, :, -1]
+
+        plt.subplot(plot_dims[0], plot_dims[1], i + 1)
+
+        if mode == 'mean':
+            values = np.nanmean(results, axis=-1)
+        elif mode == 'max':
+            values = np.nanmax(results, axis=-1)
+        elif mode == 'min':
+            values = np.nanmin(results, axis=-1)
+        elif mode == 'median':
+            values = np.nanmedian(results, axis=-1)
+
+        for p, pos in enumerate(matrix_indices):
+            heatmap[pos] = values[p]
+
+        im = plt.imshow(heatmap, vmin=y_lim[0], vmax=y_lim[1])
+        plt.title(titles[i], fontsize=fontsize)
+        plt.xlabel('# values', fontsize=fontsize)
+        plt.ylabel('# attributes', fontsize=fontsize)
+        plt.xticks(ticks=[0, 1, 2], labels=[4, 8, 16], fontsize=fontsize-1)
+        plt.yticks(ticks=[0, 1, 2], labels=[3, 4, 5], fontsize=fontsize-1)
+        cbar = plt.colorbar(im, fraction=0.046, pad=0.04)
+        cbar.ax.get_yaxis().set_ticks(y_lim)
+        cbar.ax.tick_params(labelsize=fontsize-2)
+
+        for k in range(3):
+            for l in range(3):
+                if not np.isnan(heatmap[l, k]):
+                    ax = plt.gca()
+                    _ = ax.text(l, k, np.round(heatmap[k, l], 2), ha="center", va="center", color="k",
+                                fontsize=fontsize)
+
+        if suptitle:
+            plt.suptitle(suptitle, fontsize=fontsize+1, y=suptitle_position)
+
+    plt.tight_layout()
+
+
 def plot_heatmap_concept_x_context(result_list,
                                     mode,
                                     score,
@@ -333,13 +409,14 @@ def plot_training_trajectory(results_train,
                              figsize=(10, 7),
                              ylim=None,
                              xlim=None,
-                             plot_indices=(1, 2, 3, 4, 5, 7),
-                             plot_shape=(3, 3),
+                             plot_indices=[1],
+                             plot_shape=(1, 3),
                              n_epochs=300,
                              train_only=False,
                              loss_plot=False,
                              message_length_plot=False,
-                             titles=('D(3,4)', 'D(3,8)', 'D(3,16)', 'D(4,4)', 'D(4,8)', 'D(5,4)')):
+                             titles=('D(3,4)',),
+                             label = None):
     """ Plot the training trajectories for training and validation data"""
     plt.figure(figsize=figsize)
 
@@ -355,7 +432,7 @@ def plot_training_trajectory(results_train,
             leg = plt.legend(['train', 'val'], fontsize=12)
             leg.legendHandles[0].set_color('blue')
             leg.legendHandles[1].set_color('red')
-        plt.title(titles[i], fontsize=13)
+        plt.title(titles[i] + label, fontsize=13)
         plt.xlabel('epoch', fontsize=12)
         if loss_plot:
             plt.ylabel('loss', fontsize=12)
@@ -375,3 +452,73 @@ def plot_training_trajectory(results_train,
     else:
         plt.suptitle('accuracy', x=0.53, fontsize=15)
     plt.tight_layout()
+
+
+import matplotlib.pyplot as plt
+
+def plot_training_trajectory_new(results_train,
+                             results_val,
+                             message_length_train=None,
+                             message_length_val=None,
+                             steps=(1, 5),
+                             figsize=(5, 3),
+                             ylim=None,
+                             xlim=None,
+                             plot_indices=[1],
+                             plot_shape=(1, 3),
+                             n_epochs=300,
+                             train_only=False,
+                             loss_plot=False,
+                             message_length_plot=False,
+                             titles=('D(3,4)',),
+                             label=None,
+                             ax=None):
+    """ Plot the training trajectories for training and validation data"""
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        plt.sca(ax)
+
+    for i, plot_idx in enumerate(plot_indices):
+        if ax is None:
+            plt.subplot(plot_shape[0], plot_shape[1], plot_idx)
+        else:
+            ax = plt.gca()
+
+        if message_length_plot:
+            ax.plot(range(0, n_epochs, steps[0]), np.transpose(message_length_train[i]), color='green')
+        else:
+            ax.plot(range(0, n_epochs, steps[0]), np.transpose(results_train[i]), color='blue')
+
+        if not train_only:
+            ax.plot(range(0, n_epochs, steps[1]), np.transpose(results_val[i]), color='red')
+            ax.legend(['train', 'val'])
+            leg = ax.legend(['train', 'val'], fontsize=12)
+            leg.legendHandles[0].set_color('blue')
+            leg.legendHandles[1].set_color('red')
+        if label != None:
+            ax.set_title(titles[i] + '' + label, fontsize=13)
+        else:
+            ax.set_title(titles[i])
+        ax.set_xlabel('epoch', fontsize=12)
+
+        if loss_plot:
+            ax.set_ylabel('loss', fontsize=12)
+        elif message_length_plot:
+            ax.set_ylabel('message length', fontsize=12)
+        else:
+            ax.set_ylabel('accuracy', fontsize=12)
+
+        if ylim:
+            ax.set_ylim(ylim)
+        if xlim:
+            ax.set_xlim(xlim)
+
+    if ax is None:
+        if loss_plot:
+            plt.suptitle('loss', x=0.53, fontsize=15)
+        elif message_length_plot:
+            plt.suptitle('message length', x=0.53, fontsize=15)
+        else:
+            plt.suptitle('accuracy', x=0.53, fontsize=15)
+        plt.tight_layout()

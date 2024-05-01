@@ -245,6 +245,9 @@ def main(params):
 
     # define game setting from args
     if opts.context_unaware:
+        ### for context_unaware, it does not make a lot of sense to change the granularity of the context
+        if opts.granularity != 'mixed':
+            raise ValueError ('For the context_unaware setting, please stick to the default granularity value')
         opts.game_setting = 'context_unaware'
         if opts.length_cost != 0.0:
             opts.game_setting = 'length_cost/context_unaware'

@@ -1,11 +1,15 @@
 import pickle
 import numpy as np
 
-
-def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=True, context_unaware=True):
+### added granularity ad a parameter
+def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=True, granularities = True, context_unaware=True):
     """ loads all accuracies into a dictionary, val_steps should be set to the same as val_frequency during training
     """
-    result_dict = {'train_acc': [], 'val_acc': [], 'test_acc': [], 'zs_specific_test_acc': [],
+    result_dict = {'train_acc': [], 'val_acc': [], 'test_acc': [], 
+                   'coarse_train_acc': [], 'coarse_test_acc': [], 'coarse_val_acc': [],
+                   'fine_train_acc': [], 'fine_test_acc': [], 'fine_val_acc': [],
+                   'mixed_train_acc' :[], 'mixed_val_acc':[], 'mixed_test_acc':[],
+                   'zs_specific_test_acc': [],
                    'zs_generic_test_acc': [], 'zs_acc_objects': [], 'zs_acc_abstraction': [],
                    'cu_train_acc': [], 'cu_val_acc': [], 'cu_test_acc': [], 'cu_zs_specific_test_acc': [],
                    'cu_zs_generic_test_acc': []}
@@ -15,6 +19,16 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
         train_accs = []
         val_accs = []
         test_accs = []
+        # coarse -> granularity_coarse, fine -> granularity_fine
+        coarse_train_accs = []
+        coarse_val_accs = []
+        coarse_test_accs = []
+        fine_train_accs = []
+        fine_val_accs = []
+        fine_test_accs = []
+        mixed_train_acc = []
+        mixed_test_acc = []
+        mixed_val_acc = []
         zs_accs_objects = []
         zs_accs_abstraction = []
         zs_specific_test_accs = []
@@ -27,7 +41,9 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
 
         for run in range(n_runs):
 
-            standard_path = path + '/standard/' + str(run) + '/'
+            standard_path = path + '/standard/' + str(run) + '/' 
+            granularity_coarse_path =  path + '/standard/' + 'granularity_coarse' + '/' + str(run) + '/'
+            granularity_fine_path =  path + '/standard/' + 'granularity_fine' + '/' + str(run) + '/'
             zero_shot_path = path + '/standard/zero_shot/'
             context_unaware_path = path + '/context_unaware/' + str(run) + '/'
             cu_zs_path = path + '/context_unaware/zero_shot/'
@@ -44,7 +60,35 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
                 val_acc = val_acc[::2]
             val_accs.append(val_acc)
             test_accs.append(data['final_test_acc'])
+
+            ### FOR NON DEFAULT GRANULARITIES
+            if granularities and not zero_shot:
+                coarse_data = pickle.load(open(granularity_coarse_path + 'loss_and_metrics.pkl', 'rb'))
+                lists = sorted(coarse_data['metrics_train0'].items())
+                _, coarse_train_acc = zip(*lists)
+                coarse_train_accs.append(coarse_train_acc)
+                lists = sorted(coarse_data['metrics_test0'].items())  # Change 'data' to 'coarse_data' here
+                _, coarse_val_acc = zip(*lists)
+                if len(coarse_val_acc) > n_epochs // val_steps:
+                    coarse_val_acc = coarse_val_acc[::2]
+                coarse_val_accs.append(coarse_val_acc)
+                coarse_test_accs.append(coarse_data['final_test_acc'])
+
+                
+                fine_data = pickle.load(open(granularity_fine_path + '/loss_and_metrics.pkl', 'rb'))
+                lists = sorted(fine_data['metrics_train0'].items())
+                _, fine_train_acc = zip(*lists)
+                fine_train_accs.append(fine_train_acc)
+                lists = sorted(fine_data['metrics_test0'].items())  # Change 'data' to 'fine_data' here
+                _, fine_val_acc = zip(*lists)
+                fine_val_accs.append(fine_val_acc)
+                fine_test_accs.append(fine_data['final_test_acc'])
+
             if zero_shot:
+                 # TODO: implemwnt loading of results for zero shot and fine/coase context settings, if needed for further experiments
+                if granularities :
+                    raise NotImplementedError
+
                 for cond in ['specific', 'generic']:
                     # zs_accs_objects.append(data['final_test_acc']) # not sure what's the purpose of this
 
@@ -88,10 +132,22 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
                     cu_val_acc = cu_val_acc[::2]
                 cu_val_accs.append(cu_val_acc)
                 cu_test_accs.append(cu_data['final_test_acc'])
+            
+            if granularities:
+                result_dict['coarse_train_acc'].append(coarse_train_accs)
+                result_dict['coarse_val_acc'].append(coarse_val_accs)
+                result_dict['coarse_test_acc'].append(coarse_test_accs)
+                result_dict['fine_train_acc'].append(fine_train_accs)
+                result_dict['fine_val_acc'].append(fine_val_accs)
+                result_dict['fine_test_acc'].append(fine_test_accs)
+                result_dict['mixed_train_acc'].append(train_accs)
+                result_dict['mixed_val_acc'].append(val_accs)
+                result_dict['mixed_test_acc'].append(test_accs)
 
-        result_dict['train_acc'].append(train_accs)
-        result_dict['val_acc'].append(val_accs)
-        result_dict['test_acc'].append(test_accs)
+            result_dict['train_acc'].append(train_accs)
+            result_dict['val_acc'].append(val_accs)
+            result_dict['test_acc'].append(test_accs)
+        
         if zero_shot:
             # result_dict['zs_acc_objects'].append(zs_accs_objects)
             # result_dict['zs_acc_abstraction'].append(zs_accs_abstraction)
