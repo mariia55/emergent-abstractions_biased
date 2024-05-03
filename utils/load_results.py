@@ -167,7 +167,7 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
     return result_dict
 
 
-def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=0.001):
+def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost = 0, granularity= 'mixed'):
     """ loads all entropy scores into a dictionary"""
 
     if context_unaware:
@@ -191,8 +191,13 @@ def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=0.001
         NMIs_conc_x_cont, effectiveness_conc_x_cont, consistency_conc_x_cont = [], [], []
 
         for run in range(n_runs):
-            standard_path = path + '/' + setting + '/' + str(run) + '/'
-            data = pickle.load(open(standard_path + 'entropy_scores.pkl', 'rb'))
+            if granularity == 'mixed':
+                standard_path = path + '/' + setting + '/' + str(run) + '/'
+                data = pickle.load(open(standard_path + 'entropy_scores.pkl', 'rb'))
+            else:
+                gran_path =  path + '/' + setting + '/granularity_' + granularity + '/'+ str(run) + '/'
+                data = pickle.load(open(gran_path + 'entropy_scores.pkl', 'rb'))
+
             NMIs.append(data['normalized_mutual_info'])
             effectiveness_scores.append(data['effectiveness'])
             consistency_scores.append(data['consistency'])
