@@ -145,13 +145,13 @@ def load_accuracies(
             result_dict["cu_val_acc"].append(cu_val_accs)
             result_dict["cu_test_acc"].append(cu_test_accs)
 
-    for key in result_dict.keys():
+    for key in result_dict:
         result_dict[key] = np.array(result_dict[key])
 
     return result_dict
 
 
-def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=0.0):
+def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=0.00):
     """loads all entropy scores into a dictionary"""
 
     if context_unaware:
@@ -227,9 +227,6 @@ def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=0.0):
         result_dict["NMI_concept_x_context"].append(NMIs_conc_x_cont)
         result_dict["consistency_concept_x_context"].append(consistency_conc_x_cont)
         result_dict["effectiveness_concept_x_context"].append(effectiveness_conc_x_cont)
-
-    for key in result_dict.keys():
-        result_dict[key] = np.array(result_dict[key])
 
     return result_dict
 
