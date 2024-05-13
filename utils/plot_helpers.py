@@ -333,13 +333,14 @@ def plot_training_trajectory(results_train,
                              figsize=(10, 7),
                              ylim=None,
                              xlim=None,
-                             plot_indices=(1, 2),
-                             plot_shape=(2, 6),
+                             plot_indices=(1, 2, 3, 4, 5, 6),
+                             plot_shape=(2, 3),
                              n_epochs=300,
                              train_only=False,
                              loss_plot=False,
                              message_length_plot=False,
-                             titles=('D(3,4)', 'D(3,8)',)):
+                             titles=('D(3,4)', 'D(3,8)', 'D(3,16)','D(4,4)', 'D(4,8)', 'D(5,4)'),
+                             suptitle = None):
     
     """ Plot the training trajectories for training and validation data"""
     plt.figure(figsize=figsize)
@@ -368,11 +369,16 @@ def plot_training_trajectory(results_train,
             plt.ylim(ylim)
         if xlim:
             plt.xlim(xlim)
+    
+    if suptitle == None:
 
-    if loss_plot:
-        plt.suptitle('loss', x=0.53, fontsize=15)
-    elif message_length_plot:
-        plt.suptitle('message length', x=0.53, fontsize=15)
+        if loss_plot:
+            plt.suptitle('loss', x=0.53, fontsize=15)
+        elif message_length_plot:
+            plt.suptitle('message length', x=0.53, fontsize=15)
+        else:
+            plt.suptitle('accuracy', x=0.53, fontsize=15)
+        plt.tight_layout()
     else:
-        plt.suptitle('accuracy', x=0.53, fontsize=15)
-    plt.tight_layout()
+        plt.suptitle(suptitle, x=0.50, fontsize=15)
+        plt.tight_layout()
