@@ -133,16 +133,16 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
                 cu_val_accs.append(cu_val_acc)
                 cu_test_accs.append(cu_data['final_test_acc'])
             
-            if granularities:
-                result_dict['coarse_train_acc'].append(coarse_train_accs)
-                result_dict['coarse_val_acc'].append(coarse_val_accs)
-                result_dict['coarse_test_acc'].append(coarse_test_accs)
-                result_dict['fine_train_acc'].append(fine_train_accs)
-                result_dict['fine_val_acc'].append(fine_val_accs)
-                result_dict['fine_test_acc'].append(fine_test_accs)
-                result_dict['mixed_train_acc'].append(train_accs)
-                result_dict['mixed_val_acc'].append(val_accs)
-                result_dict['mixed_test_acc'].append(test_accs)
+        if granularities:
+            result_dict['coarse_train_acc'].append(coarse_train_accs)
+            result_dict['coarse_val_acc'].append(coarse_val_accs)
+            result_dict['coarse_test_acc'].append(coarse_test_accs)
+            result_dict['fine_train_acc'].append(fine_train_accs)
+            result_dict['fine_val_acc'].append(fine_val_accs)
+            result_dict['fine_test_acc'].append(fine_test_accs)
+            result_dict['mixed_train_acc'].append(train_accs)
+            result_dict['mixed_val_acc'].append(val_accs)
+            result_dict['mixed_test_acc'].append(test_accs)
 
         result_dict['train_acc'].append(train_accs)
         result_dict['val_acc'].append(val_accs)

@@ -47,6 +47,7 @@ def plot_heatmap(result_list,
             values = np.nanmedian(results, axis=-1)
 
         for p, pos in enumerate(matrix_indices):
+            #print(pos,p)
             heatmap[pos] = values[p]
 
         im = plt.imshow(heatmap, vmin=y_lim[0], vmax=y_lim[1])
@@ -324,73 +325,6 @@ def plot_heatmap_different_vs(result_list,
     plt.tight_layout()
 
 
-def plot_training_trajectory_new(results_train,
-                             results_val,
-                             message_length_train=None,
-                             message_length_val=None,
-                             steps=(1, 5),
-                             figsize=(5, 3),
-                             ylim=None,
-                             xlim=None,
-                             plot_indices=[1],
-                             plot_shape=(1, 3),
-                             n_epochs=300,
-                             train_only=False,
-                             loss_plot=False,
-                             message_length_plot=False,
-                             titles=('D(3,4)',),
-                             label='',
-                             ax=None):
-    """ Plot the training trajectories for training and validation data"""
-    if ax is None:
-        fig, ax = plt.subplots(figsize=figsize)
-    else:
-        plt.sca(ax)
-
-    for i, plot_idx in enumerate(plot_indices):
-        if ax is None:
-            plt.subplot(plot_shape[0], plot_shape[1], plot_idx)
-        else:
-            ax = plt.gca()
-
-        if message_length_plot:
-            ax.plot(range(0, n_epochs, steps[0]), np.transpose(message_length_train[i]), color='green')
-        else:
-            ax.plot(range(0, n_epochs, steps[0]), np.transpose(results_train[i]), color='blue')
-
-        if not train_only:
-            ax.plot(range(0, n_epochs, steps[1]), np.transpose(results_val[i]), color='red')
-            ax.legend(['train', 'val'])
-            leg = ax.legend(['train', 'val'], fontsize=12)
-            leg.legendHandles[0].set_color('blue')
-            leg.legendHandles[1].set_color('red')
-        if label != None:
-            ax.set_title(titles[i] + '' + label, fontsize=13)
-        else:
-            ax.set_title(titles[i])
-        ax.set_xlabel('epoch', fontsize=12)
-
-        if loss_plot:
-            ax.set_ylabel('loss', fontsize=12)
-        elif message_length_plot:
-            ax.set_ylabel('message length', fontsize=12)
-        else:
-            ax.set_ylabel('accuracy', fontsize=12)
-
-        if ylim:
-            ax.set_ylim(ylim)
-        if xlim:
-            ax.set_xlim(xlim)
-
-    if ax is None:
-        if loss_plot:
-            plt.suptitle('loss', x=0.53, fontsize=15)
-        elif message_length_plot:
-            plt.suptitle('message length', x=0.53, fontsize=15)
-        else:
-            plt.suptitle('accuracy', x=0.53, fontsize=15)
-        plt.tight_layout()
-
 def plot_training_trajectory(results_train,
                              results_val,
                              message_length_train=None,
@@ -399,13 +333,14 @@ def plot_training_trajectory(results_train,
                              figsize=(10, 7),
                              ylim=None,
                              xlim=None,
-                             plot_indices=(1, 2, 3, 4, 5, 7),
-                             plot_shape=(3, 3),
+                             plot_indices=(1, 2),
+                             plot_shape=(2, 6),
                              n_epochs=300,
                              train_only=False,
                              loss_plot=False,
                              message_length_plot=False,
-                             titles=('D(3,4)', 'D(3,8)', 'D(3,16)', 'D(4,4)', 'D(4,8)', 'D(5,4)')):
+                             titles=('D(3,4)', 'D(3,8)',)):
+    
     """ Plot the training trajectories for training and validation data"""
     plt.figure(figsize=figsize)
 
