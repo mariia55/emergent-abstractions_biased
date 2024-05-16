@@ -20,7 +20,8 @@ submitit = "^1.5.1"
 matplotlib = "^3.8.3"
 pandas = "^2.2.1"
 tqdm = "^4.66.2"
-egg = {git = "https://github.com/facebookresearch/EGG.git"}
+egg = {git = "https://github.com/kaulson/EGG.git", branch="bugfix/concurrent-wrapper-missing-output"}
+notebook = "^7.1.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
