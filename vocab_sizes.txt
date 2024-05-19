@@ -10,3 +10,27 @@ results/(3,4)_game_size_10_vsf_3/standard/granularity_fine/0/interactions/train/
 Counter({0: 742, 14: 332, 5: 315, 4: 214, 12: 205, 1: 193, 15: 187, 8: 168, 10: 151, 13: 149, 3: 148, 2: 95, 11: 46, 7: 23})
 14 
 
+dataset: (3,4)
+
+coarse context condition
+results/(3,4)_game_size_10_vsf_3/standard/granularity_coarse/0/interactions/train/epoch_300/interaction_gpu0
+Counter({0: 742, 14: 450, 9: 391, 4: 387, 6: 295, 3: 196, 15: 153, 1: 124, 2: 100, 7: 47, 8: 46, 12: 37})
+12 
+
+fine context condition
+results/(3,4)_game_size_10_vsf_3/standard/granularity_fine/0/interactions/train/epoch_300/interaction_gpu0
+Counter({0: 742, 14: 332, 5: 315, 4: 214, 12: 205, 1: 193, 15: 187, 8: 168, 10: 151, 13: 149, 3: 148, 2: 95, 11: 46, 7: 23})
+14 
+
+dataset: (3,4)
+
+coarse context condition
+results/(3,4)_game_size_10_vsf_3/standard/granularity_coarse/0/interactions/train/epoch_300/interaction_gpu0
+Counter({0: 742, 14: 450, 9: 391, 4: 387, 6: 295, 3: 196, 15: 153, 1: 124, 2: 100, 7: 47, 8: 46, 12: 37})
+12 
+
+fine context condition
+results/(3,4)_game_size_10_vsf_3/standard/granularity_fine/0/interactions/train/epoch_300/interaction_gpu0
+Counter({0: 742, 14: 332, 5: 315, 4: 214, 12: 205, 1: 193, 15: 187, 8: 168, 10: 151, 13: 149, 3: 148, 2: 95, 11: 46, 7: 23})
+14 
+
