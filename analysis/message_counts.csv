@@ -1,14 +1,19 @@
 dataset,context_condition,unique_messages
-"(3, 4)",coarse,33
-"(3, 4)",fine,133
-"(3, 8)",coarse,41
-"(3, 8)",fine,438
-"(3, 16)",coarse,133
-"(3, 16)",fine,1308
-"(4, 4)",coarse,204
-"(4, 4)",fine,1071
-"(4, 8)",coarse,788
-"(4, 8)",fine,6636
-"(5, 4)",coarse,1443
-"(5, 4)",fine,4337
+"(3,4)",coarse,33
 "(3,4)",mixed,175
+"(3,4)",fine,133
+"(3,8)",coarse,41
+"(3,8)",mixed,803
+"(3,8)",fine,438
+"(3,16)",coarse,133
+"(3,16)",mixed,4032
+"(3,16)",fine,1308
+"(4,4)",coarse,204
+"(4,4)",mixed,1312
+"(4,4)",fine,1071
+"(4,8)",coarse,788
+"(4,8)",mixed,12925
+"(4,8)",fine,6636
+"(5,4)",coarse,1443
+"(5,4)",mixed,6325
+"(5,4)",fine,4337
