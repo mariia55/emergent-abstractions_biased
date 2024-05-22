@@ -20,8 +20,7 @@ from archs_mu_goodman import Speaker, Listener
 import feature
 import itertools
 
-from load import load_data
-from vis_module import vision_module
+from vision_module import vision_module
 
 SPLIT = (0.6, 0.2, 0.2)
 SPLIT_ZERO_SHOT = (0.75, 0.25)
@@ -124,60 +123,9 @@ def train(opts, datasets, verbose_callbacks=False):
         save_epoch = opts.n_epochs
     else:
         save_epoch = None
-
-    if opts.shapes3d:
-        # try to load the dataset first
-        try:
-            train = torch.load('./dataset/training_dataset')
-            val = torch.load('./dataset/validation_dataset')
-            test = torch.load('./dataset/test_dataset')
-
-            print('3dshapes dataset was found and loaded successfully')
-
-        # otherwise create the dataset and save it to the foulder for later use
-        except:
-            print('3dshapes dataset was not found, creating it instead...')
-            input_shape = [3,64,64]
-            
-            train, val, test, target_names, full_labels, complete_data = load_data(input_shape, normalize=False,
-                                                                            subtract_mean=False,
-                                                                            trait_weights=None,
-                                                                            return_trait_weights=False,
-                                                                            return_full_labels=True,
-                                                                            datapath=None,
-                                                                            test_size=0.25) # train, val, test = 0.6, 0.2, 0.2
-            
-            torch.save(train, './dataset/training_dataset')
-            torch.save(val, './dataset/validation_dataset')
-            torch.save(test, './dataset/test_dataset')
-            torch.save(complete_data, './dataset/complete_dataset')
-        
-        # # if the train/test split of the currently saved dataset does not match 0.75 to 0.25 we correct it
-        # if (len(train)+len(val))*0.25 != len(val):
-        #     print("Found dataset's split did not match given test size of 0.25, creating new dataset accordingly...")
-        #     input_shape = [3,64,64]
-
-        #     train, val, test_data, target_names,  full_labels, complete_data = load_data(input_shape, normalize=False,
-        #                                                                 subtract_mean=False,
-        #                                                                 trait_weights=None,
-        #                                                                 return_trait_weights=False,
-        #                                                                 return_full_labels=True,
-        #                                                                 datapath=None,
-        #                                                                 test_size=0.25)
-            
-        #     # and overwrite the existing save
-        #     torch.save(train, './dataset/training_dataset')
-        #     torch.save(val, './dataset/validation_dataset')
-        
-        # load the trained model
-        model = vision_module(batch_size=32, num_classes=64)
-        model.load_state_dict(torch.load('./models/vision_module'))
-
-        dimensions = [10, 10, 4, 4, 4, 15] # just 64 bcs of 4*4*4?
-
-    else:
-        train, val, test = datasets
-        dimensions = train.dimensions
+    
+    train, val, test = datasets
+    dimensions = train.dimensions
 
     train = torch.utils.data.DataLoader(train, batch_size=opts.batch_size, shuffle=True)
     val = torch.utils.data.DataLoader(val, batch_size=opts.batch_size, shuffle=False, drop_last=True)
@@ -199,12 +147,14 @@ def train(opts, datasets, verbose_callbacks=False):
                             n_layers=opts.listener_n_layers,
                             ),
                             nn.Embedding(opts.vocab_size + 3, opts.embedding_size))
-    elif opts.shapes3d:
-        sender = Sender(opts.hidden_size, sum(dimensions), opts.game_size, opts.context_unaware, model)
-        receiver = Receiver(sum(dimensions), opts.hidden_size, model)
     else:
-        sender = Sender(opts.hidden_size, sum(dimensions), opts.game_size, opts.context_unaware)
-        receiver = Receiver(sum(dimensions), opts.hidden_size)
+        if opts.shapes3d:
+            # hard coded number of features for the feature representations at the moment
+            sender = Sender(opts.hidden_size, 100, opts.game_size, opts.context_unaware)
+            receiver = Receiver(100, opts.hidden_size)
+        else:
+            sender = Sender(opts.hidden_size, sum(dimensions), opts.game_size, opts.context_unaware)
+            receiver = Receiver(sum(dimensions), opts.hidden_size)
 
     minimum_vocab_size = dimensions[0] + 1  # plus one for 'any'
     vocab_size = minimum_vocab_size * opts.vocab_size_factor + 1  # multiply by factor plus add one for eos-symbol
@@ -298,6 +248,8 @@ def main(params):
     # if not opts.dimensions == [16, 16, 16, 16, 16]: # NOTE: just for hyperparameter search
 
     data_set_name = '(' + str(len(opts.dimensions)) + ',' + str(opts.dimensions[0]) + ')'
+    if opts.shapes3d:
+        data_set_name = 'shapes3d_feat_rep'
     folder_name = (data_set_name + '_game_size_' + str(opts.game_size) 
                         + '_vsf_' + str(opts.vocab_size_factor))
     folder_name = os.path.join("results", folder_name)
@@ -322,9 +274,18 @@ def main(params):
 
 
     for _ in range(opts.num_of_runs):
+        if opts.shapes3d and not opts.zero_shot:
+            data_set = torch.load('./dataset/feat_rep_concept_dataset')
+            opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
+            # hard coded game_size for the moment to prevent errors when not specifying the correct game_size before executing train.py
+            opts.game_size = 4
+
+            if not os.path.exists(opts.save_path) and opts.save:
+                os.makedirs(opts.save_path)
 
         # otherwise generate data set (new for each run for the small datasets)
-        if not opts.load_dataset and not opts.zero_shot:
+        elif not opts.load_dataset and not opts.zero_shot:
+            
             data_set = dataset.DataSet(opts.dimensions,
                                         game_size=opts.game_size,
                                         device=opts.device)
@@ -356,11 +317,16 @@ def main(params):
                     opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting, 'zero_shot', cond)
                     if not os.path.exists(opts.save_path) and opts.save:
                         os.makedirs(opts.save_path)
-                    data_set = dataset.DataSet(opts.dimensions,
-                                                game_size=opts.game_size,
-                                                device=opts.device,
-                                                zero_shot=True,
-                                                zero_shot_test=cond)
+                    if opts.shapes3d:
+                        data_set = torch.load('./dataset/feat_rep_zero_concept_dataset')
+                        # hard coded game_size for the moment to prevent errors when not specifying the correct game_size before executing train.py
+                        opts.game_size = 4
+                    else:
+                        data_set = dataset.DataSet(opts.dimensions,
+                                                    game_size=opts.game_size,
+                                                    device=opts.device,
+                                                    zero_shot=True,
+                                                    zero_shot_test=cond)
                     train(opts, data_set, verbose_callbacks=False)
 
         if opts.zero_shot_test != None or not opts.zero_shot:

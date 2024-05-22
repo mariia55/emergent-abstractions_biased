@@ -5,8 +5,6 @@ import h5py
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.model_selection import train_test_split
 
-from img_dataset import shapes3d
-
 # code taken from / inspired by https://github.com/XeniaOhmer/language_perception_communication_games/
 
 def coarse_generic_relational_labels(label_map):
@@ -136,6 +134,7 @@ def load_data(input_shape, normalize=True,
               return_trait_weights=False,
               return_full_labels=False,
               datapath=None):
+    
     assert return_trait_weights + return_full_labels < 2, 'only can return one of trait_weights or full_labels'
 
     if datapath is None:
@@ -166,47 +165,19 @@ def load_data(input_shape, normalize=True,
     if keeper_idxs is not None:
         data = np.array([data[idx] for idx in keeper_idxs])
 
-    (train_data, test_data, train_labels, test_labels) = train_test_split(data, labels_reg,
-                                                                          test_size=0.8) # 0.2 to get 0.2 to 0.8 train and test split
-    
-    (train_data, val_data, train_labels, val_labels) = train_test_split(train_data, train_labels,
-                                                                          test_size=0.25) # 0.25 from the 0.8 training data to achieve overall split of 0.6 train, 0.2 val, 0.2 test
-
-    train_data = train_data.reshape((train_data.shape[0],
-                                        input_shape[0], input_shape[1], input_shape[2]))
-    test_data = test_data.reshape((test_data.shape[0],
-                                    input_shape[0], input_shape[1], input_shape[2]))
-    val_data = val_data.reshape((val_data.shape[0],
-                                    input_shape[0], input_shape[1], input_shape[2]))
     full_data = data.reshape((data.shape[0],
                                     input_shape[0], input_shape[1], input_shape[2]))
 
     if normalize:
-        train_data = train_data.astype("float32") / 255.0
-        test_data = test_data.astype("float32") / 255.0
-        val_data = val_data.astype("float32") / 255.0
+
         full_data = full_data.astype("float32") / 255.0
+
     if subtract_mean:
-        tmp_data = train_data.reshape(train_data.shape[1], -1)
+        
+        tmp_data = full_data.reshape(full_data.shape[1], -1)
 
         mean = np.mean(tmp_data, axis=1)
-        train_data = train_data - mean
-        test_data = test_data - mean
-        val_data = val_data - mean
+
         full_data = full_data - mean
 
-    if len(train_labels.shape) == 1 or train_labels.shape[1] == 1:
-        le = LabelBinarizer()
-        train_labels = le.fit_transform(train_labels)
-        test_labels = le.transform(test_labels)
-        val_labels = le.fit_transform(val_labels)
-        target_names = [str(x) for x in le.classes_]
-    else:
-        target_names = []
-
-    train_data = shapes3d(train_data, train_labels)
-    test_data = shapes3d(test_data, test_labels)
-    val_data = shapes3d(val_data, val_labels)
-    complete_data = shapes3d(full_data, labels_reg)
-
-    return train_data, val_data, test_data, target_names, meta, complete_data
+    return full_data, labels_reg, meta

@@ -53,7 +53,7 @@ def plot_heatmap(result_list,
         plt.title(titles[i], fontsize=fontsize)
         plt.xlabel('# values', fontsize=fontsize)
         plt.ylabel('# attributes', fontsize=fontsize)
-        plt.xticks(ticks=[0, 1, 2], labels=[4, 8, 16], fontsize=fontsize-1)
+        plt.xticks(ticks=[0, 1, 2], labels=[4, 8, "shapes3d"], fontsize=fontsize-1)
         plt.yticks(ticks=[0, 1, 2], labels=[3, 4, 5], fontsize=fontsize-1)
         cbar = plt.colorbar(im, fraction=0.046, pad=0.04)
         cbar.ax.get_yaxis().set_ticks(y_lim)

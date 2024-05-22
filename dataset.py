@@ -7,7 +7,6 @@ import random
 from tqdm import tqdm
 
 import numpy as np
-from load import load_data
 
 SPLIT = (0.6, 0.2, 0.2)
 SPLIT_ZERO_SHOT = (0.75, 0.25)
@@ -16,21 +15,30 @@ class DataSet(torch.utils.data.Dataset):
 	""" 
 	This class provides the torch.Dataloader-loadable dataset.
 	"""
-	def __init__(self, properties_dim=[3,3,3], game_size=10, device='cuda', testing=False, zero_shot=False, zero_shot_test='generic'):
+	def __init__(self, properties_dim=[3,3,3], game_size=10, device='cuda', testing=False, zero_shot=False, zero_shot_test='generic', is_shapes3d = False, images = [], labels = []):
 		"""
 		properties_dim: vector that defines how many attributes and features per attributes the dataset should contain, defaults to a 3x3x3 dataset
 		game_size: integer that defines how many targets and distractors a game consists of
 		"""
 		super().__init__()
 		
-		self.properties_dim = properties_dim
 		self.game_size = game_size
 		self.device = device
 
+		# if the flag for shapes3d is True the dataset will be created with the images and labels of shapes3d
+		self.is_shapes3d = is_shapes3d
+		
+		if self.is_shapes3d:
+			# images can also be feature representations
+			self.images = images
+			self.labels = labels
+			self.properties_dim = [4,4,4]
+			self.all_objects = self.reverse_one_hottify()
+		else:
+			self.properties_dim = properties_dim
+			self.all_objects = self._get_all_possible_objects(properties_dim)
 		# get all concepts
 		self.concepts = self.get_all_concepts()
-		# get all objects
-		self.all_objects = self._get_all_possible_objects(properties_dim)
 
 		# generate dataset
 		if not testing and not zero_shot:
@@ -61,7 +69,6 @@ class DataSet(torch.utils.data.Dataset):
 		# Split is based on how many distinct concepts there are (regardless context conditions)
 		ratio = int(len(self.concepts)*(train_ratio + val_ratio))
 		concept_indices.sort()
-		print("concept indeces", concept_indices[0])
 
 		train_and_val = []
 		print("Creating train_ds and val_ds...")
@@ -144,8 +151,6 @@ class DataSet(torch.utils.data.Dataset):
 
         # Save information about train dataset
 		train.dimensions = self.properties_dim
-		print("Length of train and validation datasets:", len(train), "/", len(val))
-		print("Length of test dataset:", len(test))
 
 		return train, val, test
 
@@ -189,21 +194,39 @@ class DataSet(torch.utils.data.Dataset):
 				for obj in distractor_objects:
 					receiver_input.append(obj)
 		# sender input does not need to be shuffled - that way I don't need labels either
-		#random.shuffle(sender_input)
-		#sender_label = [idx for idx, obj in enumerate(sender_input) if obj in sender_targets]
-		#sender_label = torch.Tensor(sender_label).to(torch.int64)
-		#sender_label = F.one_hot(sender_label, num_classes=self.game_size*2).sum(dim=0).float()
 		# shuffle receiver input and create (many-hot encoded) label
 		random.shuffle(receiver_input)
 		receiver_label = [idx for idx, obj in enumerate(receiver_input) if obj in receiver_targets]
 		receiver_label = torch.Tensor(receiver_label).to(torch.int64).to(device=self.device)
 		receiver_label = F.one_hot(receiver_label, num_classes=self.game_size*2).sum(dim=0).float()
-		# ENCODE and return as TENSOR
-		sender_input = torch.stack([encoding_func(elem) for elem in sender_input])
-		receiver_input = torch.stack([encoding_func(elem) for elem in receiver_input])
+		
+		if self.is_shapes3d:
+			# translation from labels to real images/their feature representation
+			sender_input = self.fill_input(sender_input)
+			receiver_input = self.fill_input(receiver_input)
+
+		else:
+			# ENCODE and return as TENSOR
+			sender_input = torch.stack([encoding_func(elem) for elem in sender_input])
+			receiver_input = torch.stack([encoding_func(elem) for elem in receiver_input])
+
 		# output needs to have the structure sender_input, labels, receiver_input
 		#return torch.cat([sender_input, sender_label]), receiver_label, receiver_input
 		return sender_input, receiver_label, receiver_input
+	
+	def fill_input(self, input):
+		"""
+		Finds all matching labels for the chosen samples in the given concept and chooses one of these matches to fill the input with
+		"""
+		filled_input = list()
+		for elem in input:
+			indeces = list()
+			for idx, label in enumerate(self.all_objects):
+				if elem == label:
+					indeces.append(idx)
+			index = random.sample(indeces, 1)
+			filled_input.append(self.images[index[0]])
+		return torch.tensor(np.array(filled_input), dtype=torch.float32)
 
 	def get_sample(self, concept_idx, context_condition):
 		"""
@@ -219,10 +242,6 @@ class DataSet(torch.utils.data.Dataset):
 		# get all possible distractors for a given concept (for all possible context conditions)
 		context = self.get_distractors(concept_idx, context_condition)
 		context_sampled = self.sample_distractors(context, context_condition)
-		print("this is target_objects: ", target_objects)
-		print("this is fixed: ", fixed)
-		print("this is context_condition: ", context_condition)
-		print("this is corresponding context: ", context_sampled)
 		# return target concept, context (distractor objects + context_condition) for each context
 		return [target_objects, fixed], context_sampled
 		
@@ -315,7 +334,6 @@ class DataSet(torch.utils.data.Dataset):
 				helper_list.append(dist_object)
 		return context
 		
-		
 	def get_all_concepts(self):
 		"""
 		Returns all possible concepts for a given dataset size.
@@ -323,20 +341,22 @@ class DataSet(torch.utils.data.Dataset):
 			objects: a list with all object-tuples that satisfy the concept
 			fixed: a tuple that denotes how many and which attributes are fixed
 		"""
-		fixed_vectors = self.get_fixed_vectors(self.properties_dim)	
-		all_objects = self._get_all_possible_objects(self.properties_dim)
+		if self.is_shapes3d:# color,   scale,   shape, color and scale, color and shape, scale and shape, color and scale and shape fixed
+			fixed_vectors = [(1,0,0), (0,1,0), (0,0,1), (1,1,0),        (1,0,1),            (0,1,1),       (1,1,1)]
+		else:
+			fixed_vectors = self.get_fixed_vectors(self.properties_dim)	
 		# create all possible concepts
-		all_fixed_object_pairs = list(itertools.product(all_objects, fixed_vectors))
+		all_fixed_object_pairs = list(itertools.product(self.all_objects, fixed_vectors))
 		
 		concepts = list()
 		# go through all concepts (i.e. fixed, objects pairs)
-		for concept in all_fixed_object_pairs:
+		for concept in tqdm(all_fixed_object_pairs):
 			# treat each fixed_object pair as a target concept once
 			# e.g. target concept (_, _, 0) (i.e. fixed = (0,0,1) and objects e.g. (0,0,0), (1,0,0))
 			fixed = concept[1]
 			# go through all objects and check whether they satisfy the target concept (in this example have 0 as 3rd attribute)
 			target_objects = list()
-			for object in all_objects:
+			for object in self.all_objects:
 				if self.satisfies(object, concept):
 					if object not in target_objects:
 						target_objects.append(object)
@@ -359,8 +379,86 @@ class DataSet(torch.utils.data.Dataset):
 				shared[i] = 1
 				shared_vectors.append(shared)
 		return shared_vectors
+	
+	def reverse_one_hottify(self):
 
+		# dictionary to translate one-hot encoded labels for shapes3d dataset
+		# only used for shapes3d dataset variant
+		attribute_dict =  {
+			0: (0.0, 0.75, 0.0), 
+			1: (0.0, 0.75, 1.0), 
+			2: (0.0, 0.75, 2.0), 
+			3: (0.0, 0.75, 3.0), 
+			4: (0.0, 0.9642857142857143, 0.0), 
+			5: (0.0, 0.9642857142857143, 1.0), 
+			6: (0.0, 0.9642857142857143, 2.0), 
+			7: (0.0, 0.9642857142857143, 3.0), 
+			8: (0.0, 1.1071428571428572, 0.0), 
+			9: (0.0, 1.1071428571428572, 1.0), 
+			10: (0.0, 1.1071428571428572, 2.0), 
+			11: (0.0, 1.1071428571428572, 3.0), 
+			12: (0.0, 1.25, 0.0), 
+			13: (0.0, 1.25, 1.0), 
+			14: (0.0, 1.25, 2.0), 
+			15: (0.0, 1.25, 3.0), 
+			16: (0.2, 0.75, 0.0), 
+			17: (0.2, 0.75, 1.0), 
+			18: (0.2, 0.75, 2.0), 
+			19: (0.2, 0.75, 3.0), 
+			20: (0.2, 0.9642857142857143, 0.0), 
+			21: (0.2, 0.9642857142857143, 1.0), 
+			22: (0.2, 0.9642857142857143, 2.0), 
+			23: (0.2, 0.9642857142857143, 3.0), 
+			24: (0.2, 1.1071428571428572, 0.0), 
+			25: (0.2, 1.1071428571428572, 1.0), 
+			26: (0.2, 1.1071428571428572, 2.0), 
+			27: (0.2, 1.1071428571428572, 3.0), 
+			28: (0.2, 1.25, 0.0), 
+			29: (0.2, 1.25, 1.0), 
+			30: (0.2, 1.25, 2.0), 
+			31: (0.2, 1.25, 3.0), 
+			32: (0.4, 0.75, 0.0), 
+			33: (0.4, 0.75, 1.0), 
+			34: (0.4, 0.75, 2.0), 
+			35: (0.4, 0.75, 3.0), 
+			36: (0.4, 0.9642857142857143, 0.0), 
+			37: (0.4, 0.9642857142857143, 1.0), 
+			38: (0.4, 0.9642857142857143, 2.0), 
+			39: (0.4, 0.9642857142857143, 3.0), 
+			40: (0.4, 1.1071428571428572, 0.0), 
+			41: (0.4, 1.1071428571428572, 1.0), 
+			42: (0.4, 1.1071428571428572, 2.0), 
+			43: (0.4, 1.1071428571428572, 3.0), 
+			44: (0.4, 1.25, 0.0), 
+			45: (0.4, 1.25, 1.0), 
+			46: (0.4, 1.25, 2.0), 
+			47: (0.4, 1.25, 3.0), 
+			48: (0.8, 0.75, 0.0), 
+			49: (0.8, 0.75, 1.0), 
+			50: (0.8, 0.75, 2.0), 
+			51: (0.8, 0.75, 3.0), 
+			52: (0.8, 0.9642857142857143, 0.0), 
+			53: (0.8, 0.9642857142857143, 1.0), 
+			54: (0.8, 0.9642857142857143, 2.0), 
+			55: (0.8, 0.9642857142857143, 3.0), 
+			56: (0.8, 1.1071428571428572, 0.0), 
+			57: (0.8, 1.1071428571428572, 1.0), 
+			58: (0.8, 1.1071428571428572, 2.0), 
+			59: (0.8, 1.1071428571428572, 3.0), 
+			60: (0.8, 1.25, 0.0), 
+			61: (0.8, 1.25, 1.0), 
+			62: (0.8, 1.25, 2.0), 
+			63: (0.8, 1.25, 3.0)}
 		
+		indeces = np.argmax(self.labels, axis = 1)
+		unhottified = []
+
+		for index in indeces:
+
+			unhottified.append(attribute_dict[index])
+
+		return unhottified
+
 		
 	@staticmethod
 	def satisfies(object, concept):
@@ -392,12 +490,9 @@ class DataSet(torch.utils.data.Dataset):
 		Fixed vectors are vectors of length len(properties_dim), where 1 denotes that an attribute is fixed, 0 that it isn't.
 		The more attributes are fixed, the more specific the concept -- the less attributes fixed, the more generic the concept.
 		"""
-		# what I want to get: [(1,0,0), (0,1,0), (0,0,1)] for most generic
 		# concrete: [(1,1,0), (0,1,1), (1,0,1)]
 		# most concrete: [(1,1,1)]
 		# for variable dataset sizes
-		if properties_dim == [10, 10, 10, 8, 4, 15] or properties_dim == [10, 10, 4, 4, 4, 15]:
-			return [(0, 0, 1, 0, 0, 0), (0, 0, 0, 1, 0, 0), (0, 0, 0, 0, 1, 0), (0, 0, 1, 1, 0, 0), (0, 0, 1, 0, 1, 0), (0, 0, 0, 1, 1, 0), (0, 0, 1, 1, 1, 0)]
 		# range(0,2) because I want [0,1] values for whether an attribute is fixed or not		
 		list_of_dim = [range(0, 2) for dim in properties_dim]
 		fixed_vectors = list(itertools.product(*list_of_dim))
@@ -444,36 +539,6 @@ class DataSet(torch.utils.data.Dataset):
 		"""
 		Returns all possible combinations of attribute-feature values as a dataframe.
 		"""
-		if properties_dim == [10, 10, 10, 8, 4, 15]:
-			# create all possible combinations of relevant attributes
-			incomplete_objects = [range(0,9), range(0,7), range(0,3)]
-			incomplete_objects = list(itertools.product(*incomplete_objects))
-
-			all_objects = list()
-			# add random values for non-relevant attributes in valid values
-			for tuple in incomplete_objects:
-				prepend =   (random.randint(0,9), random.randint(0,9))
-				append =    (random.randint(0,14),)
-				# concatenate random values for non-relevant attributes with all possible combinations of relevant attributes
-				all_objects.append(prepend + tuple + append)
-			return all_objects
-		
-		elif properties_dim == [10, 10, 4, 4, 4, 15]:
-			# define 4 possible values for color, scale and shape
-			possible_colors, possible_scales, possible_shapes = [0,3,5,8], [0,2,5,7], [0,1,2,3]
-			# create all possible combinations of the 12 values
-			incomplete_objects = [(c for c in possible_colors), (sc for sc in possible_scales), (s for s in possible_shapes)]
-			incomplete_objects = list(itertools.product(*incomplete_objects))
-
-			all_objects = list()
-			# add random values for non-relevant attributes in valid range
-			for tuple in incomplete_objects:
-				prepend =   (random.randint(0,9), random.randint(0,9))
-				append =    (random.randint(0,14),)
-				# concatenate random values for non-relevant attributes with all possible combinations of relevant attributes
-				all_objects.append(prepend + tuple + append)
-			return all_objects
-		
 		list_of_dim = [range(0, dim) for dim in properties_dim]
 		# Each object is a row
 		all_objects = list(itertools.product(*list_of_dim))
@@ -492,9 +557,6 @@ class DataSet(torch.utils.data.Dataset):
 			start += dim
 			
 		return output
-
-
-
 
 def get_distractors_old(self, concept_idx):
 		"""

@@ -33,6 +33,7 @@ class Sender(nn.Module):
         batch_size = x.shape[0]
         n_obj = x.shape[1]
         n_features = x.shape[2]
+        #n_features = 3*64*64
         n_targets = int(n_obj/2)
 
         # embed target objects:
@@ -74,8 +75,6 @@ class Receiver(nn.Module):
         self.vision_module = vision_module
 
     def forward(self, x, input, _aux_input=None):
-        if self.vision_module:
-            x = self.vision_module(x)
         # from EGG: the rationale for the non-linearity here is that the RNN output will also be the 
         # outcome of a non-linearity
         embedded_input = self.fc1(input).tanh() # [32, 20, 256]
