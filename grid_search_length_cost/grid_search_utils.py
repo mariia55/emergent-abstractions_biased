@@ -2,7 +2,7 @@ import os
 import re
 import pandas as pd
     
-def get_grid_search_results(directory, n_lines=125):
+def get_grid_search_results(directory, n_lines=125, header_in_line=0):
 
     # results should be stored in a pandas dataframe and exported as csv
     data = pd.DataFrame()
@@ -15,7 +15,7 @@ def get_grid_search_results(directory, n_lines=125):
                 lines = file.readlines()
                 
                 if len(lines) == n_lines: # if files have less lines, the search did not run for 100 epochs
-                    header = lines[0].strip()
+                    header = lines[header_in_line].strip()
 
                     # create a dictionary with parameters
                     parameters = {}
@@ -29,19 +29,23 @@ def get_grid_search_results(directory, n_lines=125):
                     final_train = lines[-3].strip()
                     final_test = lines[-2].strip()
 
-                    train_loss, train_acc = re.findall(r"\"loss\": (.+?), \"acc\": (.+?),", final_train)[0]
-                    test_loss, test_acc = re.findall(r"\"loss\": (.+?), \"acc\": (.+?),", final_test)[0]
+                    train_loss, train_acc, train_length = re.findall(r"\"loss\": (.+?), \"acc\": (.+?), \"length\": (.+?),", final_train)[0]
+                    test_loss, test_acc, test_length = re.findall(r"\"loss\": (.+?), \"acc\": (.+?), \"length\": (.+?),", final_test)[0]
 
                     # update the parameters dictionary with train and test accuracies
                     parameters['train_loss'] = train_loss
                     parameters['train_accuracy'] = train_acc
+                    parameters['train_length'] = train_length
                     parameters['test_loss'] = test_loss
                     parameters['test_accuracy'] = test_acc
+                    parameters['test_length'] = test_length
 
                     df = pd.DataFrame(parameters, index=[0])
 
                     data = pd.concat([data, df], ignore_index=True)
 
+    if 'context_unaware' in data:
+        data['context_unaware'] = data['context_unaware'].map({'True': 1.0, 'False': 0.0})
     # sort and save as csv
     data = data.astype(float)
     print(data)
