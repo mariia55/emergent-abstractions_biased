@@ -4,7 +4,7 @@
 
 import numpy as np
 import torch
-from egg.core.callbacks import Callback, ConsoleLogger
+from egg.core.callbacks import Callback, ConsoleLogger, InteractionSaver
 from egg.core.early_stopping import EarlyStopper
 from egg.core.interaction import Interaction
 import json
@@ -56,14 +56,8 @@ class SavingConsoleLogger(ConsoleLogger):
                 with open(self.save_path + '/loss_and_metrics.pkl', 'wb') as handle:
                     pickle.dump(self.save_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-    def on_early_stopping(
-            self,
-            train_loss: float,
-            train_logs: Interaction,
-            epoch: int,
-            test_loss: float = None,
-            test_logs: Interaction = None,
-    ):
+    def on_early_stopping(self, train_loss: float = None, train_logs: Interaction = None, epoch: int = None,
+                          test_loss: float = None, test_logs: Interaction = None):
         if self.save:
             with open(self.save_path + '/loss_and_metrics.pkl', 'wb') as handle:
                 pickle.dump(self.save_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -108,8 +102,8 @@ class MessageLengthHierarchical(Callback):
             # print(first_zero_index)
             messages[m_idx, first_zero_index:] = torch.zeros((1, max_len - first_zero_index))
         # calculate message length
-        print(messages)
-        print(torch.sum(messages == 0, dim=1))
+        # print(messages)
+        # print(torch.sum(messages == 0, dim=1))
         message_length = max_len - torch.sum(messages == 0, dim=1)
         return message_length
 
@@ -350,8 +344,8 @@ class TopographicSimilarityConceptLevel(Callback):
 
     def on_early_stopping(
             self,
-            train_loss: float,
-            train_logs: Interaction,
+            train_loss,
+            train_interaction,
             epoch: int,
             test_loss: float = None,
             test_logs: Interaction = None,
@@ -376,6 +370,7 @@ class EarlyStopperLossWithPatience(EarlyStopper):
         :param validation: whether the statistics on the validation (or training, if False) data should be checked
         """
         super(EarlyStopperLossWithPatience, self).__init__(validation)
+        self.best_interaction = None
         self.patience = patience
         self.field_name = field_name
         self.min_delta = min_delta
@@ -383,12 +378,18 @@ class EarlyStopperLossWithPatience(EarlyStopper):
         self.stopped_epoch = None
         self.best = None
         self.stop_training = None
+        self.best_epoch = None
 
     def on_train_begin(self, logs=None):
         self.wait = 0
         self.stopped_epoch = 0
         self.best = None
         self.stop_training = False
+        self.best_epoch = 0
+        self.best_interaction = None
+
+    def on_epoch_end(self, loss: float, logs: Interaction, epoch: int):
+        self.epoch = epoch
 
     def should_stop(self) -> bool:
         if self.validation:
@@ -407,16 +408,50 @@ class EarlyStopperLossWithPatience(EarlyStopper):
         # for first epoch:
         if self.best is None:
             self.best = current
+            self.best_epoch = self.epoch
+            self.best_interaction = last_epoch_interactions
         # checks whether the current is smaller than the so far best value (while only treating differences larger than
         # min_delta as a real difference)
         elif current < self.best - self.min_delta:
             self.best = current
             self.wait = 0
+            self.best_epoch = self.epoch
+            self.best_interaction = last_epoch_interactions
         else:
             self.wait += 1
             if self.wait >= self.patience:
-                # self.stopped_epoch = self.epoch
+                self.stopped_epoch = self.epoch
                 self.stop_training = True
-                # print("Epoch %05d: early stopping" % (self.epoch + 1))
-
+                print("Epoch %d: early stopping" % self.stopped_epoch)
+                print("Best epoch:", self.best_epoch + 1)
         return self.stop_training
+
+
+class InteractionSaverEarlyStopping(InteractionSaver):
+    """
+    Implements an extra function to the InteractionSaver implemented in EGG for saving interactions after early stopping.
+    """
+    def __init__(self):
+        super(InteractionSaverEarlyStopping, self).__init__()
+
+    def on_early_stopping(self,
+        train_loss: float,
+        train_logs: Interaction,
+        epoch: int,
+        test_loss: float = None,
+        test_logs: Interaction = None,):
+
+        if (
+                not self.aggregated_interaction
+                or self.trainer.distributed_context.is_leader
+        ):
+            rank = self.trainer.distributed_context.rank
+            self.dump_interactions(
+                test_logs, "validation", epoch, rank, self.checkpoint_dir)
+
+        if (
+                not self.aggregated_interaction
+                or self.trainer.distributed_context.is_leader
+        ):
+            rank = self.trainer.distributed_context.rank
+            self.dump_interactions(train_logs, "train", epoch, rank, self.checkpoint_dir)
