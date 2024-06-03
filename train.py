@@ -283,10 +283,11 @@ def train(opts, datasets, verbose_callbacks=False):
 
                 if opts.save:
                     # Save interaction
-                    save_path = os.path.join(opts.save_path, 'interactions', 'rsa_test')
+                    save_path = os.path.join(opts.game_path, opts.load_interactions, 'interactions', 'rsa_test')
                     if not os.path.exists(save_path):
                         os.makedirs(save_path)
-                    torch.save(interaction, os.path.join(save_path, 'interaction_gpu' + rank))
+                    #torch.save(interaction, os.path.join(save_path, 'interaction_gpu' + rank))
+                    InteractionSaver.dump_interactions(interaction, mode="rsa_" + opts.test_rsa, epoch=0, rank=rank, dump_dir=save_path)
 
                     # Save loss and metrics
                     loss_and_metrics = pickle.load(open(opts.save_path + '/loss_and_metrics.pkl', 'rb'))
@@ -320,18 +321,20 @@ def main(params):
     # define game setting from args
     if opts.context_unaware:
         opts.game_setting = 'context_unaware'
-        if opts.length_cost != 0.0:
-            opts.game_setting = 'length_cost/context_unaware'
-        else:
-            opts.game_setting = 'length_cost/no_cost_context_unaware'
+        if opts.length_cost:
+            if opts.length_cost != 0.0:
+                opts.game_setting = 'length_cost/context_unaware'
+            else:
+                opts.game_setting = 'length_cost/no_cost_context_unaware'
     elif opts.mu_and_goodman:
         opts.game_setting = 'mu_and_goodman'
     else:
         opts.game_setting = 'standard'
-        if opts.length_cost != 0.0:
-            opts.game_setting = 'length_cost/context_aware'
-        else:
-            'length_cost/no_cost_context_aware'
+        if opts.length_cost:
+            if opts.length_cost != 0.0:
+                opts.game_setting = 'length_cost/context_aware'
+            else:
+                opts.game_setting = 'length_cost/no_cost_context_aware'
 
     opts.game_path = os.path.join(opts.path, folder_name, opts.game_setting)
     opts.save_path = opts.game_path  # Used later to load all runs
@@ -347,17 +350,21 @@ def main(params):
 
     # if given, set checkpoint path
     if opts.load_checkpoint:
-        opts.checkpoint_path = os.path.join(opts.save_path, opts.load_checkpoint, 'final.tar')
+        opts.checkpoint_path = os.path.join(opts.game_path, opts.load_checkpoint, 'final.tar')
         if not os.path.exists(opts.checkpoint_path):
             raise ValueError(f"Checkpoint file {opts.checkpoint_path} not found. Use --load_run to try another run.")
 
     # if test_rsa is given, validate and setup interactions
     if opts.test_rsa:
-        if opts.test_rsa == 'train' or opts.test_rsa == 'validation':
-            if not os.path.exists(opts.save_path):
+        if opts.test_rsa == 'train' or opts.test_rsa == 'validation' or opts.test_rsa == 'test':
+            # create subfolder if necessary
+            opts.save_path = os.path.join(opts.game_path, opts.load_interactions,
+                                          'interactions', opts.test_rsa)
+            if not os.path.exists(opts.save_path) and opts.save:
                 os.makedirs(opts.save_path)
-            opts.save = True  # Needed to be able to load interactions later
-        elif opts.test_rsa != 'test':
+            #opts.save = True  # Needed to be able to load interactions later
+        #elif opts.test_rsa != 'test':
+        else:
             raise ValueError("--test_rsa must be 'train', 'validation', or 'test'")
 
     for _ in range(opts.num_of_runs):
@@ -367,8 +374,11 @@ def main(params):
             data_set = dataset.DataSet(opts.dimensions,
                                        game_size=opts.game_size,
                                        device=opts.device)
+
+            # save folder for opts rsa is already specified above
+            if not opts.test_rsa:
+                opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
             # create subfolder if necessary
-            opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
             if not os.path.exists(opts.save_path) and opts.save:
                 os.makedirs(opts.save_path)
 

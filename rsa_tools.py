@@ -13,6 +13,7 @@ def get_utterances(vocab_size, max_length, interactions=None):
 
     # Convert to one-hot encoding
     utterances = torch.nn.functional.one_hot(utterances, num_classes=vocab_size).float()
+
     return utterances
 
 
