@@ -73,3 +73,71 @@ class Receiver(nn.Module):
         embedded_input = self.fc1(input).tanh()  # [32, 20, 256]
         dots = torch.matmul(embedded_input, torch.unsqueeze(x, dim=-1))
         return dots.squeeze()  # [32, 20]
+
+
+class RSASender(nn.Module):
+    """
+    The RSA sender uses an internal listener to calculate the utility of each utterance and selects the utterance
+    with the highest utility. The utility is calculated as the difference between the score of the targets and the
+    score of the distractors minus the cost of the utterance (message length).
+    Score = sum of unnormalized probabilities
+    Cost = position of the first EOS symbol in the message.
+
+    As a sender, it gets as input targets and distractors in an ordered fashion (targets first).
+    """
+
+    def __init__(self, internal_listener, utterances, cost_factor=0.01):
+        """
+        internal_listener: Trained listener. Needs to be able to process one-hot encoded messages
+        utterances: List of possible utterances to pick from. Each utterance is a one-hot encoded tensor
+        cost_factor: Weighting factor for the cost of the utterance (message length)
+        """
+        super(RSASender, self).__init__()
+        self.internal_listener = internal_listener
+        self.utterances = utterances
+        self.cost_factor = cost_factor
+
+    def forward(self, x, aux_input=None):
+        batch_size = x.shape[0]
+        num_utterances = len(self.utterances)
+        utilities = torch.zeros(batch_size, num_utterances)
+
+        for i, utterance in enumerate(self.utterances):
+            utility = self.calculate_utility(x, utterance)
+            utilities[:, i] = utility
+
+        # Find the indices of utterances with the highest utility for each item in the batch
+        max_indices = torch.argmax(utilities, dim=1)
+
+        # Collect the best utterance for each batch item
+        best_utterances = [self.utterances[i] for i in max_indices]
+        return torch.stack(best_utterances)
+
+    def calculate_utility(self, x, utterance):
+        """
+        Calculate the utility of an utterance given the batch of inputs x.
+        The utterance is repeated to match the batch size and the utility is calculated as the difference between
+        the score of the targets and the score of the distractors minus the cost of the utterance.
+        """
+        batch_size = x.shape[0]
+
+        # Find effective message length (first occurrence of EOS symbol)
+        eos_one_hot = torch.zeros_like(utterance[0]).float()
+        eos_one_hot[0] = 1
+        matches = torch.all(utterance == eos_one_hot, dim=1)
+        zeroes = torch.nonzero(matches)
+        cost = zeroes[0] if zeroes.shape[0] > 0 else len(utterance[0])
+
+        # Repeat the utterance to match the batch size. All inputs in batch will be paired with the same utterance.
+        utterance = utterance.unsqueeze(0).repeat(batch_size, 1, 1)
+        logits = self.internal_listener(input=x, message=utterance)
+
+        # Get number of targets so we can slice the logits into targets and distractors
+        n_obj = x.shape[1]
+        n_targets = int(n_obj / 2)
+        # Using -1 to get the logits for the last RNN time step
+        target_score = torch.sum(logits[:, -1, :n_targets], dim=1)
+        distractor_score = torch.sum(logits[:, -1, n_targets:], dim=1)
+        overall_score = target_score - distractor_score
+
+        return overall_score - self.cost_factor * cost

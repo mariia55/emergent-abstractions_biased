@@ -15,10 +15,12 @@ import os
 import pickle
 
 import dataset
-from archs import Sender, Receiver
+from archs import Sender, Receiver, RSASender
 from archs_mu_goodman import Speaker, Listener
+from rsa_tools import get_utterances
 import feature
 import itertools
+import time
 
 
 SPLIT = (0.6, 0.2, 0.2)
@@ -86,6 +88,14 @@ def get_params(params):
     parser.add_argument("--min_delta", type=float, default=0.001,
                         help="How much of an improvement to consider a significant improvement of loss before early "
                              "stopping.")
+    parser.add_argument("--load_checkpoint", type=str, default=False,
+                        help="Skip training and load pretrained models from checkpoint. Specify run folder eg. 5")
+    parser.add_argument("--load_interactions", type=str, default=None,
+                        help="Load interaction files up to the given run.")
+    parser.add_argument("--test_rsa", type=str, default=None,
+                        help="Use for testing the RSA speaker after training. Can be 'train', 'validation' or 'test'.")
+    parser.add_argument("--cost-factor", type=float, default=0.01,
+                        help="Used for RSA test. Factor for the message length cost in utility.")
 
     args = core.init(parser, params)
 
@@ -111,7 +121,7 @@ def loss(_sender_input, _message, _receiver_input, receiver_output, labels, _aux
     return loss, {'acc': acc}
 
 
-def train(opts, datasets, verbose_callbacks=False): 
+def train(opts, datasets, verbose_callbacks=False):
     """
     Train function completely copied from hierarchical_reference_game.
     """
@@ -213,7 +223,12 @@ def train(opts, datasets, verbose_callbacks=False):
 
     trainer = core.Trainer(game=game, optimizer=optimizer,
                            train_data=train, validation_data=val, callbacks=callbacks)
-    trainer.train(n_epochs=opts.n_epochs)
+
+    # if checkpoint path is given, load checkpoint and skip training
+    if opts.load_checkpoint:
+        trainer.load_from_checkpoint(opts.checkpoint_path)
+    else:
+        trainer.train(n_epochs=opts.n_epochs)
 
     # after training evaluate performance on the test data set
     if len(test):
@@ -222,10 +237,69 @@ def train(opts, datasets, verbose_callbacks=False):
         acc = torch.mean(interaction.aux['acc']).item()
         print("test accuracy: " + str(acc))
         if opts.save:
-            loss_and_metrics = pickle.load(open(opts.save_path + '/loss_and_metrics.pkl', 'rb'))
+            loss_and_metrics_path = os.path.join(opts.save_path, 'loss_and_metrics.pkl')
+            if os.path.exists(loss_and_metrics_path):
+                with open(loss_and_metrics_path, 'rb') as pickle_file:
+                    loss_and_metrics = pickle.load(pickle_file)
+            else:
+                loss_and_metrics = {}
+
             loss_and_metrics['final_test_loss'] = eval_loss
             loss_and_metrics['final_test_acc'] = acc
             pickle.dump(loss_and_metrics, open(opts.save_path + '/loss_and_metrics.pkl', 'wb'))
+        if opts.test_rsa:
+            rank = str(trainer.distributed_context.rank)
+            if opts.test_rsa == 'test':
+                # Use the latest interactions from the test run
+                utterances = get_utterances(vocab_size, max_len, [interaction])
+            elif opts.load_interactions:
+                # Use all interactions up to the given run
+                interactions = []
+                for i in range(int(opts.load_interactions)):
+                    interaction_path = os.path.join(opts.game_path, str(i), 'interactions',
+                                                    opts.test_rsa, 'epoch_' + str(opts.n_epochs),
+                                                    'interaction_gpu' + rank)
+                    if os.path.exists(interaction_path):
+                        interaction = torch.load(interaction_path)
+                        interactions.append(interaction)
+                utterances = get_utterances(vocab_size, max_len, interactions)
+            else:
+                # Use the interactions from the latest run
+                interaction_path = os.path.join(opts.save_path, 'interactions', opts.test_rsa,
+                                                'epoch_' + str(opts.n_epochs), 'interaction_gpu' + rank)
+                interaction = torch.load(interaction_path)
+                utterances = get_utterances(vocab_size, max_len, [interaction])
+
+            # Set data split
+            if opts.test_rsa == 'train':
+                trainer.validation_data = train
+            elif opts.test_rsa == 'validation':
+                trainer.validation_data = val
+            else:
+                trainer.validation_data = test
+
+            rsa_sender = RSASender(receiver, utterances, opts.cost_factor)
+            rsa_game = core.SenderReceiverRnnGS(rsa_sender, receiver, loss, length_cost=opts.length_cost)
+            trainer.game = rsa_game
+            start = time.time()
+            with torch.no_grad():
+                eval_loss, interaction = trainer.eval()
+                print("RSA evaluation time: " + str(time.time() - start))
+                acc = torch.mean(interaction.aux['acc']).item()
+                print("RSA test accuracy: " + str(acc))
+
+                if opts.save:
+                    # Save interaction
+                    save_path = os.path.join(opts.save_path, 'interactions', 'rsa_test')
+                    if not os.path.exists(save_path):
+                        os.makedirs(save_path)
+                    torch.save(interaction, os.path.join(save_path, 'interaction_gpu' + rank))
+
+                    # Save loss and metrics
+                    loss_and_metrics = pickle.load(open(opts.save_path + '/loss_and_metrics.pkl', 'rb'))
+                    loss_and_metrics['rsa_test_loss'] = eval_loss
+                    loss_and_metrics['rsa_test_acc'] = acc
+                    pickle.dump(loss_and_metrics, open(opts.save_path + '/loss_and_metrics.pkl', 'wb'))
 
 
 def main(params):
@@ -265,16 +339,32 @@ def main(params):
             opts.game_setting = 'length_cost/context_aware'
         else: 'length_cost/no_cost_context_aware'
 
+    opts.game_path = os.path.join(opts.path, folder_name, opts.game_setting)
+    opts.save_path = opts.game_path  # Used later to load all runs
+
     # if name of precreated data set is given, load dataset
     if opts.load_dataset:
         data_set = torch.load(opts.path + 'data/' + opts.load_dataset)
         print('data loaded from: ' + 'data/' + opts.load_dataset)
         if not opts.zero_shot:
             # create subfolder if necessary
-            opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
             if not os.path.exists(opts.save_path) and opts.save:
-                os.makedirs(opts.save_path)  
+                os.makedirs(opts.save_path)
 
+    # if given, set checkpoint path
+    if opts.load_checkpoint:
+        opts.checkpoint_path = os.path.join(opts.save_path, opts.load_checkpoint, 'final.tar')
+        if not os.path.exists(opts.checkpoint_path):
+            raise ValueError(f"Checkpoint file {opts.checkpoint_path} not found. Use --load_run to try another run.")
+
+    # if test_rsa is given, validate and setup interactions
+    if opts.test_rsa:
+        if opts.test_rsa == 'train' or opts.test_rsa == 'validation':
+            if not os.path.exists(opts.save_path):
+                os.makedirs(opts.save_path)
+            opts.save = True  # Needed to be able to load interactions later
+        elif opts.test_rsa != 'test':
+            raise ValueError("--test_rsa must be 'train', 'validation', or 'test'")
 
     for _ in range(opts.num_of_runs):
 
