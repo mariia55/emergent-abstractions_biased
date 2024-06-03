@@ -3,8 +3,8 @@
 
 import argparse
 import torch
-#print(torch.__version__)
-#import torch.utils.data
+# print(torch.__version__)
+# import torch.utils.data
 import torch.nn as nn
 import torch.nn.functional as F
 import egg.core as core
@@ -22,18 +22,16 @@ import feature
 import itertools
 import time
 
-
 SPLIT = (0.6, 0.2, 0.2)
 SPLIT_ZERO_SHOT = (0.75, 0.25)
 
 
 def get_params(params):
-
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument('--load_dataset', type=str, default=None,
                         help='If provided that data set is loaded. Datasets can be generated with pickle.ds'
-                            'This makes sense if running several runs with the exact same dataset.')
+                             'This makes sense if running several runs with the exact same dataset.')
     parser.add_argument('--dimensions', nargs='+', type=int, default=None)
     parser.add_argument('--attributes', type=int, default=3)
     parser.add_argument('--values', type=int, default=4)
@@ -137,7 +135,7 @@ def train(opts, datasets, verbose_callbacks=False):
         save_epoch = None
 
     train, val, test = datasets
-    #print("train", train)
+    # print("train", train)
     dimensions = train.dimensions
 
     train = torch.utils.data.DataLoader(train, batch_size=opts.batch_size, shuffle=True)
@@ -150,15 +148,16 @@ def train(opts, datasets, verbose_callbacks=False):
         if not opts.listener_hidden_size:
             opts.listener_hidden_size = opts.speaker_hidden_size
         sender = Speaker(feature.FeatureMLP(
-                input_size=sum(dimensions),
-                output_size=int(opts.speaker_hidden_size/2),   # divide by 2 to allow for concatenating prototype embeddings
-                n_layers=opts.speaker_n_layers,
-            ), n_targets=opts.game_size)
+            input_size=sum(dimensions),
+            output_size=int(opts.speaker_hidden_size / 2),
+            # divide by 2 to allow for concatenating prototype embeddings
+            n_layers=opts.speaker_n_layers,
+        ), n_targets=opts.game_size)
         receiver = Listener(feature.FeatureMLP(
-                            input_size=sum(dimensions),
-                            output_size=opts.listener_hidden_size,
-                            n_layers=opts.listener_n_layers,
-                            ))
+            input_size=sum(dimensions),
+            output_size=opts.listener_hidden_size,
+            n_layers=opts.listener_n_layers,
+        ))
     else:
         sender = Sender(opts.hidden_size, sum(dimensions), opts.game_size, opts.context_unaware)
         receiver = Receiver(sum(dimensions), opts.hidden_size)
@@ -202,7 +201,7 @@ def train(opts, datasets, verbose_callbacks=False):
     # setup training and callbacks
     # results/ data set name/ kind_of_dataset/ run/
     callbacks = [SavingConsoleLogger(print_train_loss=True, as_json=True,
-                                    save_path=opts.save_path, save_epoch=save_epoch),
+                                     save_path=opts.save_path, save_epoch=save_epoch),
                  core.TemperatureUpdater(agent=sender, decay=opts.temp_update, minimum=0.5)]
     if opts.save:
         callbacks.extend([core.callbacks.InteractionSaver([opts.n_epochs],
@@ -210,7 +209,10 @@ def train(opts, datasets, verbose_callbacks=False):
                                                           checkpoint_dir=opts.save_path),
                           core.callbacks.CheckpointSaver(opts.save_path, checkpoint_freq=0)])
     if opts.early_stopping:
-        callbacks.extend([EarlyStopperLossWithPatience(patience=opts.patience, min_delta=opts.min_delta)])
+        callbacks.extend([InteractionSaverEarlyStopping([opts.n_epochs],
+                                                        test_epochs=[opts.n_epochs],
+                                                        checkpoint_dir=opts.save_path),
+                          EarlyStopperLossWithPatience(patience=opts.patience, min_delta=opts.min_delta)])
 
     trainer = core.Trainer(game=game, optimizer=optimizer,
                            train_data=train, validation_data=val, callbacks=callbacks)
@@ -301,18 +303,18 @@ def main(params):
 
     # NOTE: I checked and the default device seems to be cuda
     # Otherwise there is an option in a later pytorch version (don't know about compatibility with egg):
-    #torch.set_default_device(opts.device)
+    # torch.set_default_device(opts.device)
 
     # has to be executed in Project directory for consistency
-    #assert os.path.split(os.getcwd())[-1] == 'emergent-abstractions'
+    # assert os.path.split(os.getcwd())[-1] == 'emergent-abstractions'
 
     # dimensions calculated from attribute-value pairs:
     if not opts.dimensions:
         opts.dimensions = list(itertools.repeat(opts.values, opts.attributes))
 
     data_set_name = '(' + str(len(opts.dimensions)) + ',' + str(opts.dimensions[0]) + ')'
-    folder_name = (data_set_name + '_game_size_' + str(opts.game_size) 
-                        + '_vsf_' + str(opts.vocab_size_factor))
+    folder_name = (data_set_name + '_game_size_' + str(opts.game_size)
+                   + '_vsf_' + str(opts.vocab_size_factor))
     folder_name = os.path.join("results", folder_name)
 
     # define game setting from args
@@ -328,7 +330,8 @@ def main(params):
         opts.game_setting = 'standard'
         if opts.length_cost != 0.0:
             opts.game_setting = 'length_cost/context_aware'
-        else: 'length_cost/no_cost_context_aware'
+        else:
+            'length_cost/no_cost_context_aware'
 
     opts.game_path = os.path.join(opts.path, folder_name, opts.game_setting)
     opts.save_path = opts.game_path  # Used later to load all runs
@@ -362,8 +365,8 @@ def main(params):
         # otherwise generate data set (new for each run for the small datasets)
         if not opts.load_dataset and not opts.zero_shot:
             data_set = dataset.DataSet(opts.dimensions,
-                                        game_size=opts.game_size,
-                                        device=opts.device)
+                                       game_size=opts.game_size,
+                                       device=opts.device)
             # create subfolder if necessary
             opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
             if not os.path.exists(opts.save_path) and opts.save:
@@ -374,15 +377,16 @@ def main(params):
             # either the zero-shot test condition is given (with pre-generated dataset)
             if opts.zero_shot_test is not None:
                 # create subfolder if necessary
-                opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting, 'zero_shot', opts.zero_shot_test)
+                opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting, 'zero_shot',
+                                              opts.zero_shot_test)
                 if not os.path.exists(opts.save_path) and opts.save:
                     os.makedirs(opts.save_path)
                 if not opts.load_dataset:
                     data_set = dataset.DataSet(opts.dimensions,
-                                                game_size=opts.game_size,
-                                                device=opts.device,
-                                                zero_shot=True,
-                                                zero_shot_test=opts.zero_shot_test)
+                                               game_size=opts.game_size,
+                                               device=opts.device,
+                                               zero_shot=True,
+                                               zero_shot_test=opts.zero_shot_test)
             # or both test conditions are generated        
             else:
                 # implement two zero-shot conditions: test on most generic vs. test on most specific dataset
@@ -393,15 +397,14 @@ def main(params):
                     if not os.path.exists(opts.save_path) and opts.save:
                         os.makedirs(opts.save_path)
                     data_set = dataset.DataSet(opts.dimensions,
-                                                game_size=opts.game_size,
-                                                device=opts.device,
-                                                zero_shot=True,
-                                                zero_shot_test=cond)
+                                               game_size=opts.game_size,
+                                               device=opts.device,
+                                               zero_shot=True,
+                                               zero_shot_test=cond)
                     train(opts, data_set, verbose_callbacks=False)
 
         if opts.zero_shot_test != None or not opts.zero_shot:
             train(opts, data_set, verbose_callbacks=False)
-        
 
 
 if __name__ == "__main__":

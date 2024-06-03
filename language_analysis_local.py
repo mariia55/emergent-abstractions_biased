@@ -431,8 +431,8 @@ class InteractionSaverEarlyStopping(InteractionSaver):
     """
     Implements an extra function to the InteractionSaver implemented in EGG for saving interactions after early stopping.
     """
-    def __init__(self):
-        super(InteractionSaverEarlyStopping, self).__init__()
+    def __init__(self, train_epochs, test_epochs, checkpoint_dir) -> None:
+        super(InteractionSaverEarlyStopping, self).__init__(train_epochs, test_epochs, checkpoint_dir)
 
     def on_early_stopping(self,
         train_loss: float,
