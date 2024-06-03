@@ -201,25 +201,16 @@ def train(opts, datasets, verbose_callbacks=False):
 
     # setup training and callbacks
     # results/ data set name/ kind_of_dataset/ run/
-    if opts.early_stopping:
-        callbacks = [SavingConsoleLogger(print_train_loss=True, as_json=True,
-                                         save_path=opts.save_path, save_epoch=save_epoch),
-                     core.TemperatureUpdater(agent=sender, decay=opts.temp_update, minimum=0.5),
-                     EarlyStopperLossWithPatience(patience=opts.patience, min_delta=opts.min_delta)]
-    else:
-        callbacks = [SavingConsoleLogger(print_train_loss=True, as_json=True,
-                                         save_path=opts.save_path, save_epoch=save_epoch),
-                     core.TemperatureUpdater(agent=sender, decay=opts.temp_update, minimum=0.5)]
+    callbacks = [SavingConsoleLogger(print_train_loss=True, as_json=True,
+                                    save_path=opts.save_path, save_epoch=save_epoch),
+                 core.TemperatureUpdater(agent=sender, decay=opts.temp_update, minimum=0.5)]
     if opts.save:
         callbacks.extend([core.callbacks.InteractionSaver([opts.n_epochs],
                                                           test_epochs=[opts.n_epochs],
                                                           checkpoint_dir=opts.save_path),
                           core.callbacks.CheckpointSaver(opts.save_path, checkpoint_freq=0)])
-    if verbose_callbacks:
-        callbacks.extend([
-            TopographicSimilarityConceptLevel(dimensions, is_gumbel=True,
-                                              save_path=opts.save_path, save_epoch=save_epoch)
-        ])
+    if opts.early_stopping:
+        callbacks.extend([EarlyStopperLossWithPatience(patience=opts.patience, min_delta=opts.min_delta)])
 
     trainer = core.Trainer(game=game, optimizer=optimizer,
                            train_data=train, validation_data=val, callbacks=callbacks)
