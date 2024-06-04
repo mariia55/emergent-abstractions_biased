@@ -387,7 +387,7 @@ def main(params):
             # either the zero-shot test condition is given (with pre-generated dataset)
             if opts.zero_shot_test is not None:
                 # create subfolder if necessary
-                opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting, 'zero_shot',
+                opts.save_path = os.path.join(opts.game_path, 'zero_shot',
                                               opts.zero_shot_test)
                 if not os.path.exists(opts.save_path) and opts.save:
                     os.makedirs(opts.save_path)
@@ -403,7 +403,7 @@ def main(params):
                 for cond in ['generic', 'specific']:
                     print("Zero-shot condition:", cond)
                     # create subfolder if necessary
-                    opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting, 'zero_shot', cond)
+                    opts.save_path = os.path.join(opts.game_path, 'zero_shot', cond)
                     if not os.path.exists(opts.save_path) and opts.save:
                         os.makedirs(opts.save_path)
                     data_set = dataset.DataSet(opts.dimensions,
