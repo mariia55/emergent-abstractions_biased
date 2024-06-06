@@ -1,5 +1,6 @@
 # code inspired by https://github.com/XeniaOhmer/hierarchical_reference_game/blob/master/dataset.py
-
+# To create a dataset using the vague float encoded setting, ensure to use method _float_range_encoding 
+# in place of _one_hot_
 import torch
 import torch.nn.functional as F
 import itertools
