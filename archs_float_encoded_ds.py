@@ -2,12 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# try out different senders:
-# 1) a sender who only sees the targets
-# 2) a sender who receives the objects in random order and a vector of labels indicating which are the targets
-# 3) a sender who computes prototype embeddings over targets and distractors
-# 4) a sender who receives targets first, then distractors and is thus implicitly informed
-# about which are the targets (used in Lazaridou et al. 2017)
+#This is the architecture used for the vague float encoded setting. It is like the 
+#orginial "archs" file with an added linear layer in both Sender and Receiver.
 
 
 class Sender(nn.Module):
