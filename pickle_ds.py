@@ -16,6 +16,9 @@ parser.add_argument('--game_size', type=int, default=10,
 parser.add_argument('--zero_shot', type=bool, default=False,
                     help='Set to True if zero-shot datasets should be generated.')
 parser.add_argument("--save", type=bool, default=True)
+parser.add_argument('--sample_context', type=bool, default=False,
+                    help="If true, sample context condition instead of generating all possible context condition for "
+                         "each concept.")
 
 args = parser.parse_args()
 
@@ -27,16 +30,23 @@ else:
     if not os.path.exists('data/'):
         os.makedirs('data/')
 
+# prepare appendix for dataset name if sample_context
+if args.sample_context:
+    sample = '_context_sampled'
+else:
+    sample = ''
+
 # for normal dataset (not zero-shot)
 if not args.zero_shot:
     data_set = DataSet(args.dimensions,
                         game_size=args.game_size,
-                        device='cpu')
+                        device='cpu',
+                       sample_context=args.sample_context)
     
     if args.path:
-        path = (args.path + 'data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ').ds')
+        path = (args.path + 'data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ')' + sample + '.ds')
     else:
-        path = ('data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ').ds')
+        path = ('data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ')' + sample + '.ds')
 
     if args.save:
         with open(path, "wb") as f:
@@ -49,7 +59,8 @@ else:
         data_set = DataSet(args.dimensions,
                            game_size=args.game_size,
                            testing=True, 
-                           device='cpu')
+                           device='cpu',
+                           sample_context=args.sample_context)
         data_set = data_set.get_zero_shot_datasets(split_ratio=SPLIT_ZERO_SHOT, test_cond=cond)
         
         if args.path:
