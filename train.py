@@ -94,6 +94,9 @@ def get_params(params):
                         help="Use for testing the RSA speaker after training. Can be 'train', 'validation' or 'test'.")
     parser.add_argument("--cost-factor", type=float, default=0.01,
                         help="Used for RSA test. Factor for the message length cost in utility.")
+    parser.add_argument('--sample_context', type=bool, default=False,
+                        help="Use for sampling context condition in dataset generation. (Otherwise, each context "
+                             "condition is added for each concept.)")
 
     args = core.init(parser, params)
 
@@ -359,7 +362,8 @@ def main(params):
         if not opts.load_dataset and not opts.zero_shot:
             data_set = dataset.DataSet(opts.dimensions,
                                        game_size=opts.game_size,
-                                       device=opts.device)
+                                       device=opts.device,
+                                       sample_context=opts.sample_context)
 
             # save folder for opts rsa is already specified above
             if not opts.test_rsa:
@@ -408,7 +412,8 @@ def main(params):
                                                game_size=opts.game_size,
                                                device=opts.device,
                                                zero_shot=True,
-                                               zero_shot_test=opts.zero_shot_test)
+                                               zero_shot_test=opts.zero_shot_test,
+                                               sample_context=opts.sample_context)
             # or both test conditions are generated        
             else:
                 # implement two zero-shot conditions: test on most generic vs. test on most specific dataset
@@ -422,7 +427,8 @@ def main(params):
                                                game_size=opts.game_size,
                                                device=opts.device,
                                                zero_shot=True,
-                                               zero_shot_test=cond)
+                                               zero_shot_test=cond,
+                                               sample_context=opts.sample_context)
                     train(opts, data_set, verbose_callbacks=False)
 
             # set checkpoint path

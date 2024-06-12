@@ -13,7 +13,8 @@ class DataSet(torch.utils.data.Dataset):
 	""" 
 	This class provides the torch.Dataloader-loadable dataset.
 	"""
-	def __init__(self, properties_dim=[3,3,3], game_size=10, device='cuda', testing=False, zero_shot=False, zero_shot_test='generic'):
+	def __init__(self, properties_dim=[3,3,3], game_size=10, device='cuda', testing=False, zero_shot=False,
+				 zero_shot_test=None, sample_context = False):
 		"""
 		properties_dim: vector that defines how many attributes and features per attributes the dataset should contain, defaults to a 3x3x3 dataset
 		game_size: integer that defines how many targets and distractors a game consists of
@@ -23,6 +24,7 @@ class DataSet(torch.utils.data.Dataset):
 		self.properties_dim = properties_dim
 		self.game_size = game_size
 		self.device = device
+		self.sample_context = sample_context
 		
 		# get all concepts
 		self.concepts = self.get_all_concepts()
@@ -65,7 +67,12 @@ class DataSet(torch.utils.data.Dataset):
 				# for each concept, we consider all possible context conditions
 				# i.e. 1 for generic concepts, and up to len(properties_dim) for more specific concepts
 				nr_possible_contexts = sum(self.concepts[concept_idx][1])
-				for context_condition in range(nr_possible_contexts):
+				if not self.sample_context:
+					for context_condition in range(nr_possible_contexts):
+						train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+				# or sample context condition from possible context conditions
+				else:
+					context_condition = random.choice(range(nr_possible_contexts))
 					train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
 		
 		# Calculating how many train
@@ -80,7 +87,12 @@ class DataSet(torch.utils.data.Dataset):
 		for concept_idx in tqdm(concept_indices[ratio:]):
 			for _ in range(self.game_size):
 				nr_possible_contexts = sum(self.concepts[concept_idx][1])
-				for context_condition in range(nr_possible_contexts):
+				if not self.sample_context:
+					for context_condition in range(nr_possible_contexts):
+						test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+				# or sample context condition from possible context conditions
+				else:
+					context_condition = random.choice(range(nr_possible_contexts))
 					test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
 
 		return train, val, test
