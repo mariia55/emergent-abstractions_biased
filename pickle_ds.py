@@ -63,7 +63,6 @@ else:
                            sample_context=args.sample_context,
                            zero_shot=True,
                            zero_shot_test=cond)
-        # data_set = data_set.get_zero_shot_datasets(split_ratio=SPLIT_ZERO_SHOT, test_cond=cond)
         
         if args.path:
             path = (args.path + 'data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ')' + sample + '_' + str(cond) + '.ds')
