@@ -39,8 +39,8 @@ else:
 # for normal dataset (not zero-shot)
 if not args.zero_shot:
     data_set = DataSet(args.dimensions,
-                        game_size=args.game_size,
-                        device='cpu',
+                       game_size=args.game_size,
+                       device='cpu',
                        sample_context=args.sample_context)
     
     if args.path:
@@ -60,8 +60,10 @@ else:
                            game_size=args.game_size,
                            testing=True, 
                            device='cpu',
-                           sample_context=args.sample_context)
-        data_set = data_set.get_zero_shot_datasets(split_ratio=SPLIT_ZERO_SHOT, test_cond=cond)
+                           sample_context=args.sample_context,
+                           zero_shot=True,
+                           zero_shot_test=cond)
+        # data_set = data_set.get_zero_shot_datasets(split_ratio=SPLIT_ZERO_SHOT, test_cond=cond)
         
         if args.path:
             path = (args.path + 'data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ')' + sample + '_' + str(cond) + '.ds')
