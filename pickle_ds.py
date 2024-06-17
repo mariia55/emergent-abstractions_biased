@@ -13,6 +13,8 @@ parser.add_argument('--dimensions', nargs="*", type=int, default=[3, 3, 3],
                     help='Number of features for every perceptual dimension')
 parser.add_argument('--game_size', type=int, default=10,
                     help='Number of target/distractor objects')
+parser.add_argument('--scaling_factor', type=int, default=10,
+                    help='Scaling factor for dataset generation.')
 parser.add_argument('--zero_shot', type=bool, default=False,
                     help='Set to True if zero-shot datasets should be generated.')
 parser.add_argument("--save", type=bool, default=True)
@@ -40,6 +42,7 @@ else:
 if not args.zero_shot:
     data_set = DataSet(args.dimensions,
                        game_size=args.game_size,
+                       scaling_factor=args.scaling_factor,
                        device='cpu',
                        sample_context=args.sample_context)
     
@@ -58,6 +61,7 @@ else:
     for cond in ['generic', 'specific']:
         data_set = DataSet(args.dimensions,
                            game_size=args.game_size,
+                           scaling_factor=args.scaling_factor,
                            testing=True, 
                            device='cpu',
                            sample_context=args.sample_context,
