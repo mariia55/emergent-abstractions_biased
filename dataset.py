@@ -161,6 +161,7 @@ class DataSet(torch.utils.data.Dataset):
                     if test_cond == 'generic':
                         # test dataset only contains most generic concepts
                         if nr_possible_contexts == 1:
+                            context_condition = 0 # for generic concepts, only coarse context condition exists
                             test.append(
                                 self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
                         else:
@@ -172,6 +173,8 @@ class DataSet(torch.utils.data.Dataset):
                     elif test_cond == 'specific':
                         # test dataset only contains most specific concepts
                         if nr_possible_contexts == len(self.properties_dim):
+                            # add specific concepts with a random context condition
+                            context_condition = random.choice(range(nr_possible_contexts))
                             test.append(
                                 self.get_item(concept_idx, context_condition, self._many_hot_encoding,
                                               include_concept))
