@@ -36,6 +36,8 @@ def get_params(params):
     parser.add_argument('--attributes', type=int, default=3)
     parser.add_argument('--values', type=int, default=4)
     parser.add_argument('--game_size', type=int, default=10)
+    parser.add_argument('--scaling_factor', type=int, default=10,
+                        help='For scaling up the symbolic datasets.')
     parser.add_argument('--vocab_size_factor', type=int, default=3,
                         help='Factor applied to minimum vocab size to calculate actual vocab size')
     parser.add_argument('--hidden_size', type=int, default=128,
@@ -142,7 +144,7 @@ def train(opts, datasets, verbose_callbacks=False):
     dimensions = train.dimensions
 
     train = torch.utils.data.DataLoader(train, batch_size=opts.batch_size, shuffle=True)
-    val = torch.utils.data.DataLoader(val, batch_size=opts.batch_size, shuffle=False, drop_last=True)
+    val = torch.utils.data.DataLoader(val, batch_size=opts.batch_size, shuffle=False)
     test = torch.utils.data.DataLoader(test, batch_size=opts.batch_size, shuffle=False)
 
     # initialize sender and receiver agents
@@ -362,6 +364,7 @@ def main(params):
         if not opts.load_dataset and not opts.zero_shot:
             data_set = dataset.DataSet(opts.dimensions,
                                        game_size=opts.game_size,
+                                       scaling_factor=opts.scaling_factor,
                                        device=opts.device,
                                        sample_context=opts.sample_context)
 
@@ -410,6 +413,7 @@ def main(params):
                 if not opts.load_dataset:
                     data_set = dataset.DataSet(opts.dimensions,
                                                game_size=opts.game_size,
+                                               scaling_factor=opts.scaling_factor,
                                                device=opts.device,
                                                zero_shot=True,
                                                zero_shot_test=opts.zero_shot_test,
@@ -425,6 +429,7 @@ def main(params):
                         os.makedirs(opts.save_path)
                     data_set = dataset.DataSet(opts.dimensions,
                                                game_size=opts.game_size,
+                                               scaling_factor=opts.scaling_factor,
                                                device=opts.device,
                                                zero_shot=True,
                                                zero_shot_test=cond,
