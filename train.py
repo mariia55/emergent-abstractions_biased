@@ -40,7 +40,7 @@ def get_params(params):
                         help='For scaling up the symbolic datasets.')
     parser.add_argument('--vocab_size_factor', type=int, default=3,
                         help='Factor applied to minimum vocab size to calculate actual vocab size')
-    parser.add_argument('--vocab_size', type=int, default=16,
+    parser.add_argument('--vocab_size_user', type=int, default=16,
                         help='Determines the vocab size. Use only if vocab size factor is None.')
     parser.add_argument('--hidden_size', type=int, default=128,
                         help='Size of the hidden layer of Sender and Receiver,\
@@ -169,11 +169,11 @@ def train(opts, datasets, verbose_callbacks=False):
         sender = Sender(opts.hidden_size, sum(dimensions), opts.game_size, opts.context_unaware)
         receiver = Receiver(sum(dimensions), opts.hidden_size)
 
-    if opts.vocab_size_factor is not None:
+    if opts.vocab_size_factor != 0:
         minimum_vocab_size = dimensions[0] + 1  # plus one for 'any'
         vocab_size = minimum_vocab_size * opts.vocab_size_factor + 1  # multiply by factor plus add one for eos-symbol
     else:
-        vocab_size = opts.vocab_size
+        vocab_size = opts.vocab_size_user
     print("vocab size", vocab_size)
     # allow user to specify a maximum message length
     if opts.max_mess_len:
