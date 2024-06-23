@@ -22,6 +22,8 @@ import feature
 import itertools
 import time
 
+from models_lazimpa import LazImpaSenderReceiverRnnGS
+
 SPLIT = (0.6, 0.2, 0.2)
 SPLIT_ZERO_SHOT = (0.75, 0.25)
 
@@ -101,6 +103,10 @@ def get_params(params):
     parser.add_argument('--sample_context', type=bool, default=False,
                         help="Use for sampling context condition in dataset generation. (Otherwise, each context "
                              "condition is added for each concept.)")
+    
+    # LazImpa arguments: 
+    parser.add_argument("--lazy_threshold",type=float, default=0.0, # if 0, accuracy ** 0 = 1 therefore like lazy = False
+                        help="Use this to multiply length_cost with the current accuracy to allow more exploration. Only does something if length_cost is not 0.0.")
 
     args = core.init(parser, params)
 
@@ -200,7 +206,12 @@ def train(opts, datasets, verbose_callbacks=False):
                                   opts.hidden_size,
                                   cell=opts.receiver_cell)
 
-    game = core.SenderReceiverRnnGS(sender, receiver, loss, length_cost=opts.length_cost)
+    # Add LazImpaSenderReceiver which multiplies length cost with accuracy ** threshold
+    if opts.length_cost and opts.lazy_threshold: # already test if != 0.0
+            #game = core.SenderReceiverRnnGS(sender, receiver, loss, length_cost=opts.length_cost)
+            game = LazImpaSenderReceiverRnnGS(sender, receiver, loss, length_cost=opts.length_cost,threshold=opts.lazy_threshold)
+    else: 
+        game = core.SenderReceiverRnnGS(sender, receiver, loss, length_cost=opts.length_cost)
 
     # set learning rates
     optimizer = torch.optim.Adam([
@@ -334,22 +345,29 @@ def main(params):
     folder_name = os.path.join("results", folder_name)
 
     # define game setting from args
+    # define game setting from args # TODO make it incremental for less depth
     if opts.context_unaware:
         opts.game_setting = 'context_unaware'
-        if opts.length_cost:
-            if opts.length_cost != 0.0:
-                opts.game_setting = 'length_cost/context_unaware'
+        if opts.length_cost: # test if exists and not 0
+            if opts.lazy_threshold:
+                if opts.lazy_threshold > 0.0:
+                    opts.game_setting = 'lazy/context_unaware'
+                else:
+                    opts.game_setting = 'lazy/negative_value_context_unaware'
             else:
-                opts.game_setting = 'length_cost/no_cost_context_unaware'
+                opts.game_setting = 'length_cost/context_unaware'
     elif opts.mu_and_goodman:
         opts.game_setting = 'mu_and_goodman'
     else:
         opts.game_setting = 'standard'
         if opts.length_cost:
-            if opts.length_cost != 0.0:
-                opts.game_setting = 'length_cost/context_aware'
+            if opts.lazy_threshold:
+                if opts.lazy_threshold > 0.0:
+                    opts.game_setting = 'lazy/context_aware'
+                else:
+                    opts.game_setting = 'lazy/negative_value_context_aware'
             else:
-                opts.game_setting = 'length_cost/no_cost_context_aware'
+                opts.game_setting = 'length_cost/context_aware'
 
     opts.game_path = os.path.join(opts.path, folder_name, opts.game_setting)
     opts.save_path = opts.game_path  # Used later to load all runs

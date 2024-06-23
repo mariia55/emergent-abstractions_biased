@@ -6,7 +6,7 @@
 from typing import Optional
 import torch
 import torch.nn as nn
-from .interaction import LoggingStrategy
+from egg.core import LoggingStrategy
 
 class LazImpaSenderReceiverRnnGS(nn.Module):
     """
@@ -87,8 +87,6 @@ class LazImpaSenderReceiverRnnGS(nn.Module):
             if test_logging_strategy is None
             else test_logging_strategy
         )
-        # for debugging only
-        print("Using Lazy loss")
 
     def forward(self, sender_input, labels, receiver_input=None, aux_input=None):
         message = self.sender(sender_input, aux_input)
@@ -115,9 +113,11 @@ class LazImpaSenderReceiverRnnGS(nn.Module):
 
             # for laziness we need this: 
             #**************************
-            adaptive_regularization_coefficient = step_aux['acc']**self.threshold #/intensity # intensity = 10 == alpha = 0.1; threshold = beta1 = 45
+            adaptive_regularization_coefficient = step_aux['acc']**self.threshold #intensity of Rita et al. = 10 == length_cost = 0.1; threshold = beta1 = 45
             # TODO frag chat GPT ob man im GRU einen regularization coefficient am step loss oder am endgültigen Loss anbringt. Oder probier mal was besser klappt. 
             # Rita: nur einmal length cost, aber die haben auch das average von den step loss genommen, dann ist das verhältnismäßig auch kleiner. 
+
+            # Test parameter influence, maybe save amount of loss vs laziness pressure to see what has how much influence. 
 
             add_mask = eos_mask * not_eosed_before
             z += add_mask
