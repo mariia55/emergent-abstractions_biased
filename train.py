@@ -221,9 +221,14 @@ def train(opts, datasets, verbose_callbacks=False):
 
     # setup training and callbacks
     # results/ data set name/ kind_of_dataset/ run/
-    callbacks = [SavingConsoleLogger(print_train_loss=True, as_json=True,
+    if opts.length_cost and opts.lazy_threshold: # if lazy I want to print some more infos while training
+        callbacks = [SavingConsoleLogger(print_train_loss=True, as_json=True, n_metrics=4,
                                      save_path=opts.save_path, save_epoch=save_epoch),
                  core.TemperatureUpdater(agent=sender, decay=opts.temp_update, minimum=0.5)]
+    else:
+        callbacks = [SavingConsoleLogger(print_train_loss=True, as_json=True,
+                                        save_path=opts.save_path, save_epoch=save_epoch),
+                    core.TemperatureUpdater(agent=sender, decay=opts.temp_update, minimum=0.5)]
     if opts.save:
         callbacks.extend([core.callbacks.InteractionSaver([opts.n_epochs],
                                                           test_epochs=[opts.n_epochs],

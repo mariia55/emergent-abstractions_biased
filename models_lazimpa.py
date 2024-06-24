@@ -93,6 +93,7 @@ class LazImpaSenderReceiverRnnGS(nn.Module):
         receiver_output = self.receiver(message, receiver_input, aux_input)
 
         loss = 0
+        pressure = 0
         not_eosed_before = torch.ones(receiver_output.size(0)).to(
             receiver_output.device
         )
@@ -113,15 +114,15 @@ class LazImpaSenderReceiverRnnGS(nn.Module):
 
             # for laziness we need this: 
             #**************************
-            adaptive_regularization_coefficient = step_aux['acc']**self.threshold #intensity of Rita et al. = 10 == length_cost = 0.1; threshold = beta1 = 45
-            # TODO frag chat GPT ob man im GRU einen regularization coefficient am step loss oder am endgültigen Loss anbringt. Oder probier mal was besser klappt. 
-            # Rita: nur einmal length cost, aber die haben auch das average von den step loss genommen, dann ist das verhältnismäßig auch kleiner. 
+            step_length_pressure = self.length_cost * step_aux['acc']**self.threshold * (1.0 + step) #intensity of Rita et al. = 10 == length_cost = 0.1; threshold = beta1 = 45
+            # Rita: nur einmal length cost, aber die haben auch das average von den step loss genommen, dann ist verhältnismäßig beides kleiner. 
 
             # Test parameter influence, maybe save amount of loss vs laziness pressure to see what has how much influence. 
 
             add_mask = eos_mask * not_eosed_before
             z += add_mask
-            loss += step_loss * add_mask + self.length_cost * adaptive_regularization_coefficient * (1.0 + step) * add_mask # Laziness: added accuracy (laziness)
+            loss += step_loss * add_mask + step_length_pressure * add_mask # Laziness: added accuracy (laziness)
+            pressure += step_length_pressure * add_mask
             expected_length += add_mask.detach() * (1.0 + step)
 
             for name, value in step_aux.items():
@@ -132,8 +133,9 @@ class LazImpaSenderReceiverRnnGS(nn.Module):
         # the remainder of the probability mass
         loss += (
             step_loss * not_eosed_before
-            + self.length_cost * adaptive_regularization_coefficient * (step + 1.0) * not_eosed_before # Laziness: added accuracy (laziness)
+            + step_length_pressure * not_eosed_before # Laziness: added accuracy (laziness)
         )
+        pressure += step_length_pressure * not_eosed_before
         expected_length += (step + 1) * not_eosed_before
 
         z += not_eosed_before
@@ -144,6 +146,8 @@ class LazImpaSenderReceiverRnnGS(nn.Module):
         for name, value in step_aux.items():
             aux_info[name] = value * not_eosed_before + aux_info.get(name, 0.0)
 
+        aux_info["o_loss"] = loss - pressure
+        aux_info["pressure"] = pressure
         aux_info["length"] = expected_length
 
         logging_strategy = (
