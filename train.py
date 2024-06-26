@@ -356,9 +356,9 @@ def main(params):
         if opts.length_cost: # test if exists and not 0
             if opts.lazy_threshold:
                 if opts.lazy_threshold > 0.0:
-                    opts.game_setting = 'lazy/context_unaware'
+                    opts.game_setting = 'lazy_context_unaware'
                 else:
-                    opts.game_setting = 'lazy/negative_value_context_unaware'
+                    opts.game_setting = 'lazy_negative_value_context_unaware'
             else:
                 opts.game_setting = 'length_cost/context_unaware'
     elif opts.mu_and_goodman:
@@ -368,9 +368,9 @@ def main(params):
         if opts.length_cost:
             if opts.lazy_threshold:
                 if opts.lazy_threshold > 0.0:
-                    opts.game_setting = 'lazy/context_aware'
+                    opts.game_setting = 'lazy_context_aware'
                 else:
-                    opts.game_setting = 'lazy/negative_value_context_aware'
+                    opts.game_setting = 'lazy_negative_value_context_aware'
             else:
                 opts.game_setting = 'length_cost/context_aware'
 
