@@ -11,22 +11,26 @@ from matplotlib.widgets import Button, Slider
 
 
 # The parametrized function to be plotted
-def separate(t, threshold, cost,length,l_threshold):
+def separate(threshold, cost,length,l_threshold):
     """ returns the pressure value for all points"""
     pressure = t ** threshold * cost * length **l_threshold
-    return pressure
+    return t, pressure
 
-def added(t, threshold, cost,length,l_threshold):
+def added(threshold, cost,length,l_threshold):
     """ returns the pressure value for all points added to the loss"""
-    pressure = np.array(acc_data).T ** threshold * cost * length **l_threshold
-    return pressure + loss_data
+    pressure = np.array(acc_data).T ** threshold * cost * (length) ** l_threshold
+    if cumulative:
+        pressure_cum = np.cumsum(pressure) # cumulative for integrating step_loss pressure
+        return np.array(acc_data) , pressure_cum + loss_data
+    return np.array(acc_data) , pressure + loss_data
 
-def something(t, threshold, cost,length,l_threshold):
+def something(threshold, cost,length,l_threshold):
     """ try harsh pressure, evtl need different hyperparameter"""
-    #pressure = cost * (length-1) **l_threshold * (0.95) ** threshold
-    pressure = np.where(t>0.95, cost * length ** l_threshold * (t - 0.95) ** threshold, 0)
-    return pressure + loss_data # add loss here to stack pressure in picture on loss
-# TODO What exactly is the influence of step loss and step loss pressure. 
+    pressure = np.array(acc_data).T ** threshold * cost * (length) **((length-minimum)*0.5)
+    if cumulative:
+        pressure_cum = np.cumsum(pressure) # cumulative for integrating step_loss pressure
+        return np.array(acc_data) , pressure_cum + loss_data
+    return np.array(acc_data) , pressure + loss_data
 
 #Change this area
 #********************
@@ -35,13 +39,21 @@ def something(t, threshold, cost,length,l_threshold):
 # added / separate / something
 f = added
 
+game = 3,4# attributes, values
+cumulative = False # whether the length pressure should be calculated as max only min length needed (all summed up) if True, or as only for the longest step if False
+
 # Define initial parameters
 init_threshold = 45
-init_cost = 0.1
-game = 3,4
-length = 4
+t_min = 0.0
+t_max = 100
+
+init_cost = 0.006
+c_min = 0.001
+c_max = 0.1
+
 init_l_threshold = 1
-lines = []
+l_min = 0.1
+l_max = 5.0
 
 # End of Change Area
 # ******************
@@ -56,13 +68,33 @@ for dic in data:
     loss_data.append(dic["loss"])
     acc_data.append(dic["acc"])
 
-t = np.linspace(0.0, 1, 1000) if f != added else np.array(acc_data)
+t = np.linspace(0.0, 1, 1000) 
+length = game[0]+1
+
+def calc_min(att,val):
+    total = val ** att
+    voc = val **2
+    summe = 0
+    for i,n in [[l,voc**l] for l in range(1,att + 2)]:
+        if n < total:
+            summe += n * i
+            total -= n
+        else:
+            summe += total * i
+            break
+    return summe / (val ** att)
+
+minimum = calc_min(game[0],game[1])
+print("Minimum: ", minimum)
 
 # Create the figure and the line that we will manipulate
 fig, ax = plt.subplots()
+lines = []
 for l in range(length):
-    lines.append(ax.plot(t, f(t, init_threshold, init_cost,l+1,init_l_threshold), lw=2,label=f"{l+1}"))
-lines.append(ax.plot(t,f(t,init_threshold,init_cost,1.75,init_l_threshold),lw=2,label=f"{1.75}"))
+    x,y = f(init_threshold, init_cost,l+1,init_l_threshold)
+    lines.append(ax.plot(x,y, lw=2,label=f"{l+1}",alpha = 0.5))
+x,y = f(init_threshold, init_cost,minimum,init_l_threshold)
+lines.append(ax.plot(x,y,lw=2,label=f"Min ca: {round(minimum,2)}",c="red"))
 ax.set_xlabel('accuracy')
 ax.set_xlim([0.6,1.0])
 ax.set_ylim([0.0,1.0])
@@ -78,8 +110,8 @@ axfreq = fig.add_axes([0.25, 0.1, 0.65, 0.03])
 freq_slider = Slider(
     ax=axfreq,
     label='cost',
-    valmin=0.001,
-    valmax=1,
+    valmin=c_min,
+    valmax=c_max,
     valinit=init_cost,
 )
 
@@ -88,8 +120,8 @@ axamp = fig.add_axes([0.1, 0.25, 0.0225, 0.63])
 amp_slider = Slider(
     ax=axamp,
     label="threshold",
-    valmin=0,
-    valmax=100,
+    valmin=t_min,
+    valmax=t_max,
     valinit=init_threshold,
     orientation="vertical"
 )
@@ -99,8 +131,8 @@ axl = fig.add_axes([0.9, 0.25, 0.0225, 0.63])
 l_slider = Slider(
     ax=axl,
     label="length_threshold",
-    valmin=1,
-    valmax=5,
+    valmin=l_min,
+    valmax=l_max,
     valinit=init_l_threshold,
     orientation="vertical"
 )
@@ -109,8 +141,10 @@ l_slider = Slider(
 # The function to be called anytime a slider's value changes
 def update(val):
     for l in range(length):
-        lines[l][0].set_ydata(f(t, amp_slider.val, freq_slider.val,l+1,l_slider.val))
-    lines[-1][0].set_ydata(f(t, amp_slider.val, freq_slider.val,1.75,l_slider.val))
+        _,y = f(amp_slider.val, freq_slider.val,l+1,l_slider.val)
+        lines[l][0].set_ydata(y)
+    _,y = f(amp_slider.val, freq_slider.val,minimum,l_slider.val)
+    lines[-1][0].set_ydata(y)
     fig.canvas.draw_idle()
 
 
