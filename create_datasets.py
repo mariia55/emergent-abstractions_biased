@@ -3,6 +3,7 @@ import numpy as np
 from torch.utils.data import Dataset
 
 from dataset import DataSet
+from load import load_data
 from vision_module import feat_rep_vision_module
 
 
@@ -35,10 +36,13 @@ def generate_dataset():
     print("Starting to create the feature representation dataset")
     # load the trained model from save
     model = feat_rep_vision_module()
-    model.load_state_dict(torch.load('./models/vision_module'), strict=False)
+    try:
+        model.load_state_dict(torch.load('./models/vision_module'), strict=False)
+    except:
+        raise ValueError('No trained vision module found in /models/vision_module')
 
     if torch.cuda.is_available():
-            model.cuda()
+        model.cuda()
     
     model.eval()
 
@@ -82,17 +86,33 @@ def generate_dataset():
     torch.save(feat_rep_dataset_without_images, './dataset/feat_rep_dataset')
 
     print("Saved feature representation dataset to /dataset twice, once with (complete_dataset) and once without images (feat_rep_datset)")
+    return feat_rep_dataset_full, feat_rep_dataset_without_images
 
 if __name__ == "__main__":
+    try:
+        
+        complete_data = torch.load('./dataset/complete_dataset')
+    
+    except:
+        input_shape = [3,64,64]
+        
+        full_data, labels_reg, full_labels = load_data(input_shape, normalize=False,
+                                                                        subtract_mean=False,
+                                                                        trait_weights=None,
+                                                                        return_trait_weights=False,
+                                                                        return_full_labels=True,
+                                                                        datapath=None)
+        
+        complete_data = shapes_dataset(full_data, labels_reg)
+
+        torch.save(complete_data, './dataset/complete_dataset')
     # generate the dataset with the feature representations first
-    generate_dataset()
+    complete_dataset,_ = generate_dataset()
 
-    # use feature representations to create the concept datasets
-    complete_dataset = torch.load('./dataset/complete_dataset')
-
+    # generate concept datasets for the communication game
     feat_rep_concept_dataset = DataSet(game_size=4, is_shapes3d=True, images=complete_dataset.feat_reps, labels=complete_dataset.labels)
-    torch.save(feat_rep_concept_dataset, './dataset/feat_rep_concept_dataset')
+    torch.save(feat_rep_concept_dataset, './dataset/feat_rep_concept_dataset_new')
 
     # also for the zero_shot dataset
     feat_rep_zero_concept_dataset = DataSet(game_size=4, zero_shot=True, is_shapes3d=True, images=complete_dataset.feat_reps, labels=complete_dataset.labels)
-    torch.save(feat_rep_zero_concept_dataset, './dataset/feat_rep_zero_concept_dataset')
+    torch.save(feat_rep_zero_concept_dataset, './dataset/feat_rep_zero_concept_dataset_new')

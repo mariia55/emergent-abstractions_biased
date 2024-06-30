@@ -15,7 +15,8 @@ class DataSet(torch.utils.data.Dataset):
 	""" 
 	This class provides the torch.Dataloader-loadable dataset.
 	"""
-	def __init__(self, properties_dim=[3,3,3], game_size=10, device='cuda', testing=False, zero_shot=False, zero_shot_test='generic', is_shapes3d = False, images = [], labels = []):
+	def __init__(self, properties_dim=[3, 3, 3], game_size=10, scaling_factor=10, device='cuda', testing=False, zero_shot=False,
+                 zero_shot_test=None, sample_context=False, is_shapes3d = False, images = [], labels = []):
 		"""
 		properties_dim: vector that defines how many attributes and features per attributes the dataset should contain, defaults to a 3x3x3 dataset
 		game_size: integer that defines how many targets and distractors a game consists of
@@ -25,6 +26,12 @@ class DataSet(torch.utils.data.Dataset):
 		self.game_size = game_size
 		self.device = device
 
+		self.properties_dim = properties_dim
+		self.game_size = game_size
+		self.scaling_factor = scaling_factor
+		self.device = device
+		self.sample_context = sample_context
+
 		# if the flag for shapes3d is True the dataset will be created with the images and labels of shapes3d
 		self.is_shapes3d = is_shapes3d
 		
@@ -33,7 +40,7 @@ class DataSet(torch.utils.data.Dataset):
 			self.images = images
 			self.labels = labels
 			self.properties_dim = [4,4,4]
-			self.all_objects = self.reverse_one_hottify()
+			self.all_objects = self.reverse_one_hot()
 		else:
 			self.properties_dim = properties_dim
 			self.all_objects = self._get_all_possible_objects(properties_dim)
@@ -64,24 +71,30 @@ class DataSet(torch.utils.data.Dataset):
 
 		train_ratio, val_ratio, test_ratio = split_ratio
 
-        # Shuffle sender indices
+		# Shuffle sender indices
 		concept_indices = torch.randperm(len(self.concepts)).tolist()
 		# Split is based on how many distinct concepts there are (regardless context conditions)
-		ratio = int(len(self.concepts)*(train_ratio + val_ratio))
-		concept_indices.sort()
+		ratio = int(len(self.concepts) * (train_ratio + val_ratio))
 
 		train_and_val = []
 		print("Creating train_ds and val_ds...")
 		for concept_idx in tqdm(concept_indices[:ratio]):
-			for _ in range(self.game_size):
+			for _ in range(self.scaling_factor):
 				# for each concept, we consider all possible context conditions
 				# i.e. 1 for generic concepts, and up to len(properties_dim) for more specific concepts
 				nr_possible_contexts = sum(self.concepts[concept_idx][1])
-				for context_condition in range(nr_possible_contexts):
-					train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
-		
+				if not self.sample_context:
+					for context_condition in range(nr_possible_contexts):
+						train_and_val.append(
+							self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+				# or sample context condition from possible context conditions
+				else:
+					context_condition = random.choice(range(nr_possible_contexts))
+					train_and_val.append(
+						self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+
 		# Calculating how many train
-		train_samples = int(len(train_and_val)*(train_ratio/(train_ratio+val_ratio)))
+		train_samples = int(len(train_and_val) * (train_ratio / (train_ratio + val_ratio)))
 		val_samples = len(train_and_val) - train_samples
 		train, val = torch.utils.data.random_split(train_and_val, [train_samples, val_samples])
 		# Save information about train dataset
@@ -90,31 +103,36 @@ class DataSet(torch.utils.data.Dataset):
 		test = []
 		print("\nCreating test_ds...")
 		for concept_idx in tqdm(concept_indices[ratio:]):
-			for _ in range(self.game_size):
+			for _ in range(self.scaling_factor):
 				nr_possible_contexts = sum(self.concepts[concept_idx][1])
-				for context_condition in range(nr_possible_contexts):
+				if not self.sample_context:
+					for context_condition in range(nr_possible_contexts):
+						test.append(
+							self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+				# or sample context condition from possible context conditions
+				else:
+					context_condition = random.choice(range(nr_possible_contexts))
 					test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
 
 		return train, val, test
-	
 
 	def get_zero_shot_datasets(self, split_ratio, test_cond='generic', include_concept=False):
 		"""
-        Note: Generates train, val and test data. 
-            Test and training set contain different concepts. There are two possible datasets:
-            1) 'generic': train on more specific concepts, test on most generic concepts
-            2) 'specific': train on more generic concepts, test on most specific concepts
-        :param split_ratio Tuple of ratios (train, val) of the samples should be in the training and validation sets.
-        """
+		Note: Generates train, val and test data. 
+			Test and training set contain different concepts. There are two possible datasets:
+			1) 'generic': train on more specific concepts, test on most generic concepts
+			2) 'specific': train on more generic concepts, test on most specific concepts
+		:param split_ratio Tuple of ratios (train, val) of the samples should be in the training and validation sets.
+		"""
 
 		if sum(split_ratio) != 1:
 			raise ValueError
 
-        # For each category, one attribute will be chosen for zero shot
-        # The attributes will be taken from a random object
-        # zero_shot_object = pd.Series([0 for _ in self.properties_dim])  # self.objects.sample().iloc[0]
+		# For each category, one attribute will be chosen for zero shot
+		# The attributes will be taken from a random object
+		# zero_shot_object = pd.Series([0 for _ in self.properties_dim])  # self.objects.sample().iloc[0]
 
-        # split ratio applies only to train and validation datasets - size of test dataset depends on available concepts
+		# split ratio applies only to train and validation datasets - size of test dataset depends on available concepts
 		train_ratio, val_ratio = split_ratio
 
 		train_and_val = []
@@ -122,35 +140,74 @@ class DataSet(torch.utils.data.Dataset):
 
 		print("Creating train_ds, val_ds and test_ds...")
 		for concept_idx in tqdm(range(len(self.concepts))):
-			for _ in range(self.game_size):
-            # for each concept, we consider all possible context conditions
-            # i.e. 1 for generic concepts, and up to len(properties_dim) for more specific concepts
+			for _ in range(self.scaling_factor):
+				# for each concept, we consider all possible context conditions
+				# i.e. 1 for generic concepts, and up to len(properties_dim) for more specific concepts
 				nr_possible_contexts = sum(self.concepts[concept_idx][1])
-                #print("nr poss cont", nr_possible_contexts)
-				for context_condition in range(nr_possible_contexts):
-                	# 1) 'generic'
+				if not self.sample_context:
+					for context_condition in range(nr_possible_contexts):
+						# 1) 'generic'
+						if test_cond == 'generic':
+							# test dataset only contains most generic concepts
+							if nr_possible_contexts == 1:
+								test.append(
+									self.get_item(concept_idx, context_condition, self._many_hot_encoding,
+													include_concept))
+							else:
+								train_and_val.append(
+									self.get_item(concept_idx, context_condition, self._many_hot_encoding,
+													include_concept))
+
+						# 2) 'specific'
+						elif test_cond == 'specific':
+							# test dataset only contains most specific concepts
+							if nr_possible_contexts == len(self.properties_dim):
+								test.append(
+									self.get_item(concept_idx, context_condition, self._many_hot_encoding,
+													include_concept))
+							else:
+								train_and_val.append(
+									self.get_item(concept_idx, context_condition, self._many_hot_encoding,
+													include_concept))
+
+				# or sample context condition from possible context conditions
+				else:
+					# 1) 'generic'
 					if test_cond == 'generic':
-                        # test dataset only contains most generic concepts
+						# test dataset only contains most generic concepts
 						if nr_possible_contexts == 1:
-							test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+							context_condition = 0 # for generic concepts, only coarse context condition exists
+							test.append(
+								self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
 						else:
-							train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+							context_condition = random.choice(range(nr_possible_contexts))
+							train_and_val.append(
+								self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
 
-                    # 2) 'specific'
-					if test_cond == 'specific':
-                    	# test dataset only contains most specific concepts
+					# 2) 'specific'
+					elif test_cond == 'specific':
+						# test dataset only contains most specific concepts
 						if nr_possible_contexts == len(self.properties_dim):
-							test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+							# add specific concepts with a random context condition
+							context_condition = random.choice(range(nr_possible_contexts))
+							test.append(
+								self.get_item(concept_idx, context_condition, self._many_hot_encoding,
+												include_concept))
 						else:
-							train_and_val.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+							context_condition = random.choice(range(nr_possible_contexts))
+							train_and_val.append(
+								self.get_item(concept_idx, context_condition, self._many_hot_encoding,
+												include_concept))
 
-        # Train val split
-		train_samples = int(len(train_and_val)*train_ratio)
+		# Train val split
+		train_samples = int(len(train_and_val) * train_ratio)
 		val_samples = len(train_and_val) - train_samples
 		train, val = torch.utils.data.random_split(train_and_val, [train_samples, val_samples])
 
-        # Save information about train dataset
+		# Save information about train dataset
 		train.dimensions = self.properties_dim
+		print("Length of train and validation datasets:", len(train), "/", len(val))
+		print("Length of test dataset:", len(test))
 
 		return train, val, test
 
@@ -224,7 +281,9 @@ class DataSet(torch.utils.data.Dataset):
 			for idx, label in enumerate(self.all_objects):
 				if elem == label:
 					indeces.append(idx)
+			# tested for the random suspected impact of random.choice here
 			index = random.sample(indeces, 1)
+			#index = [indeces[0]]
 			filled_input.append(self.images[index[0]])
 		return torch.tensor(np.array(filled_input), dtype=torch.float32)
 
@@ -380,7 +439,7 @@ class DataSet(torch.utils.data.Dataset):
 				shared_vectors.append(shared)
 		return shared_vectors
 	
-	def reverse_one_hottify(self):
+	def reverse_one_hot(self):
 
 		# dictionary to translate one-hot encoded labels for shapes3d dataset
 		# only used for shapes3d dataset variant

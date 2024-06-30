@@ -273,7 +273,8 @@ def main(params):
                 os.makedirs(opts.save_path)  
 
 
-    for _ in range(opts.num_of_runs):
+    for run in range(opts.num_of_runs):
+        print(run)
         if opts.shapes3d and not opts.zero_shot:
             data_set = torch.load('./dataset/feat_rep_concept_dataset')
             opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
@@ -294,7 +295,7 @@ def main(params):
             if not os.path.exists(opts.save_path) and opts.save:
                 os.makedirs(opts.save_path)             
 
-        # zero-shot                
+        # zero-shot
         if opts.zero_shot:
             # either the zero-shot test condition is given (with pre-generated dataset)
             if opts.zero_shot_test is not None:
