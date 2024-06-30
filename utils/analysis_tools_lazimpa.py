@@ -69,25 +69,29 @@ def symbol_informative(listener,messages,targets,vocab, eos_token = 0.0): # TODO
     message_length = messages.shape[1]
     num_messages = messages.shape[0]
     vocab_size = len(vocab)
+    vocab_tensor = torch.tensor(vocab).unsqueeze(0)
 
     informative_scores = []
-    vocab_big = torch.cat([torch.tensor(vocab).unsqueeze(0)]*num_messages, dim=0)
+    vocab_big = torch.cat([vocab_tensor]*num_messages, dim=0)
+    vocab_filler = vocab_tensor.clone()
+    vocab_filler[0,0] = 0.0
 
-    for i in message_length:
+    for i in range(message_length-1): # index = -1 is always eos and not changed. 
 
-        # remove correct symbols from vocab list for each message
+        # remove correct symbols from vocab list for each message 
         vocab_other = torch.where(vocab_big != messages[:,i].unsqueeze(1),vocab_big,0) # (num_messages,vocab_size)
+        vocab_other = torch.where(eos_token != messages[:,i].unsqueeze(1),vocab_other,vocab_filler) # if eos no value is 0, therefore make first 0. Later anyways no value change if eos
         vocab_other = torch.gather(vocab_other,1,vocab_other.nonzero()[:,1].reshape(num_messages,vocab_size-1)) # (num_messages, vocab_size -1)
 
         # get random new symbol for each message
         new_symbol_index = torch.multinomial(vocab_other,1,replacement=True).long() # (num_messages,1) 
         random_symbols = torch.gather(vocab_other,1,new_symbol_index) # (num_messages,1) 
 
-        # switch value i of all messages to new symbol
+        # switch value i of all messages to new symbol, if old symbol is not eos
         messages_manipulated = messages.clone()
         messages_manipulated[:,i] = torch.where(messages_manipulated[:,i] != eos_token, random_symbols.squeeze(), messages_manipulated[:,i])
 
-        prediction = listener(messages_manipulated)
+        prediction = listener(messages_manipulated) # if eos no change therefore should be prediction = target
 
         Lambda_m_k_sum = (prediction != targets).sum(dim=1).unsqueeze(1) # (num_messages, 1 )
         Lambda_m_k = torch.where(Lambda_m_k_sum >= 1, 1, 0) # TODO Use this if wanted, will see later if I need the values
