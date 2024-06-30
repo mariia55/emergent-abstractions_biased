@@ -27,7 +27,7 @@ def mean_weighted_message_length_from_interaction(interaction):
     av_message_length = torch.mean(message_length.float())
     return av_message_length
 
-def mean_weighted_message_length(length,frequency):
+def mean_weighted_message_length(length,frequency): # TODO analyse context x concept counts and if it matches this calculation but should
     """ calculates the average length of the messages wieghted by their generation frequency from length and frequency. """
     return torch.sum(((length * frequency)/torch.sum(frequency)).float())
 
@@ -61,6 +61,43 @@ def ZLA_significance_score(interaction,num_permutations = 1000):
 
 # positional encoding by Rita et al. 
 # *************************************
+
+def symbol_informative(listener,messages,targets,vocab, eos_token = 0.0): # TODO sollte ich nach eos nur nullen haben? Wie macht das der Listener? Ist er davon beeinflusst?
+    """ Calculates for each symbol if it is informative or not by replacing it with a random other symbol (except eos) and observing if the prediction of the listener changes. """
+
+    vocab.remove(eos_token)
+    message_length = messages.shape[1]
+    num_messages = messages.shape[0]
+    vocab_size = len(vocab)
+
+    informative_scores = []
+    vocab_big = torch.cat([torch.tensor(vocab).unsqueeze(0)]*num_messages, dim=0)
+
+    for i in message_length:
+
+        # remove correct symbols from vocab list for each message
+        vocab_other = torch.where(vocab_big != messages[:,i].unsqueeze(1),vocab_big,0) # (num_messages,vocab_size)
+        vocab_other = torch.gather(vocab_other,1,vocab_other.nonzero()[:,1].reshape(num_messages,vocab_size-1)) # (num_messages, vocab_size -1)
+
+        # get random new symbol for each message
+        new_symbol_index = torch.multinomial(vocab_other,1,replacement=True).long() # (num_messages,1) 
+        random_symbols = torch.gather(vocab_other,1,new_symbol_index) # (num_messages,1) 
+
+        # switch value i of all messages to new symbol
+        messages_manipulated = messages.clone()
+        messages_manipulated[:,i] = torch.where(messages_manipulated[:,i] != eos_token, random_symbols.squeeze(), messages_manipulated[:,i])
+
+        prediction = listener(messages_manipulated)
+
+        Lambda_m_k_sum = (prediction != targets).sum(dim=1).unsqueeze(1) # (num_messages, 1 )
+        Lambda_m_k = torch.where(Lambda_m_k_sum >= 1, 1, 0) # TODO Use this if wanted, will see later if I need the values
+        informative_scores.append(Lambda_m_k_sum)
+
+    informative_tensor = torch.cat(information_scores,dim=0)
+
+    if informative_tensor.shape == messages.shape:
+        return informative_tensor
+    pass
 
 def positional_encoding():
     """ """
