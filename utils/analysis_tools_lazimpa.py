@@ -65,12 +65,12 @@ def ZLA_significance_score(interaction,num_permutations = 1000):
 def symbol_informative(listener,messages,targets,vocab, eos_token = 0.0): # TODO sollte ich nach eos nur nullen haben? Wie macht das der Listener? Ist er davon beeinflusst?
     """ Calculates for each symbol if it is informative or not by replacing it with a random other symbol (except eos) and observing if the prediction of the listener changes. """
 
-    vocab.remove(eos_token)
+    if eos_token in vocab:
+        vocab.remove(eos_token)
     message_length = messages.shape[1]
     num_messages = messages.shape[0]
     vocab_size = len(vocab)
-    vocab_tensor = torch.tensor(vocab).unsqueeze(0)
-
+    vocab_tensor = torch.tensor(vocab,dtype=torch.float).unsqueeze(0)
     informative_scores = []
     vocab_big = torch.cat([vocab_tensor]*num_messages, dim=0)
     vocab_filler = vocab_tensor.clone()
@@ -97,11 +97,10 @@ def symbol_informative(listener,messages,targets,vocab, eos_token = 0.0): # TODO
         Lambda_m_k = torch.where(Lambda_m_k_sum >= 1, 1, 0) # TODO Use this if wanted, will see later if I need the values
         informative_scores.append(Lambda_m_k_sum)
 
-    informative_tensor = torch.cat(information_scores,dim=0)
+    informative_scores.append(torch.zeros(num_messages).unsqueeze(1))
+    informative_tensor = torch.cat(informative_scores,dim=1)
 
-    if informative_tensor.shape == messages.shape:
-        return informative_tensor
-    pass
+    return False, informative_tensor
 
 def positional_encoding():
     """ """
