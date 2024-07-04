@@ -4,8 +4,7 @@
 # 
 
 
-# ZLA significance score by Rita et al. 
-# https://github.com/MathieuRita/Lazimpa egg.zoo.channel.test ???
+# ZLA significance score as described by Rita et al. (2020)
 # ********************
 
 import torch
@@ -59,10 +58,11 @@ def ZLA_significance_score(interaction,num_permutations = 1000):
                   'Pzla':pZLA}
     return score_dict
 
-# positional encoding by Rita et al. 
+# positional encoding as described by Rita et al. (2020)
 # *************************************
 
 def symbol_informative(listener,messages,targets,vocab, eos_token = 0.0): # TODO sollte ich nach eos nur nullen haben? Wie macht das der Listener? Ist er davon beeinflusst?
+def symbol_informativeness(listener,messages,targets,vocab, eos_token = 0.0):
     """ Calculates for each symbol if it is informative or not by replacing it with a random other symbol (except eos) and observing if the prediction of the listener changes. """
 
     if eos_token in vocab:
@@ -71,16 +71,22 @@ def symbol_informative(listener,messages,targets,vocab, eos_token = 0.0): # TODO
     num_messages = messages.shape[0]
     vocab_size = len(vocab)
     vocab_tensor = torch.tensor(vocab,dtype=torch.float).unsqueeze(0)
-    informative_scores = []
     vocab_big = torch.cat([vocab_tensor]*num_messages, dim=0)
     vocab_filler = vocab_tensor.clone()
     vocab_filler[0,0] = 0.0
+    eos_mask_total = eos_token != messages
+    eos_cumulative = []
+    Lambda_m_k_list = []
 
     for i in range(message_length-1): # index = -1 is always eos and not changed. 
 
+        # only take ones that did not have eos yet
+        eos_mask = eos_mask_total[:,:i+1].sum(dim=1).unsqueeze(1) == i+1
+        eos_cumulative.append(eos_mask)
+
         # remove correct symbols from vocab list for each message 
         vocab_other = torch.where(vocab_big != messages[:,i].unsqueeze(1),vocab_big,0) # (num_messages,vocab_size)
-        vocab_other = torch.where(eos_token != messages[:,i].unsqueeze(1),vocab_other,vocab_filler) # if eos no value is 0, therefore make first 0. Later anyways no value change if eos
+        vocab_other = torch.where(eos_mask,vocab_other,vocab_filler) # if eos no value is 0, therefore make first 0.
         vocab_other = torch.gather(vocab_other,1,vocab_other.nonzero()[:,1].reshape(num_messages,vocab_size-1)) # (num_messages, vocab_size -1)
 
         # get random new symbol for each message
@@ -89,30 +95,52 @@ def symbol_informative(listener,messages,targets,vocab, eos_token = 0.0): # TODO
 
         # switch value i of all messages to new symbol, if old symbol is not eos
         messages_manipulated = messages.clone()
-        messages_manipulated[:,i] = torch.where(messages_manipulated[:,i] != eos_token, random_symbols.squeeze(), messages_manipulated[:,i])
+        messages_manipulated[:,i] = torch.where(eos_mask.squeeze(), random_symbols.squeeze(), messages_manipulated[:,i])
 
-        prediction = listener(messages_manipulated) # if eos no change therefore should be prediction = target
+        prediction = listener(messages_manipulated)
 
-        Lambda_m_k_sum = (prediction != targets).sum(dim=1).unsqueeze(1) # (num_messages, 1 )
-        Lambda_m_k = torch.where(Lambda_m_k_sum >= 1, 1, 0) # TODO Use this if wanted, will see later if I need the values
-        informative_scores.append(Lambda_m_k_sum)
+        Lambda_m_k_position = (prediction != targets).sum(dim=1).unsqueeze(1).bool() # (num_messages, 1 )
+        Lambda_m_k_list.append(Lambda_m_k_position)
 
-    informative_scores.append(torch.zeros(num_messages).unsqueeze(1))
-    informative_tensor = torch.cat(informative_scores,dim=1)
+    Lambda_m_k = torch.cat(Lambda_m_k_list,dim=1)
+    eos_cumulative_tensor = torch.cat(eos_cumulative,dim=1)
 
-    return False, informative_tensor
+    return Lambda_m_k, eos_cumulative_tensor # both should be the same shape
 
-def positional_encoding():
-    """ """
-    pass
+def positional_encoding(Lambda_m_k,eos_cumulative):
+    """ Calculates a vector Lambda_dot_k, that contains the proportions of informative symbols for each position in messages. Lambda_m_k. Excludes eos"""
+    nr_non_eos_per_position = eos_cumulative.sum(dim=0)
+    nr_informative_per_position = Lambda_m_k.sum(dim=0)
+    return nr_informative_per_position / nr_non_eos_per_position
 
-def effective_length():
-    """ """
-    pass
+def effective_length(Lambda_m_k,eos_cumulative):
+    """ Measures the mean number of informative symbols by message."""
+    nr_non_eos_per_message = eos_cumulative.sum(dim=1)
+    nr_informative_per_message = Lambda_m_k.sum(dim=1)
+    return nr_informative_per_message / nr_non_eos_per_message
+    
+def information_density(Lambda_m_k,eos_cumulative):
+    """ Measures the fraction of informative symbols in a language. """
+    nr_non_eos = eos_cumulative.sum()
+    nr_informative = Lambda_m_k.sum()
+    return nr_informative / nr_non_eos
 
-def information_density():
-    """ """
-    pass
+def information_analysis(listener,messages,targets,vocab, eos_token = 0.0):
+    """ Calculates positional_encoding, effective_length and information_density. """
+
+    Lambda_m_k, eos_mask = symbol_informativeness(listener, messages,targets,vocab,eos_token)
+
+    Lambda_dot_k = positional_encoding(Lambda_m_k, eos_mask)
+    L_eff = effective_length(Lambda_m_k, eos_mask)
+    rho_inf = information_density(Lambda_m_k,eos_mask)
+
+    return_dict = {
+        "positional_encoding" : Lambda_dot_k,
+        "effective_length" : L_eff,
+        "information_density" : rho_inf
+    }
+    return return_dict
+
 
 # other functions I might need
 #**************************
