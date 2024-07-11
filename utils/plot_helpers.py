@@ -34,6 +34,7 @@ def plot_heatmap(result_list,
         results = result_list[i]
         if results.shape[-1] > n_runs:
             results = results[:, :, -1]
+        print(type(results))
 
         plt.subplot(plot_dims[0], plot_dims[1], i + 1)
 
