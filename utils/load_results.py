@@ -2,38 +2,65 @@ import pickle
 import numpy as np
 
 
-def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=True, context_unaware=True):
+def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=True, context_unaware=True, length_cost=True):
     """ loads all accuracies into a dictionary, val_steps should be set to the same as val_frequency during training
     """
-    result_dict = {'train_acc': [], 'val_acc': [], 'test_acc': [], 'zs_specific_test_acc': [],
-                   'zs_generic_test_acc': [], 'zs_acc_objects': [], 'zs_acc_abstraction': [],
-                   'cu_train_acc': [], 'cu_val_acc': [], 'cu_test_acc': [], 'cu_zs_specific_test_acc': [],
-                   'cu_zs_generic_test_acc': []}
+    result_dict = {'train_acc': [], 'val_acc': [], 'test_acc': [],
+                   'train_message_lengths': [], 'val_message_lengths': [],
+                   'zs_specific_train_acc': [], 'zs_specific_val_acc': [], 'zs_specific_test_acc': [],
+                   'zs_specific_train_message_length': [], 'zs_specific_val_message_length': [],
+                   'zs_generic_train_acc': [], 'zs_generic_val_acc': [], 'zs_generic_test_acc': [],
+                   'zs_generic_train_message_length': [], 'zs_generic_val_message_length': [],
+                   'cu_train_acc': [], 'cu_val_acc': [], 'cu_test_acc': [],
+                   'cu_train_message_lengths': [], 'cu_val_message_lengths': [],
+                   'cu_zs_specific_train_acc': [], 'cu_zs_specific_val_acc': [], 'cu_zs_specific_test_acc': [],
+                   'cu_zs_specific_val_message_length': [], 'cu_zs_generic_train_message_length': [],
+                   'cu_zs_generic_train_acc': [], 'cu_zs_generic_val_acc': [], 'cu_zs_generic_test_acc': [],
+                   'cu_zs_specific_train_message_length': [], 'cu_zs_generic_val_message_length': []}
 
     for path_idx, path in enumerate(all_paths):
 
         train_accs = []
         val_accs = []
         test_accs = []
-        zs_accs_objects = []
-        zs_accs_abstraction = []
+        train_message_lengths = []
+        val_message_lengths = []
+        zs_specific_train_accs = []
+        zs_specific_val_accs = []
         zs_specific_test_accs = []
+        zs_specific_train_message_lengths = []
+        zs_specific_val_message_lengths = []
+        zs_generic_train_accs = []
+        zs_generic_val_accs = []
         zs_generic_test_accs = []
+        zs_generic_train_message_lengths = []
+        zs_generic_val_message_lengths = []
         cu_train_accs = []
         cu_val_accs = []
         cu_test_accs = []
+        cu_train_message_lengths = []
+        cu_val_message_lengths = []
+        cu_zs_specific_train_accs = []
+        cu_zs_specific_val_accs = []
         cu_zs_specific_test_accs = []
+        cu_zs_specific_train_message_lengths = []
+        cu_zs_specific_val_message_lengths = []
+        cu_zs_generic_train_accs = []
+        cu_zs_generic_val_accs = []
         cu_zs_generic_test_accs = []
+        cu_zs_generic_train_message_lengths = []
+        cu_zs_generic_val_message_lengths = []
 
         for run in range(n_runs):
 
             standard_path = path + '/standard/' + str(run) + '/'
             zero_shot_path = path + '/standard/zero_shot/'
+            length_cost_zs_path = path + '/length_cost/context_aware/zero_shot/'
             context_unaware_path = path + '/context_unaware/' + str(run) + '/'
             cu_zs_path = path + '/context_unaware/zero_shot/'
+            cu_lc_zs_path = path + '/length_cost/context_unaware/zero_shot/'
 
             # train and validation accuracy
-
             data = pickle.load(open(standard_path + 'loss_and_metrics.pkl', 'rb'))
             lists = sorted(data['metrics_train0'].items())
             _, train_acc = zip(*lists)
@@ -44,26 +71,85 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
                 val_acc = val_acc[::2]
             val_accs.append(val_acc)
             test_accs.append(data['final_test_acc'])
+            # message lengths
+            lists = sorted(data['metrics_train1'].items())
+            _, train_message_length = zip(*lists)
+            lists = sorted(data['metrics_test1'].items())
+            _, val_message_length = zip(*lists)
+            train_message_lengths.append(train_message_length)
+            val_message_lengths.append(val_message_length)
+
             if zero_shot:
                 for cond in ['specific', 'generic']:
-                    # zs_accs_objects.append(data['final_test_acc']) # not sure what's the purpose of this
+                    if not context_unaware:
+                        if not length_cost:
+                            # zero shot accuracy (standard)
+                            zs_data = pickle.load(
+                                open(zero_shot_path + str(cond) + '/' + str(run) + '/loss_and_metrics.pkl', 'rb'))
+                        else:
+                            zs_data = pickle.load(
+                                open(length_cost_zs_path + str(cond) + '/' + str(run) + '/loss_and_metrics.pkl', 'rb')
+                            )
 
-                    # zero shot accuracy (standard)
-                    zs_data = pickle.load(
-                        open(zero_shot_path + str(cond) + '/' + str(run) + '/loss_and_metrics.pkl', 'rb'))
-                    if cond == 'specific':
-                        zs_specific_test_accs.append(zs_data['final_test_acc'])
-                    else:
-                        zs_generic_test_accs.append(zs_data['final_test_acc'])
+                        # accuracies
+                        lists = sorted(data['metrics_train0'].items())
+                        _, zs_train_acc = zip(*lists)
+                        lists = sorted(data['metrics_test0'].items())
+                        _, zs_val_acc = zip(*lists)
+
+                        # message lengths
+                        lists = sorted(zs_data['metrics_train1'].items())
+                        _, train_message_length = zip(*lists)
+                        lists = sorted(zs_data['metrics_test1'].items())
+                        _, val_message_length = zip(*lists)
+
+                        if cond == 'specific':
+                            zs_specific_train_accs.append(zs_train_acc)
+                            zs_specific_val_accs.append(zs_val_acc)
+                            zs_specific_test_accs.append(zs_data['final_test_acc'])
+                            zs_specific_train_message_lengths.append(train_message_length)
+                            zs_specific_val_message_lengths.append(val_message_length)
+                        else:
+                            zs_generic_train_accs.append(zs_train_acc)
+                            zs_generic_val_accs.append(zs_val_acc)
+                            zs_generic_test_accs.append(zs_data['final_test_acc'])
+                            zs_generic_train_message_lengths.append(train_message_length)
+                            zs_generic_val_message_lengths.append(val_message_length)
 
                     # zero-shot accuracy (context-unaware)
-                    if context_unaware:
-                        cu_zs_data = pickle.load(
-                            open(cu_zs_path + str(cond) + '/' + str(run) + '/loss_and_metrics.pkl', 'rb'))
-                        if cond == 'specific':
-                            cu_zs_specific_test_accs.append(cu_zs_data['final_test_acc'])
+                    elif context_unaware:
+                        if not length_cost:
+                            cu_zs_data = pickle.load(
+                                open(cu_zs_path + str(cond) + '/' + str(run) + '/loss_and_metrics.pkl', 'rb'))
                         else:
+                            cu_zs_data = pickle.load(
+                                open(cu_lc_zs_path + str(cond) + '/' + str(run) + '/loss_and_metrics.pkl', 'rb')
+                            )
+
+                        # accuracies
+                        lists = sorted(data['metrics_train0'].items())
+                        _, cu_zs_train_acc = zip(*lists)
+                        lists = sorted(data['metrics_test0'].items())
+                        _, cu_zs_val_acc = zip(*lists)
+
+                        # message lengths
+                        lists = sorted(cu_zs_data['metrics_train1'].items())
+                        _, train_message_length = zip(*lists)
+                        lists = sorted(cu_zs_data['metrics_test1'].items())
+                        _, val_message_length = zip(*lists)
+
+                        if cond == 'specific':
+                            cu_zs_specific_train_accs.append(cu_zs_train_acc)
+                            cu_zs_specific_val_accs.append(cu_zs_val_acc)
+                            cu_zs_specific_test_accs.append(cu_zs_data['final_test_acc'])
+                            cu_zs_specific_train_message_lengths.append(train_message_length)
+                            cu_zs_specific_val_message_lengths.append(val_message_length)
+                        else:
+                            cu_zs_generic_train_accs.append(cu_zs_train_acc)
+                            cu_zs_generic_val_accs.append(cu_zs_val_acc)
                             cu_zs_generic_test_accs.append(cu_zs_data['final_test_acc'])
+                            cu_zs_generic_train_message_lengths.append(train_message_length)
+                            cu_zs_generic_val_message_lengths.append(val_message_length)
 
             # context-unaware accuracy
             if context_unaware:
@@ -89,21 +175,47 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=T
                 cu_val_accs.append(cu_val_acc)
                 cu_test_accs.append(cu_data['final_test_acc'])
 
+                # message lengths
+                lists = sorted(cu_data['metrics_train1'].items())
+                _, cu_train_message_length = zip(*lists)
+                lists = sorted(cu_data['metrics_test1'].items())
+                _, cu_val_message_length = zip(*lists)
+                cu_train_message_lengths.append(cu_train_message_length)
+                cu_val_message_lengths.append(cu_val_message_length)
+
         result_dict['train_acc'].append(train_accs)
         result_dict['val_acc'].append(val_accs)
         result_dict['test_acc'].append(test_accs)
+        result_dict['train_message_lengths'].append(train_message_lengths)
+        result_dict['val_message_lengths'].append(val_message_lengths)
         if zero_shot:
-            # result_dict['zs_acc_objects'].append(zs_accs_objects)
-            # result_dict['zs_acc_abstraction'].append(zs_accs_abstraction)
+            result_dict['zs_specific_train_acc'].append(zs_specific_train_accs)
+            result_dict['zs_specific_val_acc'].append(zs_specific_val_accs)
             result_dict['zs_specific_test_acc'].append(zs_specific_test_accs)
+            result_dict['zs_specific_train_message_length'].append(zs_specific_train_message_lengths)
+            result_dict['zs_specific_val_message_length'].append(zs_specific_val_message_lengths)
+            result_dict['zs_generic_train_acc'].append(zs_generic_train_accs)
+            result_dict['zs_generic_val_acc'].append(zs_generic_val_accs)
             result_dict['zs_generic_test_acc'].append(zs_generic_test_accs)
+            result_dict['zs_generic_train_message_length'].append(zs_generic_train_message_lengths)
+            result_dict['zs_generic_val_message_length'].append(zs_generic_val_message_lengths)
             if context_unaware:
+                result_dict['cu_zs_specific_train_acc'].append(cu_zs_specific_train_accs)
+                result_dict['cu_zs_specific_val_acc'].append(cu_zs_specific_val_accs)
                 result_dict['cu_zs_specific_test_acc'].append(cu_zs_specific_test_accs)
+                result_dict['cu_zs_specific_train_message_length'].append(cu_zs_specific_train_message_lengths)
+                result_dict['cu_zs_specific_val_message_length'].append(cu_zs_specific_val_message_lengths)
+                result_dict['cu_zs_generic_train_acc'].append(cu_zs_generic_train_accs)
+                result_dict['cu_zs_generic_val_acc'].append(cu_zs_generic_val_accs)
                 result_dict['cu_zs_generic_test_acc'].append(cu_zs_generic_test_accs)
+                result_dict['cu_zs_generic_train_message_length'].append(cu_zs_generic_train_message_lengths)
+                result_dict['cu_zs_generic_val_message_length'].append(cu_zs_generic_val_message_lengths)
         if context_unaware:
             result_dict['cu_train_acc'].append(cu_train_accs)
             result_dict['cu_val_acc'].append(cu_val_accs)
             result_dict['cu_test_acc'].append(cu_test_accs)
+            result_dict['cu_train_message_lengths'].append(cu_train_message_lengths)
+            result_dict['cu_val_message_lengths'].append(cu_val_message_lengths)
 
     for key in result_dict.keys():
         result_dict[key] = np.array(result_dict[key])

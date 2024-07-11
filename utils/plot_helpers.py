@@ -346,6 +346,12 @@ def plot_training_trajectory(results_train,
     for i, plot_idx in enumerate(plot_indices):
         plt.subplot(plot_shape[0], plot_shape[1], plot_idx)
         if message_length_plot:
+            for j in range(len(message_length_train[i])):
+                if j == 0:
+                    n_epochs = len(message_length_train[i][j])
+                else:
+                    if len(message_length_train[i][j]) > n_epochs:
+                        n_epochs = len(message_length_train[i][j])
             plt.plot(range(0, n_epochs, steps[0]), np.transpose(message_length_train[i]), color='green')
         else:
             plt.plot(range(0, n_epochs, steps[0]), np.transpose(results_train[i]), color='blue')
