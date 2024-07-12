@@ -90,6 +90,8 @@ def get_params(params):
     parser.add_argument("--min_delta", type=float, default=0.001,
                         help="How much of an improvement to consider a significant improvement of loss before early "
                              "stopping.")
+    parser.add_argument("--min_acc_early_stopping", type=float, default=0.00,
+                        help="Minimum validation accuracy that needs to reached before early stopping can apply.")
     parser.add_argument("--load_checkpoint", type=bool, default=False,
                         help="Skip training and load pretrained models from checkpoint.")
     parser.add_argument("--load_interaction", type=bool, default=False,
@@ -133,8 +135,8 @@ def train(opts, datasets, verbose_callbacks=False):
 
     if opts.save:
         # make folder for new run
-        latest_run = len(os.listdir(opts.save_path))
-        opts.save_path = os.path.join(opts.save_path, str(latest_run))
+        latest_run = len(os.listdir(opts.game_path))
+        opts.save_path = os.path.join(opts.game_path, str(latest_run))
         os.makedirs(opts.save_path)
         pickle.dump(opts, open(opts.save_path + '/params.pkl', 'wb'))
         save_epoch = opts.n_epochs
@@ -222,7 +224,8 @@ def train(opts, datasets, verbose_callbacks=False):
         callbacks.extend([InteractionSaverEarlyStopping([opts.n_epochs],
                                                         test_epochs=[opts.n_epochs],
                                                         checkpoint_dir=opts.save_path),
-                          EarlyStopperLossWithPatience(patience=opts.patience, min_delta=opts.min_delta)])
+                          EarlyStopperLossWithPatience(patience=opts.patience, min_delta=opts.min_delta,
+                                                       min_acc=opts.min_acc_early_stopping)])
 
     trainer = core.Trainer(game=game, optimizer=optimizer,
                            train_data=train, validation_data=val, callbacks=callbacks)

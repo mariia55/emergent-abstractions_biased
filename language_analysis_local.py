@@ -360,7 +360,7 @@ class EarlyStopperLossWithPatience(EarlyStopper):
     Implements early stopping logic that stops training when a metric did not improve for several training iterations.
     """
 
-    def __init__(self, patience: int, min_delta: float, field_name: str = "loss", validation: bool = True
+    def __init__(self, patience: int, min_delta: float, min_acc: float, field_name: str = "loss", validation: bool = True
                  ) -> None:
         """
         :param patience: the number of epochs to wait for an iteration with an improved metric (e.g. loss) until early
@@ -372,6 +372,8 @@ class EarlyStopperLossWithPatience(EarlyStopper):
         super(EarlyStopperLossWithPatience, self).__init__(validation)
         self.best_interaction = None
         self.patience = patience
+        self.min_acc = min_acc
+        self.do_early_stopping = None
         self.field_name = field_name
         self.min_delta = min_delta
         self.wait = None
@@ -387,6 +389,7 @@ class EarlyStopperLossWithPatience(EarlyStopper):
         self.stop_training = False
         self.best_epoch = 0
         self.best_interaction = None
+        self.do_early_stopping = False
 
     def on_epoch_end(self, loss: float, logs: Interaction, epoch: int):
         self.epoch = epoch
@@ -405,25 +408,30 @@ class EarlyStopperLossWithPatience(EarlyStopper):
 
         current = loss
 
-        # for first epoch:
-        if self.best is None:
-            self.best = current
-            self.best_epoch = self.epoch
-            self.best_interaction = last_epoch_interactions
-        # checks whether the current is smaller than the so far best value (while only treating differences larger than
-        # min_delta as a real difference)
-        elif current < self.best - self.min_delta:
-            self.best = current
-            self.wait = 0
-            self.best_epoch = self.epoch
-            self.best_interaction = last_epoch_interactions
-        else:
-            self.wait += 1
-            if self.wait >= self.patience:
-                self.stopped_epoch = self.epoch
-                self.stop_training = True
-                print("Epoch %d: early stopping" % self.stopped_epoch)
-                print("Best epoch:", self.best_epoch + 1)
+        # only go into early stopping mode, when min validation acc has been reached once
+        if last_epoch_interactions.aux["acc"].mean() >= self.min_acc:
+            self.do_early_stopping = True
+
+        if self.do_early_stopping:
+            # for first epoch:
+            if self.best is None:
+                self.best = current
+                self.best_epoch = self.epoch
+                self.best_interaction = last_epoch_interactions
+            # checks whether the current is smaller than the so far best value (while only treating differences larger than
+            # min_delta as a real difference)
+            elif current < self.best - self.min_delta:
+                self.best = current
+                self.wait = 0
+                self.best_epoch = self.epoch
+                self.best_interaction = last_epoch_interactions
+            else:
+                self.wait += 1
+                if self.wait >= self.patience:
+                    self.stopped_epoch = self.epoch
+                    self.stop_training = True
+                    print("Epoch %d: early stopping" % self.stopped_epoch)
+                    print("Best epoch:", self.best_epoch, "with", self.best)
         return self.stop_training
 
 
