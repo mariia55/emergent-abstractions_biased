@@ -1,5 +1,6 @@
 import pickle
 import numpy as np
+import copy
 
 
 def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=False, context_unaware=False,
@@ -356,6 +357,90 @@ def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=False
         result_dict[key] = np.array(result_dict[key])
 
     return result_dict
+
+
+def load_entropies_zero_shot(all_paths, n_runs=5, context_unaware=False, length_cost=False):
+    """ loads all entropy scores into a dictionary"""
+
+    if length_cost:
+        if context_unaware:
+            setting = 'length_cost/context_unaware'
+        elif not context_unaware:
+            setting = 'length_cost/context_aware'
+    else:
+        if context_unaware:
+            setting = 'context_unaware'
+        else:
+            setting = 'standard'
+
+    setting = str(setting + '/' + 'zero_shot')
+
+    result_dict_specific = {'NMI': [], 'effectiveness': [], 'consistency': [],
+                            'NMI_hierarchical': [], 'effectiveness_hierarchical': [], 'consistency_hierarchical': [],
+                            'NMI_context_dep': [], 'effectiveness_context_dep': [], 'consistency_context_dep': [],
+                            'NMI_concept_x_context': [], 'effectiveness_concept_x_context': [],
+                            'consistency_concept_x_context': []}
+    result_dict_generic = copy.deepcopy(result_dict_specific)
+
+    for cond in ['specific', 'generic']:
+
+        for path_idx, path in enumerate(all_paths):
+
+            NMIs, effectiveness_scores, consistency_scores = [], [], []
+            NMIs_hierarchical, effectiveness_scores_hierarchical, consistency_scores_hierarchical = [], [], []
+            NMIs_context_dep, effectiveness_scores_context_dep, consistency_scores_context_dep = [], [], []
+            NMIs_conc_x_cont, effectiveness_conc_x_cont, consistency_conc_x_cont = [], [], []
+
+            for run in range(n_runs):
+                standard_path = path + '/' + setting + '/' + cond + '/' + str(run) + '/'
+                data = pickle.load(open(standard_path + 'entropy_scores.pkl', 'rb'))
+                NMIs.append(data['normalized_mutual_info'])
+                effectiveness_scores.append(data['effectiveness'])
+                consistency_scores.append(data['consistency'])
+                NMIs_hierarchical.append(data['normalized_mutual_info_hierarchical'])
+                effectiveness_scores_hierarchical.append(data['effectiveness_hierarchical'])
+                consistency_scores_hierarchical.append(data['consistency_hierarchical'])
+                NMIs_context_dep.append(data['normalized_mutual_info_context_dep'])
+                effectiveness_scores_context_dep.append(data['effectiveness_context_dep'])
+                consistency_scores_context_dep.append(data['consistency_context_dep'])
+                NMIs_conc_x_cont.append(data['normalized_mutual_info_concept_x_context'])
+                effectiveness_conc_x_cont.append(data['effectiveness_concept_x_context'])
+                consistency_conc_x_cont.append(data['consistency_concept_x_context'])
+
+            if cond == 'specific':
+                result_dict_specific['NMI'].append(NMIs)
+                result_dict_specific['consistency'].append(consistency_scores)
+                result_dict_specific['effectiveness'].append(effectiveness_scores)
+                result_dict_specific['NMI_hierarchical'].append(NMIs_hierarchical)
+                result_dict_specific['consistency_hierarchical'].append(consistency_scores_hierarchical)
+                result_dict_specific['effectiveness_hierarchical'].append(effectiveness_scores_hierarchical)
+                result_dict_specific['NMI_context_dep'].append(NMIs_context_dep)
+                result_dict_specific['consistency_context_dep'].append(consistency_scores_context_dep)
+                result_dict_specific['effectiveness_context_dep'].append(effectiveness_scores_context_dep)
+                result_dict_specific['NMI_concept_x_context'].append(NMIs_conc_x_cont)
+                result_dict_specific['consistency_concept_x_context'].append(consistency_conc_x_cont)
+                result_dict_specific['effectiveness_concept_x_context'].append(effectiveness_conc_x_cont)
+            else:
+                result_dict_generic['NMI'].append(NMIs)
+                result_dict_generic['consistency'].append(consistency_scores)
+                result_dict_generic['effectiveness'].append(effectiveness_scores)
+                result_dict_generic['NMI_hierarchical'].append(NMIs_hierarchical)
+                result_dict_generic['consistency_hierarchical'].append(consistency_scores_hierarchical)
+                result_dict_generic['effectiveness_hierarchical'].append(effectiveness_scores_hierarchical)
+                result_dict_generic['NMI_context_dep'].append(NMIs_context_dep)
+                result_dict_generic['consistency_context_dep'].append(consistency_scores_context_dep)
+                result_dict_generic['effectiveness_context_dep'].append(effectiveness_scores_context_dep)
+                result_dict_generic['NMI_concept_x_context'].append(NMIs_conc_x_cont)
+                result_dict_generic['consistency_concept_x_context'].append(consistency_conc_x_cont)
+                result_dict_generic['effectiveness_concept_x_context'].append(effectiveness_conc_x_cont)
+
+    for key in result_dict_specific.keys():
+        result_dict_specific[key] = np.array(result_dict_specific[key])
+    for key in result_dict_generic.keys():
+        result_dict_generic[key] = np.array(result_dict_generic[key])
+
+    return result_dict_specific, result_dict_generic
+
 
 
 # Mu and goodman:
