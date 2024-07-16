@@ -234,7 +234,7 @@ def train(opts, datasets, verbose_callbacks=False):
 
     # if checkpoint path is given, load checkpoint and skip training
     if opts.load_checkpoint:
-        trainer.load_from_checkpoint(opts.checkpoint_path)
+        trainer.load_from_checkpoint(opts.checkpoint_path, map_location=opts.device)
     else:
         trainer.train(n_epochs=opts.n_epochs)
 

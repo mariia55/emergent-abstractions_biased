@@ -4,7 +4,7 @@ import copy
 
 
 def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=False, context_unaware=False,
-                    length_cost=False, early_stopping=False):
+                    length_cost=False, early_stopping=False, rsa_test=None):
     """ loads all accuracies into a dictionary, val_steps should be set to the same as val_frequency during training
     """
     result_dict = {'train_acc': [], 'val_acc': [], 'test_acc': [],
@@ -18,7 +18,8 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                    'cu_zs_specific_train_acc': [], 'cu_zs_specific_val_acc': [], 'cu_zs_specific_test_acc': [],
                    'cu_zs_specific_val_message_length': [], 'cu_zs_generic_train_message_length': [],
                    'cu_zs_generic_train_acc': [], 'cu_zs_generic_val_acc': [], 'cu_zs_generic_test_acc': [],
-                   'cu_zs_specific_train_message_length': [], 'cu_zs_generic_val_message_length': []}
+                   'cu_zs_specific_train_message_length': [], 'cu_zs_generic_val_message_length': [],
+                   'rsa_test_loss': [], 'rsa_test_acc': []}
 
     for path_idx, path in enumerate(all_paths):
 
@@ -52,6 +53,8 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
         cu_zs_generic_test_accs = []
         cu_zs_generic_train_message_lengths = []
         cu_zs_generic_val_message_lengths = []
+        rsa_test_losses = []
+        rsa_test_accs = []
 
         # prepare paths
         standard_path = "standard"
@@ -59,89 +62,26 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
         context_unaware_path = "context_unaware"
         length_cost_path = "length_cost"
         zero_shot_path = "zero_shot"
+        rsa_path = str("rsa/" + rsa_test)
         file_name = "loss_and_metrics"
         file_extension = "pkl"
 
         for run in range(n_runs):
 
-            # for paths
             run_path = str(run)
-            # standard_path = path + '/standard/' + str(run) + '/'
-            # zero_shot_path = path + '/standard/zero_shot/'
-            # length_cost_path = path + '/length_cost/context_aware/'
-            # length_cost_zs_path = path + '/length_cost/context_aware/zero_shot/'
-            # context_unaware_path = path + '/context_unaware/' + str(run) + '/'
-            # cu_zs_path = path + '/context_unaware/zero_shot/'
-            # cu_lc_path = path + '/length_cost/context_unaware/'
-            # cu_lc_zs_path = path + '/length_cost/context_unaware/zero_shot/'
 
             # context-aware (standard)
             if not context_unaware and not length_cost and not zero_shot:
-                file_path = f"{path}/{standard_path}/{run_path}/{file_name}.{file_extension}"
-                data = pickle.load(open(file_path, 'rb'))
-                # train and validation accuracy
-                lists = sorted(data['metrics_train0'].items())
-                _, train_acc = zip(*lists)
-                train_accs.append(train_acc)
-                lists = sorted(data['metrics_test0'].items())
-                _, val_acc = zip(*lists)
-                if (len(val_acc) > n_epochs // val_steps) and not early_stopping:  # old: we had some runs where we set val freq to 5 instead of 10
-                    val_acc = val_acc[::2]
-                val_accs.append(val_acc)
-                test_accs.append(data['final_test_acc'])
-                # message lengths
-                lists = sorted(data['metrics_train1'].items())
-                _, train_message_length = zip(*lists)
-                lists = sorted(data['metrics_test1'].items())
-                _, val_message_length = zip(*lists)
-                train_message_lengths.append(train_message_length)
-                val_message_lengths.append(val_message_length)
-
-            # context-unaware
-            elif context_unaware and not length_cost and not zero_shot:
-                file_path = f"{path}/{context_unaware_path}/{run_path}/{file_name}.{file_extension}"
-                cu_data = pickle.load(open(file_path, 'rb'))
-                # accuracies
-                lists = sorted(cu_data['metrics_train0'].items())
-                _, cu_train_acc = zip(*lists)
-                if (len(cu_train_acc) != n_epochs) and not early_stopping:
-                    print(path, run, len(cu_train_acc))
-                    raise ValueError(
-                        "The stored results don't match the parameters given to this function. "
-                        "Check the number of epochs in the above mentioned runs.")
-                cu_train_accs.append(cu_train_acc)
-                lists = sorted(cu_data['metrics_test0'].items())
-                _, cu_val_acc = zip(*lists)
-                # for troubleshooting in case the stored results don't match the parameters given to this function
-                if (len(cu_val_acc) != n_epochs // val_steps) and not early_stopping:
-                    print(context_unaware_path, len(cu_val_acc))
-                    raise ValueError(
-                        "The stored results don't match the parameters given to this function. "
-                        "Check the above mentioned files for number of epochs and validation steps.")
-                if (len(cu_val_acc) > n_epochs // val_steps) and not early_stopping:
-                    cu_val_acc = cu_val_acc[::2]
-                cu_val_accs.append(cu_val_acc)
-                cu_test_accs.append(cu_data['final_test_acc'])
-                # message lengths
-                lists = sorted(cu_data['metrics_train1'].items())
-                _, cu_train_message_length = zip(*lists)
-                lists = sorted(cu_data['metrics_test1'].items())
-                _, cu_val_message_length = zip(*lists)
-                cu_train_message_lengths.append(cu_train_message_length)
-                cu_val_message_lengths.append(cu_val_message_length)
-
-            # length cost
-            elif length_cost and not zero_shot:
-                if not context_unaware:
-                    file_path = f"{path}/{length_cost_path}/{context_aware_path}/{run_path}/{file_name}.{file_extension}"
-                    # train and validation accuracy
+                if rsa_test is None:
+                    file_path = f"{path}/{standard_path}/{run_path}/{file_name}.{file_extension}"
                     data = pickle.load(open(file_path, 'rb'))
+                    # train and validation accuracy
                     lists = sorted(data['metrics_train0'].items())
                     _, train_acc = zip(*lists)
                     train_accs.append(train_acc)
                     lists = sorted(data['metrics_test0'].items())
                     _, val_acc = zip(*lists)
-                    if len(val_acc) > n_epochs // val_steps:  # old: we had some runs where we set val freq to 5 instead of 10
+                    if (len(val_acc) > n_epochs // val_steps) and not early_stopping:  # old: we had some runs where we set val freq to 5 instead of 10
                         val_acc = val_acc[::2]
                     val_accs.append(val_acc)
                     test_accs.append(data['final_test_acc'])
@@ -152,9 +92,17 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                     _, val_message_length = zip(*lists)
                     train_message_lengths.append(train_message_length)
                     val_message_lengths.append(val_message_length)
-
                 else:
-                    file_path = f"{path}/{length_cost_path}/{context_unaware_path}/{run_path}/{file_name}.{file_extension}"
+                    file_path = f"{path}/{standard_path}/{run_path}/{rsa_path}/{file_name}.{file_extension}"
+                    data = pickle.load(open(file_path, 'rb'))
+                    # test acc
+                    rsa_test_accs.append(data['rsa_test_acc'])
+                    rsa_test_losses.append(data['rsa_test_loss'])
+
+            # context-unaware
+            elif context_unaware and not length_cost and not zero_shot:
+                if rsa_test is None:
+                    file_path = f"{path}/{context_unaware_path}/{run_path}/{file_name}.{file_extension}"
                     cu_data = pickle.load(open(file_path, 'rb'))
                     # accuracies
                     lists = sorted(cu_data['metrics_train0'].items())
@@ -184,6 +132,81 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                     _, cu_val_message_length = zip(*lists)
                     cu_train_message_lengths.append(cu_train_message_length)
                     cu_val_message_lengths.append(cu_val_message_length)
+                else:
+                    file_path = f"{path}/{context_unaware_path}/{run_path}/{rsa_path}/{file_name}.{file_extension}"
+                    data = pickle.load(open(file_path, 'rb'))
+                    # test acc
+                    rsa_test_accs.append(data['rsa_test_acc'])
+                    rsa_test_losses.append(data['rsa_test_loss'])
+
+            # length cost
+            elif length_cost and not zero_shot:
+                if not context_unaware:
+                    if rsa_test is None:
+                        file_path = f"{path}/{length_cost_path}/{context_aware_path}/{run_path}/{file_name}.{file_extension}"
+                        # train and validation accuracy
+                        data = pickle.load(open(file_path, 'rb'))
+                        lists = sorted(data['metrics_train0'].items())
+                        _, train_acc = zip(*lists)
+                        train_accs.append(train_acc)
+                        lists = sorted(data['metrics_test0'].items())
+                        _, val_acc = zip(*lists)
+                        if len(val_acc) > n_epochs // val_steps:  # old: we had some runs where we set val freq to 5 instead of 10
+                            val_acc = val_acc[::2]
+                        val_accs.append(val_acc)
+                        test_accs.append(data['final_test_acc'])
+                        # message lengths
+                        lists = sorted(data['metrics_train1'].items())
+                        _, train_message_length = zip(*lists)
+                        lists = sorted(data['metrics_test1'].items())
+                        _, val_message_length = zip(*lists)
+                        train_message_lengths.append(train_message_length)
+                        val_message_lengths.append(val_message_length)
+                    else:
+                        file_path = f"{path}/{length_cost_path}/{standard_path}/{run_path}/{rsa_path}/{file_name}.{file_extension}"
+                        data = pickle.load(open(file_path, 'rb'))
+                        # test acc
+                        rsa_test_accs.append(data['rsa_test_acc'])
+                        rsa_test_losses.append(data['rsa_test_loss'])
+
+                else:
+                    if rsa_test is None:
+                        file_path = f"{path}/{length_cost_path}/{context_unaware_path}/{run_path}/{file_name}.{file_extension}"
+                        cu_data = pickle.load(open(file_path, 'rb'))
+                        # accuracies
+                        lists = sorted(cu_data['metrics_train0'].items())
+                        _, cu_train_acc = zip(*lists)
+                        if (len(cu_train_acc) != n_epochs) and not early_stopping:
+                            print(path, run, len(cu_train_acc))
+                            raise ValueError(
+                                "The stored results don't match the parameters given to this function. "
+                                "Check the number of epochs in the above mentioned runs.")
+                        cu_train_accs.append(cu_train_acc)
+                        lists = sorted(cu_data['metrics_test0'].items())
+                        _, cu_val_acc = zip(*lists)
+                        # for troubleshooting in case the stored results don't match the parameters given to this function
+                        if (len(cu_val_acc) != n_epochs // val_steps) and not early_stopping:
+                            print(context_unaware_path, len(cu_val_acc))
+                            raise ValueError(
+                                "The stored results don't match the parameters given to this function. "
+                                "Check the above mentioned files for number of epochs and validation steps.")
+                        if (len(cu_val_acc) > n_epochs // val_steps) and not early_stopping:
+                            cu_val_acc = cu_val_acc[::2]
+                        cu_val_accs.append(cu_val_acc)
+                        cu_test_accs.append(cu_data['final_test_acc'])
+                        # message lengths
+                        lists = sorted(cu_data['metrics_train1'].items())
+                        _, cu_train_message_length = zip(*lists)
+                        lists = sorted(cu_data['metrics_test1'].items())
+                        _, cu_val_message_length = zip(*lists)
+                        cu_train_message_lengths.append(cu_train_message_length)
+                        cu_val_message_lengths.append(cu_val_message_length)
+                    else:
+                        file_path = f"{path}/{length_cost_path}/{context_unaware_path}/{run_path}/{rsa_path}/{file_name}.{file_extension}"
+                        data = pickle.load(open(file_path, 'rb'))
+                        # test acc
+                        rsa_test_accs.append(data['rsa_test_acc'])
+                        rsa_test_losses.append(data['rsa_test_loss'])
 
             # zero_shot
             elif zero_shot:
@@ -257,17 +280,25 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                             cu_zs_generic_val_message_lengths.append(val_message_length)
 
         if not context_unaware and not zero_shot:
-            result_dict['train_acc'].append(train_accs)
-            result_dict['val_acc'].append(val_accs)
-            result_dict['test_acc'].append(test_accs)
-            result_dict['train_message_lengths'].append(train_message_lengths)
-            result_dict['val_message_lengths'].append(val_message_lengths)
+            if rsa_test is None:
+                result_dict['train_acc'].append(train_accs)
+                result_dict['val_acc'].append(val_accs)
+                result_dict['test_acc'].append(test_accs)
+                result_dict['train_message_lengths'].append(train_message_lengths)
+                result_dict['val_message_lengths'].append(val_message_lengths)
+            else:
+                result_dict['rsa_test_acc'].append(rsa_test_accs)
+                result_dict['rsa_test_loss'].append(rsa_test_losses)
         elif context_unaware:
-            result_dict['cu_train_acc'].append(cu_train_accs)
-            result_dict['cu_val_acc'].append(cu_val_accs)
-            result_dict['cu_test_acc'].append(cu_test_accs)
-            result_dict['cu_train_message_lengths'].append(cu_train_message_lengths)
-            result_dict['cu_val_message_lengths'].append(cu_val_message_lengths)
+            if rsa_test is None:
+                result_dict['cu_train_acc'].append(cu_train_accs)
+                result_dict['cu_val_acc'].append(cu_val_accs)
+                result_dict['cu_test_acc'].append(cu_test_accs)
+                result_dict['cu_train_message_lengths'].append(cu_train_message_lengths)
+                result_dict['cu_val_message_lengths'].append(cu_val_message_lengths)
+            else:
+                result_dict['rsa_test_acc'].append(rsa_test_accs)
+                result_dict['rsa_test_loss'].append(rsa_test_losses)
         elif zero_shot:
             result_dict['zs_specific_train_acc'].append(zs_specific_train_accs)
             result_dict['zs_specific_val_acc'].append(zs_specific_val_accs)
