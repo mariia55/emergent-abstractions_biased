@@ -142,7 +142,8 @@ def train(opts, datasets, verbose_callbacks=False):
             opts.save_path = os.path.join(opts.game_path, str(latest_run))
         if not os.path.exists(opts.save_path):
             os.makedirs(opts.save_path)
-        pickle.dump(opts, open(opts.save_path + '/params.pkl', 'wb'))
+        if not opts.save_test_interactions:
+            pickle.dump(opts, open(opts.save_path + '/params.pkl', 'wb'))
         save_epoch = opts.n_epochs
     else:
         save_epoch = None
@@ -247,7 +248,10 @@ def train(opts, datasets, verbose_callbacks=False):
         acc = torch.mean(interaction.aux['acc']).item()
         print("test accuracy: " + str(acc))
         if opts.save:
-            loss_and_metrics_path = os.path.join(opts.save_path, 'loss_and_metrics.pkl')
+            if not opts.save_test_interactions:
+                loss_and_metrics_path = os.path.join(opts.save_path, 'loss_and_metrics.pkl')
+            else:
+                loss_and_metrics_path = os.path.join(opts.save_path, 'loss_and_metrics_test.pkl')
             if os.path.exists(loss_and_metrics_path):
                 with open(loss_and_metrics_path, 'rb') as pickle_file:
                     loss_and_metrics = pickle.load(pickle_file)
@@ -256,8 +260,10 @@ def train(opts, datasets, verbose_callbacks=False):
 
             loss_and_metrics['final_test_loss'] = eval_loss
             loss_and_metrics['final_test_acc'] = acc
-            pickle.dump(loss_and_metrics, open(opts.save_path + '/loss_and_metrics.pkl', 'wb'))
-            if opts.save_test_interactions:
+            if not opts.save_test_interactions:
+                pickle.dump(loss_and_metrics, open(opts.save_path + '/loss_and_metrics.pkl', 'wb'))
+            else:
+                pickle.dump(loss_and_metrics, open(opts.save_path + '/loss_and_metrics_test.pkl', 'wb'))
                 InteractionSaver.dump_interactions(interaction, mode="test", epoch=0,
                                                    rank=str(trainer.distributed_context.rank),
                                                    dump_dir=opts.save_interactions_path)
@@ -402,6 +408,7 @@ def main(params):
             # create subfolder if necessary
             opts.save_interactions_path = os.path.join(opts.game_path, 'zero_shot',
                                               opts.zero_shot_test, str(run), "interactions")
+            opts.save_path = os.path.join(opts.game_path, 'zero_shot', opts.zero_shot_test, str(run))
             if not os.path.exists(opts.save_interactions_path) and opts.save:
                 os.makedirs(opts.save_interactions_path)
 
@@ -409,9 +416,10 @@ def main(params):
         if opts.zero_shot:
             # either the zero-shot test condition is given (with pre-generated dataset)
             if opts.zero_shot_test is not None:
-                # create subfolder if necessary
-                opts.save_path = os.path.join(opts.game_path, 'zero_shot',
-                                              opts.zero_shot_test)
+                if not opts.save_test_interactions:
+                    # create subfolder if necessary
+                    opts.save_path = os.path.join(opts.game_path, 'zero_shot',
+                                                  opts.zero_shot_test)
                 if not os.path.exists(opts.save_path) and opts.save:
                     os.makedirs(opts.save_path)
                 if not opts.load_dataset:
@@ -442,14 +450,14 @@ def main(params):
 
             # set checkpoint path
             if opts.load_checkpoint:
-                opts.checkpoint_path = os.path.join(opts.save_path, str(run), 'final.tar')
+                opts.checkpoint_path = os.path.join(opts.save_path, 'final.tar')
                 if not os.path.exists(opts.checkpoint_path):
                     raise ValueError(
                         f"Checkpoint file {opts.checkpoint_path} not found.")
 
             # set interaction path
             if opts.load_interaction:
-                opts.interaction_path = os.path.join(opts.save_path, str(run), 'interactions', opts.test_rsa,
+                opts.interaction_path = os.path.join(opts.save_path, 'interactions', opts.test_rsa,
                                                      'epoch_' +
                                                      str(opts.n_epochs), 'interaction_gpu0')
 
