@@ -92,6 +92,8 @@ def get_params(params):
                              "stopping.")
     parser.add_argument("--min_acc_early_stopping", type=float, default=0.00,
                         help="Minimum validation accuracy that needs to reached before early stopping can apply.")
+    parser.add_argument("--save_test_interactions", type=bool, default=False,
+                        help="Use to save test interactions.")
     parser.add_argument("--load_checkpoint", type=bool, default=False,
                         help="Skip training and load pretrained models from checkpoint.")
     parser.add_argument("--load_interaction", type=bool, default=False,
@@ -134,7 +136,7 @@ def train(opts, datasets, verbose_callbacks=False):
     """
 
     if opts.save:
-        if not opts.test_rsa:
+        if not opts.test_rsa and not opts.save_test_interactions:
             # make folder for new run
             latest_run = len(os.listdir(opts.game_path))
             opts.save_path = os.path.join(opts.game_path, str(latest_run))
@@ -150,7 +152,7 @@ def train(opts, datasets, verbose_callbacks=False):
     dimensions = train.dimensions
 
     train = torch.utils.data.DataLoader(train, batch_size=opts.batch_size, shuffle=True)
-    val = torch.utils.data.DataLoader(val, batch_size=opts.batch_size, shuffle=False)
+    val = torch.utils.data.DataLoader(val, batch_size=opts.batch_size, shuffle=False, drop_last=True)
     test = torch.utils.data.DataLoader(test, batch_size=opts.batch_size, shuffle=False)
 
     # initialize sender and receiver agents
@@ -255,6 +257,10 @@ def train(opts, datasets, verbose_callbacks=False):
             loss_and_metrics['final_test_loss'] = eval_loss
             loss_and_metrics['final_test_acc'] = acc
             pickle.dump(loss_and_metrics, open(opts.save_path + '/loss_and_metrics.pkl', 'wb'))
+            if opts.save_test_interactions:
+                InteractionSaver.dump_interactions(interaction, mode="test", epoch=0,
+                                                   rank=str(trainer.distributed_context.rank),
+                                                   dump_dir=opts.save_interactions_path)
         if opts.test_rsa:
             if opts.load_interaction:
                 # Use interaction for the current run
@@ -356,7 +362,7 @@ def main(params):
                                        sample_context=opts.sample_context)
 
             # save folder for opts rsa is already specified above
-            if not opts.test_rsa:
+            if not opts.test_rsa and not opts.save_test_interactions:
                 opts.save_path = os.path.join(opts.path, folder_name, opts.game_setting)
             # create subfolder if necessary
             if not os.path.exists(opts.save_path) and opts.save:
@@ -391,6 +397,13 @@ def main(params):
                     os.makedirs(opts.save_path)
             else:
                 raise ValueError("--test_rsa must be 'train', 'validation', or 'test'")
+
+        if opts.save_test_interactions:
+            # create subfolder if necessary
+            opts.save_interactions_path = os.path.join(opts.game_path, 'zero_shot',
+                                              opts.zero_shot_test, str(run), "interactions")
+            if not os.path.exists(opts.save_interactions_path) and opts.save:
+                os.makedirs(opts.save_interactions_path)
 
         # zero-shot                
         if opts.zero_shot:
