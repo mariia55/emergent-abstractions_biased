@@ -10,6 +10,11 @@
 import torch
 from language_analysis_local import MessageLengthHierarchical
 from utils.analysis_from_interaction import *
+import egg.core as core
+from archs import Sender, Receiver
+from models_lazimpa import LazImpaSenderReceiverRnnGS
+import os
+import train
 
 def mean_message_length_from_interaction(interaction):
     """ Calculates the average message length, with only accounting for each individual message one time. 
@@ -69,7 +74,7 @@ def ZLA_significance_score(interaction,num_permutations = 1000):
 
     score_dict = {'mean_message_length':L_type,
                   'mean_weighted_message_length':original_L_token,
-                  'Pzla':pZLA}
+                  'p_zla':pZLA}
     return score_dict
 
 # positional encoding as described by Rita et al. (2020)
@@ -113,7 +118,7 @@ def symbol_informativeness(listener,interaction,eos_token = 0.0):
             same_indices = (switch_index == original_messages[:,i])
 
         # values to switch with
-        new_value = torch.gather(messages[:,0,:],-1,switch_index.unsqueeze(-1)).squeeze()
+        new_value = torch.gather(messages[:,i,:],-1,switch_index.unsqueeze(-1)).squeeze()
 
         messages_manipulated = messages.clone()
 
@@ -122,11 +127,11 @@ def symbol_informativeness(listener,interaction,eos_token = 0.0):
         max_value_without_eos = torch.where(eos_mask.squeeze(),max_values[:,i],new_value)
 
         # switch value i of all messages to new symbol
-        messages_manipulated[:,0].scatter_(-1,original_messages[:,i].unsqueeze(-1),new_value_without_eos.unsqueeze(-1))
-        messages_manipulated[:,0].scatter_(-1,switch_index.unsqueeze(-1),max_value_without_eos.unsqueeze(-1))
+        messages_manipulated[:,i].scatter_(-1,original_messages[:,i].unsqueeze(-1),new_value_without_eos.unsqueeze(-1))
+        messages_manipulated[:,i].scatter_(-1,switch_index.unsqueeze(-1),max_value_without_eos.unsqueeze(-1))
 
         prediction_manipulated = (listener(messages_manipulated,interaction.receiver_input) > 0).float() # bigger 0 means thinks its a concept object
-        prediction = (interaction.receiver_output > 0).float()
+        prediction = (listener(messages,interaction.receiver_input) > 0).float()
 
         # compare whether same classification not same values
         Lambda_m_k_position = (prediction != prediction_manipulated).sum(dim=(1,2)).unsqueeze(1).bool() # (num_messages, 1 )
@@ -153,9 +158,9 @@ def effective_length(Lambda_m_k,eos_cumulative):
     :param Lambda_m_k: torch.Tensor with shape (num_messages,message_lenght - 1)
     :param eos_cumulative: torch.Tensor with shape (num_messages,message_lenght - 1)
     """
-    nr_non_eos_per_message = eos_cumulative.sum(dim=1)
     nr_informative_per_message = Lambda_m_k.sum(dim=1)
-    return nr_informative_per_message / nr_non_eos_per_message
+    nr_informative_per_message_mean = nr_informative_per_message.float().mean()
+    return nr_informative_per_message_mean
     
 def information_density(Lambda_m_k,eos_cumulative):
     """ Measures the fraction of informative symbols in a language. 
@@ -241,3 +246,41 @@ def retrieve_concepts_context(interaction,n_values):
     context_conds = retrieve_context_condition(objects, fixed, distractor_objects)
     
     return concepts, context_conds
+
+def load_listener(path, setting, run, n_attributes, n_values, context_unaware, game_size = 10, loss = train.loss, vocab_size_factor = 3, hidden_size = 128,sender_cell='gru',receiver_cell='gru'):
+    """ loads the trained listener """ # TODO loading the training parameters 
+
+    dimensions = list(itertools.repeat(n_values, n_attributes))
+    minimum_vocab_size = dimensions[0] + 1
+    vocab_size = minimum_vocab_size * vocab_size_factor + 1  # multiply by factor plus add one for eos-symbol
+    sender = Sender(hidden_size, sum(dimensions), game_size, context_unaware)
+    receiver = Receiver(sum(dimensions), hidden_size)
+    sender = core.RnnSenderGS(sender,
+                              vocab_size,
+                              int(hidden_size / 2),
+                              hidden_size,
+                              cell=sender_cell,
+                              max_len=len(dimensions), # this if not max_mess_len then max_mess_len
+                              temperature=2) # value found in analysis_eval.ipynb
+    listener = core.RnnReceiverGS(receiver,
+                                vocab_size,
+                                int(hidden_size / 2),
+                                hidden_size,
+                                cell=receiver_cell)
+    
+    game = LazImpaSenderReceiverRnnGS(sender, listener, loss, length_cost=1.0,threshold=1.0) # length_cost and threshold are only important for loss calculation
+
+    #optimizer = torch.optim.Adam([
+    #    {'params': game.sender.parameters(), 'lr': opts.learning_rate},
+    #    {'params': game.receiver.parameters(), 'lr': opts.learning_rate}
+    #])
+    
+    checkpoint_path = path + '/' + setting + '/' + str(run) + '/final.tar'
+    if not os.path.exists(checkpoint_path):
+        raise ValueError(
+            f"Checkpoint file {checkpoint_path} not found.")
+    checkpoint = torch.load(checkpoint_path)
+
+    game.load_state_dict(checkpoint[1])
+
+    return listener, checkpoint, game
