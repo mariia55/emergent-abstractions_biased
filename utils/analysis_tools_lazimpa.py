@@ -81,13 +81,13 @@ def ZLA_significance_score(interaction,num_permutations = 1000):
 # *************************************
 
 def symbol_informativeness(listener,interaction,eos_token = 0.0):
-    """ Calculates for each symbol if it is informative or not by switching its value with a random other symbols value for the same position (except eos) and observing if the prediction of the listener changes. 
+    """ Calculates for each symbol if it is informative or not by switching its value with a random other symbols value for the same position (except eos) and observing if the prediction (until eos) of the listener changes. 
     
     :param listener:
     :param interaction: interaction (EGG class)
     :param eos_token: float
 
-    Example switch for position 1 in message with message length 2, switch max = 2 with switch_index = 1 (here only option as eos an max are excluded)
+    Example switch for position 1 in message with message length 2, switch max = 2 with switch_index = 1 (here only option as eos and max are excluded)
     original_message = tensor([[0.2,0.3,0.5],[0.3,0.5,0.2]]) -> message = [2,1]
     manipulated_message = tensor([[0.2,0.5,0.3],[0.3,0.5,0.2]]) -> message = [1,1]
     """
@@ -99,14 +99,21 @@ def symbol_informativeness(listener,interaction,eos_token = 0.0):
     max_values, original_messages = messages.max(dim=-1)
 
     eos_mask_total = eos_token != original_messages
-    eos_cumulative = []
+
+    # only values before eos, to switch
+    eos_excluded_cumulative = torch.cat([ eos_mask_total[:,:i+1].sum(dim=1).unsqueeze(1) == i+1 for i in range(message_length) ],dim=1)
+
+    # until eos, evaluating changes
+    eos_included_cumualtive = torch.cat([torch.ones_like(eos_excluded_cumulative[:,-1]).unsqueeze(1).bool(), eos_excluded_cumulative[:,:-1]],dim=1)
+
+    # Prediction for original messages, exclude prediction for values after eos
+    prediction = (listener(messages,interaction.receiver_input) > 0).float()
+    empty_prediction = torch.zeros_like(prediction)
+    prediction = torch.where(eos_included_cumualtive.unsqueeze(-1),prediction,empty_prediction)
+
     Lambda_m_k_list = []
 
     for i in range(message_length-1): # index = -1 is always eos and not changed. 
-
-        # only take ones that did not have eos yet
-        eos_mask = eos_mask_total[:,:i+1].sum(dim=1).unsqueeze(1) == i+1
-        eos_cumulative.append(eos_mask)
 
         # pick random new symbol index to switch with
         switch_index = torch.randint(1,vocab_size,(num_messages,))
@@ -123,24 +130,24 @@ def symbol_informativeness(listener,interaction,eos_token = 0.0):
         messages_manipulated = messages.clone()
 
         # if eosed, take old value in so no switch
-        new_value_without_eos = torch.where(eos_mask.squeeze(), new_value,max_values[:,i])
-        max_value_without_eos = torch.where(eos_mask.squeeze(),max_values[:,i],new_value)
+        new_value_without_eos = torch.where(eos_excluded_cumulative[:,i].squeeze(), new_value,max_values[:,i])
+        max_value_without_eos = torch.where(eos_excluded_cumulative[:,i].squeeze(),max_values[:,i],new_value)
 
         # switch value i of all messages to new symbol
         messages_manipulated[:,i].scatter_(-1,original_messages[:,i].unsqueeze(-1),new_value_without_eos.unsqueeze(-1))
         messages_manipulated[:,i].scatter_(-1,switch_index.unsqueeze(-1),max_value_without_eos.unsqueeze(-1))
 
         prediction_manipulated = (listener(messages_manipulated,interaction.receiver_input) > 0).float() # bigger 0 means thinks its a concept object
-        prediction = (listener(messages,interaction.receiver_input) > 0).float()
+        prediction_manipulated = torch.where(eos_included_cumualtive.unsqueeze(-1),prediction_manipulated,empty_prediction)
 
         # compare whether same classification not same values
+        # only include predictions for symbols that are not eosed yet.
         Lambda_m_k_position = (prediction != prediction_manipulated).sum(dim=(1,2)).unsqueeze(1).bool() # (num_messages, 1 )
         Lambda_m_k_list.append(Lambda_m_k_position)
 
     Lambda_m_k = torch.cat(Lambda_m_k_list,dim=1)
-    eos_cumulative_tensor = torch.cat(eos_cumulative,dim=1)
 
-    return Lambda_m_k, eos_cumulative_tensor # both should be the same shape
+    return Lambda_m_k, eos_excluded_cumulative[:,:-1] # both should be the same shape
 
 def positional_encoding(Lambda_m_k,eos_cumulative):
     """ Calculates a vector Lambda_dot_k, that contains the proportions of informative symbols for each position in messages. Lambda_m_k. Excludes eos 
