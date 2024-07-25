@@ -50,6 +50,7 @@ class LazImpaSenderReceiverRnnGS(nn.Module):
         loss,
         length_cost=0.0,
         threshold=1.0,
+        impatience=True,
         train_logging_strategy: Optional[LoggingStrategy] = None,
         test_logging_strategy: Optional[LoggingStrategy] = None,
     ):
@@ -77,6 +78,7 @@ class LazImpaSenderReceiverRnnGS(nn.Module):
         self.loss = loss
         self.length_cost = length_cost
         self.threshold = threshold
+        self.impatience = impatience
         self.train_logging_strategy = (
             LoggingStrategy()
             if train_logging_strategy is None
@@ -114,15 +116,17 @@ class LazImpaSenderReceiverRnnGS(nn.Module):
 
             # for laziness we need this: 
             #**************************
-            step_length_pressure = self.length_cost * step_aux['acc']**self.threshold * (1.0 + step) #intensity of Rita et al. = 10 == length_cost = 0.1; threshold = beta1 = 45
-            # Rita: nur einmal length cost, aber die haben auch das average von den step loss genommen, dann ist verhältnismäßig beides kleiner. 
-
-            # Test parameter influence, maybe save amount of loss vs laziness pressure to see what has how much influence. 
+            #intensity of Rita et al. = 10 == length_cost = 0.1; threshold = beta1 = 45
+            step_length_pressure = self.length_cost * step_aux['acc']**self.threshold * (1.0 + step)#**((1.0 + step - 1.75)*0.5)
 
             add_mask = eos_mask * not_eosed_before
             z += add_mask
-            loss += step_loss * add_mask + step_length_pressure * add_mask # Laziness: added accuracy (laziness)
-            pressure += step_length_pressure * add_mask
+            
+            if self.impatience:
+                loss += step_loss * not_eosed_before
+            else:
+                loss += step_loss * add_mask
+            pressure += step_length_pressure * add_mask # Laziness: added accuracy (laziness)
             expected_length += add_mask.detach() * (1.0 + step)
 
             for name, value in step_aux.items():
@@ -133,15 +137,23 @@ class LazImpaSenderReceiverRnnGS(nn.Module):
         # the remainder of the probability mass
         loss += (
             step_loss * not_eosed_before
-            + step_length_pressure * not_eosed_before # Laziness: added accuracy (laziness)
         )
         pressure += step_length_pressure * not_eosed_before
         expected_length += (step + 1) * not_eosed_before
 
         z += not_eosed_before
-        assert z.allclose(
-            torch.ones_like(z)
-        ), f"lost probability mass, {z.min()}, {z.max()}"
+
+        # get average loss, or nothing if not impatience
+        if self.impatience:
+            loss /= z # get average (z is number of used step_losses)
+
+        # add length pressure
+        loss += pressure
+
+        if not self.impatience:
+            assert z.allclose(
+                torch.ones_like(z)
+            ), f"lost probability mass, {z.min()}, {z.max()}"
 
         for name, value in step_aux.items():
             aux_info[name] = value * not_eosed_before + aux_info.get(name, 0.0)
