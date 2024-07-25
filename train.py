@@ -107,6 +107,8 @@ def get_params(params):
     # LazImpa arguments: 
     parser.add_argument("--lazy_threshold",type=float, default=0.0, # if 0, accuracy ** 0 = 1 therefore like lazy = False
                         help="Use this to multiply length_cost with the current accuracy to allow more exploration. Only does something if length_cost is not 0.0.")
+    parser.add_argument("--lazimpa_impatience",type=bool, default=False,
+                        help="Add impatience loss calculation to the agent.")
 
     args = core.init(parser, params)
 
@@ -207,11 +209,15 @@ def train(opts, datasets, verbose_callbacks=False):
                                   cell=opts.receiver_cell)
 
     # Add LazImpaSenderReceiver which multiplies length cost with accuracy ** threshold
-    if opts.length_cost and opts.lazy_threshold: # already test if != 0.0
-            #game = core.SenderReceiverRnnGS(sender, receiver, loss, length_cost=opts.length_cost)
-            game = LazImpaSenderReceiverRnnGS(sender, receiver, loss, length_cost=opts.length_cost,threshold=opts.lazy_threshold)
+    if (opts.length_cost and opts.lazy_threshold) or opts.lazimpa_impatience: # already test if != 0.0
+            game = LazImpaSenderReceiverRnnGS(sender, 
+                                                receiver, 
+                                                loss, 
+                                                length_cost=opts.length_cost,
+                                                threshold=opts.lazy_threshold,
+                                                impatience=opts.lazimpa_impatience)
     else: 
-        game = core.SenderReceiverRnnGS(sender, receiver, loss, length_cost=opts.length_cost)
+        game = core.SenderReceiverRnnGS(sender, receiver, loss, length_cost=opts.length_cost,impatience=opts.lazimpa_impatience)
 
     # set learning rates
     optimizer = torch.optim.Adam([
@@ -355,10 +361,13 @@ def main(params):
         opts.game_setting = 'context_unaware'
         if opts.length_cost: # test if exists and not 0
             if opts.lazy_threshold:
+                start = 'lazimpa' if opts.lazimpa_impatience else 'lazy'
                 if opts.lazy_threshold > 0.0:
-                    opts.game_setting = 'lazy_context_unaware'
+                    opts.game_setting = start + '_context_unaware'
                 else:
-                    opts.game_setting = 'lazy_negative_value_context_unaware'
+                    opts.game_setting = start + 'negative_value_context_unaware'
+            elif opts.lazimpa_impatience:
+                opts.game_setting = 'impatience_context_unaware'
             else:
                 opts.game_setting = 'length_cost/context_unaware'
     elif opts.mu_and_goodman:
@@ -367,10 +376,13 @@ def main(params):
         opts.game_setting = 'standard'
         if opts.length_cost:
             if opts.lazy_threshold:
+                start = 'lazimpa' if opts.lazimpa_impatience else 'lazy'
                 if opts.lazy_threshold > 0.0:
-                    opts.game_setting = 'lazy_context_aware'
+                    opts.game_setting = start + '_context_aware'
                 else:
-                    opts.game_setting = 'lazy_negative_value_context_aware'
+                    opts.game_setting = start + '_negative_value_context_aware'
+            elif opts.lazimpa_impatience:
+                opts.game_setting = 'impatience_context_aware'
             else:
                 opts.game_setting = 'length_cost/context_aware'
 
