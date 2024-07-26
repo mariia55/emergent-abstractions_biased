@@ -46,15 +46,16 @@ def mean_weighted_message_length(length,frequency): # TODO analyse context x con
     return torch.sum(((length * frequency)/torch.sum(frequency)).float())
 
 
-def ZLA_significance_score(interaction,num_permutations = 1000):
+def ZLA_significance_score(interaction,num_permutations = 1000, remove_after_eos = True):
     """ Calculates to which degree mean_weighted_message_length is lower than a random permutation of its frequency length mapping 
     
     :param interaction: interaction (EGG class)
     :param num_permutations: int
+    :param remove_after_eos: bool (should be true, as two messages should be the same if the only difference is after eos)
     """
 
     # get message frequencies and message_length
-    messages = interaction.message.argmax(dim=-1)
+    messages = retrieve_messages(interaction,as_list=False,remove_after_eos=remove_after_eos,eos_token=0.0)
     unique_messages, frequencies = torch.unique(messages,dim=0,return_counts=True)
     message_length = MessageLengthHierarchical.compute_message_length(unique_messages)
 
@@ -92,7 +93,7 @@ def symbol_informativeness(listener,interaction,eos_token = 0.0):
     manipulated_message = tensor([[0.2,0.5,0.3],[0.3,0.5,0.2]]) -> message = [1,1]
     """
 
-    messages = interaction.message
+    messages = messages_without_after_eos(interaction.message,eos_token)
     num_messages, message_length, vocab_size = messages.shape
 
     # values to be switched
@@ -104,12 +105,12 @@ def symbol_informativeness(listener,interaction,eos_token = 0.0):
     eos_excluded_cumulative = torch.cat([ eos_mask_total[:,:i+1].sum(dim=1).unsqueeze(1) == i+1 for i in range(message_length) ],dim=1)
 
     # until eos, evaluating changes
-    eos_included_cumualtive = torch.cat([torch.ones_like(eos_excluded_cumulative[:,-1]).unsqueeze(1).bool(), eos_excluded_cumulative[:,:-1]],dim=1)
+    eos_included_cumulative = torch.cat([torch.ones_like(eos_excluded_cumulative[:,-1]).unsqueeze(1).bool(), eos_excluded_cumulative[:,:-1]],dim=1)
 
     # Prediction for original messages, exclude prediction for values after eos
     prediction = (listener(messages,interaction.receiver_input) > 0).float()
     empty_prediction = torch.zeros_like(prediction)
-    prediction = torch.where(eos_included_cumualtive.unsqueeze(-1),prediction,empty_prediction)
+    prediction = torch.where(eos_included_cumulative.unsqueeze(-1),prediction,empty_prediction)
 
     Lambda_m_k_list = []
 
@@ -138,7 +139,7 @@ def symbol_informativeness(listener,interaction,eos_token = 0.0):
         messages_manipulated[:,i].scatter_(-1,switch_index.unsqueeze(-1),max_value_without_eos.unsqueeze(-1))
 
         prediction_manipulated = (listener(messages_manipulated,interaction.receiver_input) > 0).float() # bigger 0 means thinks its a concept object
-        prediction_manipulated = torch.where(eos_included_cumualtive.unsqueeze(-1),prediction_manipulated,empty_prediction)
+        prediction_manipulated = torch.where(eos_included_cumulative.unsqueeze(-1),prediction_manipulated,empty_prediction)
 
         # compare whether same classification not same values
         # only include predictions for symbols that are not eosed yet.
@@ -180,7 +181,7 @@ def information_density(Lambda_m_k,eos_cumulative):
     return nr_informative / nr_non_eos
 
 def information_analysis(listener,interaction,eos_token = 0.0):
-    """ Calculates positional_encoding, effective_length and information_density. 
+    """ Calculates positional_encoding, effective_length and information_density. by messages in language, not individual messages
     
     :param listener:
     :param interaction: interaction
@@ -199,6 +200,24 @@ def information_analysis(listener,interaction,eos_token = 0.0):
         "information_density" : rho_inf
     }
     return return_dict
+
+def messages_without_after_eos(messages,eos_token):
+    """ replaces all values eos and after with eos, so that two messages that are the same are acknoledged as so 
+    
+    :param messages: torch.Tensor:  messages in form of probability distributions (batch,number,vocab_size) 
+    :param eos_token: float
+    """
+
+    original_messages = messages.argmax(dim=-1)
+
+    eos_mask_total = eos_token != original_messages
+
+    # only values before eos including eos, we keep
+    eos_excluded_cumulative = torch.cat([ eos_mask_total[:,:i+1].sum(dim=1).unsqueeze(1) == i+1 for i in range(messages.shape[1]) ],dim=1)
+    eos_included_cumulative = torch.cat([torch.ones_like(eos_excluded_cumulative[:,-1]).unsqueeze(1).bool(), eos_excluded_cumulative[:,:-1]],dim=1)
+
+    eos_probs = messages[0,-1]
+    return torch.where(eos_included_cumulative.unsqueeze(-1),messages,eos_probs)
 
 
 # other functions I might need
@@ -220,16 +239,21 @@ def load_interaction(path,setting,nr=0,n_epochs=300):
     print(path_to_interaction_train)
     return interaction
 
-def retrieve_messages(interaction,as_list = True):
+def retrieve_messages(interaction, as_list = True, remove_after_eos = False, eos_token = 0.0):
     """ retrieves the messages from an interaction 
     
     :param interaction: interaction (EGG class)
     :param as_list: bool
+    :param remove_after_eos: bool
+    :param eos_token: float
     """
-    messages = interaction.message.argmax(dim=-1)
+    messages = interaction.message
+
+    if remove_after_eos:
+        messages = messages_without_after_eos(messages,eos_token)
     if not as_list:
-        return messages
-    return [msg.tolist() for msg in messages]
+        return messages.argmax(dim=-1)
+    return [msg.tolist() for msg in messages.argmax(dim=-1)]
 
 def retrieve_concepts_context(interaction,n_values):
     """ retrieves Concepts and context conditions from an interaction
