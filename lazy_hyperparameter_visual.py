@@ -31,9 +31,10 @@ def something(threshold, cost,length,l_threshold):
 #********************
 
 # data to use
-setting = "lazy_context_aware"
+setting = "lazimpa_context_aware"
 path = 'results/(3,4)_game_size_10_vsf_3'
 n_epochs = 300
+dataset = 0
 
 # function to use
 # added / separate / something
@@ -70,8 +71,8 @@ if old_data:
         loss_data.append(dic["loss"])
         acc_data.append(dic["acc"])
 else:
-    interaction = load_interaction(path,setting,0,n_epochs)
-    loss_data = interaction.aux["o_loss"].detach().numpy()
+    interaction = load_interaction(path,setting,dataset,n_epochs)
+    loss_data = interaction.aux["0_loss"].detach().numpy()
     acc_data = interaction.aux["acc"].detach().numpy()
     pressure_data = interaction.aux["pressure"].detach().numpy()
 
@@ -103,7 +104,7 @@ for l in range(length):
 x,y = f(init_threshold, init_cost,minimum,init_l_threshold)
 lines.append(ax.plot(x,y,lw=2,label=f"Min ca: {round(minimum,2)}",c="red",alpha=0.5))
 x,y = np.array(acc_data), pressure_data + loss_data
-ax.scatter(x,y,lw=2,label=f"Data ",c="black") # actual pressure dat
+ax.scatter(x,y,lw=2,label=f"Data ",s=2,c="black") # actual pressure dat
 ax.set_xlabel('accuracy')
 if old_data:
     ax.set_xlim([0.6,1.0])
