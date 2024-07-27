@@ -120,11 +120,12 @@ class LazImpaSenderReceiverRnnGS(nn.Module):
             step_length_pressure = self.length_cost * step_aux['acc']**self.threshold * (1.0 + step)#**((1.0 + step - 1.75)*0.5)
 
             add_mask = eos_mask * not_eosed_before
-            z += add_mask
             
             if self.impatience:
+                z += not_eosed_before
                 loss += step_loss * not_eosed_before
             else:
+                z += add_mask
                 loss += step_loss * add_mask
             pressure += step_length_pressure * add_mask # Laziness: added accuracy (laziness)
             expected_length += add_mask.detach() * (1.0 + step)
@@ -135,9 +136,7 @@ class LazImpaSenderReceiverRnnGS(nn.Module):
             not_eosed_before = not_eosed_before * (1.0 - eos_mask)
 
         # the remainder of the probability mass
-        loss += (
-            step_loss * not_eosed_before
-        )
+        loss += step_loss * not_eosed_before
         pressure += step_length_pressure * not_eosed_before
         expected_length += (step + 1) * not_eosed_before
 
