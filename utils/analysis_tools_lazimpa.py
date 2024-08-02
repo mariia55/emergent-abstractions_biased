@@ -279,8 +279,8 @@ def retrieve_concepts_context(interaction,n_values):
     return concepts, context_conds
 
 def load_listener(path, setting, run, n_attributes, n_values, context_unaware, game_size = 10, loss = train.loss, vocab_size_factor = 3, hidden_size = 128,sender_cell='gru',receiver_cell='gru'):
-    """ loads the trained listener """ # TODO loading the training parameters 
-
+    """ loads the trained listener """
+    
     dimensions = list(itertools.repeat(n_values, n_attributes))
     minimum_vocab_size = dimensions[0] + 1
     vocab_size = minimum_vocab_size * vocab_size_factor + 1  # multiply by factor plus add one for eos-symbol
