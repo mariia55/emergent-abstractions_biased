@@ -117,7 +117,7 @@ class LazImpaSenderReceiverRnnGS(nn.Module):
             # for laziness we need this: 
             #**************************
             #intensity of Rita et al. = 10 == length_cost = 0.1; threshold = beta1 = 45
-            step_length_pressure = self.length_cost * step_aux['acc']**self.threshold * (1.0 + step)#**((1.0 + step - 1.75)*0.5)
+            step_length_pressure = self.length_cost * step_aux['acc']**self.threshold * (1.0 + step)#**((1.0 + step - 1.75)*0.5) # means eos is assumed as a symbol, therefore message (3,0,0,0) is calcuated like message length 2 !!!
 
             add_mask = eos_mask * not_eosed_before
             

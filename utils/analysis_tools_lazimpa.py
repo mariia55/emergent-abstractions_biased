@@ -201,7 +201,7 @@ def information_analysis(listener,interaction,eos_token = 0.0):
     }
     return return_dict
 
-def messages_without_after_eos(messages,eos_token):
+def messages_without_after_eos(messages,eos_token = 0.0):
     """ replaces all values eos and after with eos, so that two messages that are the same are acknoledged as so 
     
     :param messages: torch.Tensor:  messages in form of probability distributions (batch,number,vocab_size) 
