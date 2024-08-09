@@ -99,6 +99,8 @@ def get_params(params):
     parser.add_argument("--load_interaction", type=bool, default=False,
                         help="If given, load all interactions from previous runs in the folder. Else, take interaction"
                              "from the current run.")
+    parser.add_argument("--limit_utterances", type=int, default=0,
+                        help="Limit loaded or generated utterances to given number. 0 means all.")
     parser.add_argument("--test_rsa", type=str, default=None,
                         help="Use for testing the RSA speaker after training. Can be 'train', 'validation' or 'test'.")
     parser.add_argument("--cost-factor", type=float, default=0.01,
@@ -274,7 +276,7 @@ def train(opts, datasets, verbose_callbacks=False):
                 interaction = torch.load(opts.interaction_path)
 
             # Get utterances from the (loaded or current) interaction
-            utterances = get_utterances(vocab_size, max_len, [interaction])
+            utterances = get_utterances(vocab_size, max_len, [interaction], opts.limit_utterances)
 
             # Set data split
             if opts.test_rsa == 'train':
