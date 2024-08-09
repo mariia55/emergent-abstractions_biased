@@ -201,11 +201,15 @@ def information_analysis(listener,interaction,eos_token = 0.0):
     }
     return return_dict
 
+# Other analysis tools
+#***************************
+
 def messages_without_after_eos(messages,eos_token = 0.0):
     """ replaces all values eos and after with eos, so that two messages that are the same are acknoledged as so 
     
     :param messages: torch.Tensor:  messages in form of probability distributions (batch,number,vocab_size) 
     :param eos_token: float
+    :returns messages: torch.Tensor: shape (batch,number,vocab_size) like param messages, but changed
     """
 
     original_messages = messages.argmax(dim=-1)
@@ -219,8 +223,36 @@ def messages_without_after_eos(messages,eos_token = 0.0):
     eos_probs = messages[0,-1]
     return torch.where(eos_included_cumulative.unsqueeze(-1),messages,eos_probs)
 
+def percent_wrong_from_interaction(interaction):
+    """
+    Calculates to what percentage the final prediction of the listener is wrong (how many of the 20 objects are classified wrongly).
 
-# other functions I might need
+    :param interaction: interaction (EGG class)
+    :returns percent_wrong: torch.Tensor in shape interaction.messages.shape[0], percentage of final prediction is wrong
+    :returns percent_wrong: torch Tensor same shape, if at least one is wrong 1 else 0
+    """
+    messages = retrieve_messages(interaction,False,remove_after_eos=True)
+
+    # 1. create eos_exact mask
+    eos_mask_total = 0.0 != messages
+    # only values before eos, to switch
+    eos_excluded_cumulative = torch.cat([ eos_mask_total[:,:i+1].sum(dim=1).unsqueeze(-1) == i+1 for i in range(messages.shape[1]) ],dim=-1)
+    # until eos, evaluating changes
+    eos_included_cumulative = torch.cat([torch.ones_like(eos_excluded_cumulative[:,-1]).unsqueeze(-1).bool(), eos_excluded_cumulative[:,:-1]],dim=-1)
+    eos_exact = (eos_included_cumulative != eos_mask_total) # only symbol first eos
+
+    # get scores
+    predictions = (interaction.receiver_output > 0).float()
+    # remove after eos prediction
+    predictions = torch.where(eos_exact.unsqueeze(-1),predictions,interaction.labels.unsqueeze(1))
+    score = (predictions != interaction.labels.unsqueeze(1)).float()
+
+    # average over step and objects with 20 being the number ob objects + distractors the listener evaluates
+    percent_wrong = ((score.sum(dim=(1,2)) / 20) * 100).int()
+
+    return percent_wrong, percent_wrong.bool().int()
+
+# loader from interaction or other
 #**************************
 
 def load_interaction(path,setting,nr=0,n_epochs=300):
