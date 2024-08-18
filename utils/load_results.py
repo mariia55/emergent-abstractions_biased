@@ -2,7 +2,7 @@ import pickle
 import numpy as np
 
 ### added granularity ad a parameter
-def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=True, granularities = False, context_unaware=True):
+def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=False, granularities = False, context_unaware=True):
     """ loads all accuracies into a dictionary, val_steps should be set to the same as val_frequency during training
     """
     result_dict = {'train_acc': [], 'val_acc': [], 'test_acc': [], 
