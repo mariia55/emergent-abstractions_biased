@@ -15,6 +15,7 @@ from archs import Sender, Receiver
 from models_lazimpa import LazImpaSenderReceiverRnnGS
 import os
 import train
+import pickle
 
 def mean_message_length_from_interaction(interaction):
     """ Calculates the average message length, with only accounting for each individual message one time. 
@@ -347,3 +348,32 @@ def load_listener(path, setting, run, n_attributes, n_values, context_unaware, g
     game.load_state_dict(checkpoint[1])
 
     return listener, checkpoint, game
+
+def load_loss(path, run=0, n_epochs=300,metrics=1):
+    """
+    loads all losses into a dictionary
+
+    :param: path = path before run
+    :run: int
+    :n_epochs: int
+    :metrics: How many metrics to are to be expected /supposed to be loaded (1 means only accuracy for standard, 4 for lazy or impatience)
+    """
+
+    result_dict = {'train_loss': [], 'val_loss': [],}
+    data = pickle.load(open(path + "/" + str(run) + "/" + 'loss_and_metrics.pkl', 'rb'))
+
+    lists = sorted(data['loss_train'].items())
+    _, result_dict['train_loss'] = zip(*lists)
+    lists = sorted(data['loss_test'].items())
+    _, result_dict['val_loss'] = zip(*lists)
+
+    if metrics > 0:
+        for m in range(metrics):
+            lists = sorted(data['metrics_train' + str(m)].items())
+            _, result_dict['train_metric' + str(m)] = zip(*lists)
+            lists = sorted(data['metrics_test' + str(m)].items())
+            _, result_dict['val_metric' + str(m)] = zip(*lists)
+
+    # TODO final_test_loss & final_test_acc
+
+    return result_dict, data
