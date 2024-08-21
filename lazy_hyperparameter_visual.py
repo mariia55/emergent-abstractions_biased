@@ -14,12 +14,12 @@ from utils.analysis_tools_lazimpa import load_interaction, load_loss
 # The parametrized function to be plotted
 def separate(threshold, cost,length,l_threshold):
     """ returns the pressure value for all points"""
-    pressure = t ** threshold * cost * length **l_threshold
+    pressure = t ** threshold * cost * (length + int(with_eos)) **l_threshold
     return t, pressure
 
 def added(threshold, cost,length,l_threshold):
     """ returns the pressure value for all points added to the loss"""
-    pressure = np.array(acc_data).T ** threshold * cost * (length) ** l_threshold
+    pressure = np.array(acc_data).T ** threshold * cost * (length + int(with_eos)) ** l_threshold
     return np.array(acc_data) , pressure + loss_data
 
 def something(threshold, cost,length,l_threshold):
@@ -34,9 +34,12 @@ def something(threshold, cost,length,l_threshold):
 setting = "lazimpa_context_aware"
 path = 'results/(3,4)_game_size_10_vsf_3'
 n_epochs = 300
-dataset = 0
+dataset = 3
 type_data = "pkl" # "old" or "interaction" "pkl"
-with_eos = True # whether estimation is + 1 (for eos) Important if pressure is +1
+metrics_order = [0,2,3] # acc, original_loss, pressure 
+#metrics_order = [1,0,3] # only for lazy_context_aware with run 0: Test run!!
+with_eos = False# whether estimation is + 1 (for eos) Important if pressure is +1
+train_or_test = 'train' #str
 
 # function to use
 # added / separate / something
@@ -61,7 +64,6 @@ l_max = 5.0
 # ******************
 
 # create arrays with loss points
-# TODO get data over all epochs from file not interaction
 loss_data = []
 acc_data = []
 if type_data == "old":
@@ -76,16 +78,14 @@ elif type_data == "interaction":
     loss_data = interaction.aux["0_loss"].detach().numpy()
     acc_data = interaction.aux["acc"].detach().numpy()
     pressure_data = interaction.aux["pressure"].detach().numpy()
-    with_eos = True
 elif type_data == "pkl":
-    loss_dict, orig = load_loss(path + '/' + setting,dataset,n_epochs,metrics=4)
-    acc_data = np.array(loss_dict['train_metric1'])
-    loss_data = np.array(loss_dict['train_metric0'])
-    pressure_data = np.array(loss_dict['train_metric3'])
-    with_eos = True
+    loss_dict = load_loss(path + '/' + setting,dataset,n_epochs,metrics=4)
+    acc_data = np.array(loss_dict[train_or_test+'_metric'+str(metrics_order[0])])
+    loss_data = np.array(loss_dict[train_or_test+'_metric'+str(metrics_order[1])])
+    pressure_data = np.array(loss_dict[train_or_test+'_metric'+str(metrics_order[2])])
 
 t = np.linspace(0.0, 1, 1000) 
-length = game[0]
+length = game[0] +1
 
 def calc_min(att,val):
     """ calculates the minimum achievable message length, so that each concept gets a message. One message with message length 0. No weight, so assumes all messages are used to the same extend. """
@@ -100,7 +100,7 @@ def calc_min(att,val):
         else:
             summe += number_of_concepts_left * length
             break
-    return summe / sum([val ** f for f in range(1,att+1)]) + (1 if with_eos else 0)
+    return summe / sum([val ** f for f in range(1,att+1)])
 
 def calc_weighted_pred(att,val):
     """ calculates a basic predicted weighted message length, so that each concept gets a message. One message with message length 0. Uses the average message length per needed to communicated depending on context. The less information in message the shorter made here. """
@@ -132,7 +132,7 @@ def calc_weighted_pred(att,val):
         nr_concept_x_context += nr_for_this_context
         summe2 += nr_for_this_context * coarse[cx-1]
 
-    return summe2 / nr_concept_x_context + (1 if with_eos else 0) # the one is for eos
+    return summe2 / nr_concept_x_context
 
 prediction = calc_weighted_pred(game[0],game[1])
 
@@ -142,7 +142,7 @@ print("Minimum unweighted: ", calc_min(game[0],game[1]))
 fig, ax = plt.subplots()
 lines = []
 
-for l in range(1,length+1):
+for l in range(length):
     x,y = f(init_threshold, init_cost,l,init_l_threshold)
     lines.append(ax.plot(x,y, lw=2,label=f"{l}",alpha = 0.5))
 
@@ -154,12 +154,15 @@ ax.set_xlabel('accuracy')
 if type_data == "old":
     ax.set_xlim([0.6,1.0])
 else:
-    pass
-    #ax.set_xlim([0.5,1.0])
-ax.set_ylim([0.0,1.0])
+    #pass
+    ax.set_xlim([0.9,1.0])
+ax.set_ylim([0.0,0.6])
 ax.scatter(acc_data,loss_data,alpha=0.5,label="Loss",s=2,c="purple") # scatter loss
 #ax.plot(acc_data,loss_data,label="Loss") # plot loss
-ax.legend(title="Message Length with eos",loc="best")
+if with_eos:
+    ax.legend(title="Message Length with eos",loc="best")
+else:
+    ax.legend(title="Message Length without eos",loc="best")
 
 # adjust the main plot to make room for the sliders
 fig.subplots_adjust(left=0.25, bottom=0.25, right=0.75)
@@ -200,7 +203,7 @@ l_slider = Slider(
 # The function to be called anytime a slider's value changes
 def update(val):
     for l in range(length):
-        _,y = f(amp_slider.val, freq_slider.val,l+1,l_slider.val)
+        _,y = f(amp_slider.val, freq_slider.val,l,l_slider.val)
         lines[l][0].set_ydata(y)
     _,y = f(amp_slider.val, freq_slider.val,prediction,l_slider.val)
     lines[-1][0].set_ydata(y)

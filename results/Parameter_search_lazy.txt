@@ -1,0 +1,110 @@
+--dimension 4 4 4 --n_epochs 20 --batch_size 32 --length_cost 1 --lazy_threshold 45
+	test 0.83, length 4.0 ab epoch 2
+
+--dimension 4 4 4 --n_epochs 100 --batch_size 32 --length_cost 1 --lazy_threshold 45
+	test 0.86, length 2.0 war auf hoch 3.8 bei epoch 6
+
+--dimension 4 4 4 --n_epochs 20 --batch_size 32 
+	test 0.8, length 4.0 ab epoch 3
+	test 0.76, length 4.0 ab epoch 1
+
+--dimension 4 4 4 --n_epochs 20 --batch_size 32 --length_cost 0.01
+	test 0.38, length 1.0 ab epoch 1
+	test 0.5, length 1.0 ab epoch 1
+
+--dimension 4 4 4 --n_epochs 20 --batch_size 32 --length_cost 0.1
+	test 0.5, length 1.0 ab epoch 1
+
+--dimension 4 4 4 --n_epochs 20 --batch_size 32 --length_cost 0.001
+	test 0.78, length 4.0 ab epoch 8
+
+--dimension 4 4 4 --n_epochs 20 --batch_size 32 --length_cost 0.001 --lazy_threshold 1
+	test 0.87, length 4.0 ab epoch 8
+	test 0.80, length 4.0 ab epoch 5
+
+--dimension 4 4 4 --n_epochs 20 --batch_size 32 --length_cost 0.001 --lazy_threshold 45
+	test 0.82, length 4.0 ab epoch 4
+
+--dimension 4 4 4 --n_epochs 20 --batch_size 32 --length_cost 0.01 --lazy_threshold 45
+	test 0.77, length 4.0 ab epoch 2
+	test 0.78, length 4.0 ab epoch 2
+
+--dimension 4 4 4 --n_epochs 20 --batch_size 32 --length_cost 0.01 --lazy_threshold 1
+	test 0.34, length 1.0 ab epoch 1
+
+--dimension 4 4 4 --n_epochs 300 --length_cost 0.01 --lazy_threshold 45
+	test 0.81, length 4.0 
+	epochs 100: 
+
+--dimension 4 4 4 --n_epochs 100 --length_cost 0.1 --lazy_threshold 45
+1	took ?? epochs until pressure was in first number of loss.
+	length started reducing around epoch 84
+2	down until 3.0 started reducing at about 60
+	am ende loss und pressure ähnlich
+threshold 20: geht runter auf length 2.5 
+threshold 10: ist noch gleichzeitig am lernen sowie am kürzen: ergebnis: length 2, aber acc 0.91
+threshold 5: versucht erst mit möglichst kurzen Nachrichten viel zu lernen und verlängert dann die Nachrichten nach und nach auf f2, aber test 0.83 am ende, also zu start
+
+threshold 10 and cost = 0.2: zu stark aber average length 1.7
+
+--dimension 4 4 4 --n_epochs 100 --length_cost 0.2 --lazy_threshold 45
+	test 0.93, length 2.6
+
+cost 0.4, threshold 60: 
+
+--dimensions 4 4 4 --n_epochs 300 --lazy_threshold 45 --length_cost 0.1 + length_threshold 2
+	test by 0.93, length 2.2, train by 0.96 im tief
+
+--dimensions 4 4 4 --n_epochs 300 --lazy_threshold 10 --length_cost 0.1
+	train 0.94, length 1.8
+
+ --dimensions 4 4 4 --n_epochs 300 --lazy_threshold 45 --length_cost 0.1 + length_threshold 1.7 + step -1
+	length runter ab epoch 47, als acc ca. 0.97 war
+	runter auf 2.3 und train 0.98
+
+--dimensions 4 4 4 --n_epochs 300 --lazy_threshold 1 --length_cost 1.0
+	acc auf 0.99, aber length 4.0
+
+*****************
+Saves testruns
+*****************
+
+# [1,0,3] (wegen 0_loss und nicht o_loss) wahrscheinlich alphabetisch
+--dimensions 4 4 4 --n_epochs 300 --length_cost 0.1 --lazy_threshold 45 --lazimpa_impatience True --save True
+	lazimpa_context_aware 0
+	acc auf train 0.97, length steht da 2.16
+
+# [0,2,3]
+--dimensions 4 4 4 --n_epochs 300 --length_cost 0.1 --lazy_threshold 100 --lazimpa_impatience True --save True
+	lazimpa_context_aware 1
+	acc auf train 0.985, length steht da 2.3
+	Note: Alles durch Graphik vorhersehbar, 
+	Schätzte das es sehr Steil und plötzlich hoch geht für kürze und er den Berg vielleicht lieber nicht nimmt, da für niedrige Werte fast keiner ist. 
+
+# [0,2,3]
+--dimensions 4 4 4 --n_epochs 300 --length_cost 0.06 --lazy_threshold 10 --lazimpa_impatience True --save True
+	lazimpa_context_aware 2
+	acc auf train 0.977-0.98, length steht da 2.14-2.3
+	Vorhersehbarerweise geht length ab epoch 5 schon runter, kann es so überhaupt lernen?
+
+step -1 !!! with_eos = False
+--dimensions 4 4 4 --n_epochs 300 --length_cost 0.1 --lazy_threshold 45 --lazimpa_impatience True --save True
+	lazimpa_context_aware 3
+	acc auf train 0.977-0.987 , length da steht: 1.44 (denke jetzt hier auch ohne +eos (+1) Ging runter von 3 ab epoch 33
+	without_save with threshold 100: stoppt zu lernen, damit es nicht den Berg der pressure hoch geht
+	without_save with cost 0.06 and threshold 10: von anfang an unter 3, schnell auf sogar 0.9, balanciert sich später auf 1.3 aber acc = 0.97 max
+	with threshold 0: lernt es nix und macht die Nachrichten nur ganz kurz
+	threshold 1 & 0.01: l = 2.6 aber acc = 0.99
+
+***********************
+Check duration for 2 episodes
+**********************
+--dimensions 4 4 4 --n_epochs 2 --length_cost 0.1 --lazy_threshold 45 --lazimpa_impatience True
+- D(3,4): Dauer:  0:00:02.359712  Dauer für 300 epochs:  0:05:53.956800 + 00:02 Dataset creation
+- D(4,4): Dauer:  0:00:18.883556  Dauer für 300 epochs:  0:47:12.533400 + 00:28 Dataset creation
+- D(4,8): Dauer:  0:03:55.608058  Dauer für 300 epochs:  9:49:01.208700 + 25:02 Dataset creation
+- D(3,16): Dauer:  0:02:02.901559  Dauer für 300 epochs:  5:07:15.233850 + 13:09 Dataset Creation
+- D(5,4): Dauer:  0:02:29.957796  Dauer für 300 epochs:  6:14:53.669400 + 05:41 Dataset creation
+- 
+
+

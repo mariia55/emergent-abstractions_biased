@@ -357,23 +357,20 @@ def load_loss(path, run=0, n_epochs=300,metrics=1):
     :run: int
     :n_epochs: int
     :metrics: How many metrics to are to be expected /supposed to be loaded (1 means only accuracy for standard, 4 for lazy or impatience)
+    :set_type: str either 'train' oder 'test'
     """
 
-    result_dict = {'train_loss': [], 'val_loss': [],}
+    result_dict = {}
     data = pickle.load(open(path + "/" + str(run) + "/" + 'loss_and_metrics.pkl', 'rb'))
 
-    lists = sorted(data['loss_train'].items())
-    _, result_dict['train_loss'] = zip(*lists)
-    lists = sorted(data['loss_test'].items())
-    _, result_dict['val_loss'] = zip(*lists)
+    for s in ['train', 'test']:
 
-    if metrics > 0:
-        for m in range(metrics):
-            lists = sorted(data['metrics_train' + str(m)].items())
-            _, result_dict['train_metric' + str(m)] = zip(*lists)
-            lists = sorted(data['metrics_test' + str(m)].items())
-            _, result_dict['val_metric' + str(m)] = zip(*lists)
+        lists = sorted(data['loss_'+s].items())
+        _, result_dict[s+'_loss'] = zip(*lists)
 
-    # TODO final_test_loss & final_test_acc
+        if metrics > 0:
+            for m in range(metrics):
+                lists = sorted(data['metrics_'+s + str(m)].items())
+                _, result_dict[s+'_metric' + str(m)] = zip(*lists)
 
-    return result_dict, data
+    return result_dict
