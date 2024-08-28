@@ -4,7 +4,7 @@ import copy
 
 
 def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=False, context_unaware=False,
-                    length_cost=False, early_stopping=False, rsa_test=None):
+                    length_cost=False, early_stopping=False, rsa=False, rsa_test=None):
     """ loads all accuracies into a dictionary, val_steps should be set to the same as val_frequency during training
     """
     result_dict = {'train_acc': [], 'val_acc': [], 'test_acc': [],
@@ -62,7 +62,8 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
         context_unaware_path = "context_unaware"
         length_cost_path = "length_cost"
         zero_shot_path = "zero_shot"
-        rsa_path = str("rsa/" + rsa_test)
+        if rsa:
+            rsa_path = str("rsa/" + rsa_test)
         file_name = "loss_and_metrics"
         file_extension = "pkl"
 
@@ -151,7 +152,7 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                         train_accs.append(train_acc)
                         lists = sorted(data['metrics_test0'].items())
                         _, val_acc = zip(*lists)
-                        if len(val_acc) > n_epochs // val_steps:  # old: we had some runs where we set val freq to 5 instead of 10
+                        if len(val_acc) > n_epochs // val_steps and not early_stopping:  # old: we had some runs where we set val freq to 5 instead of 10
                             val_acc = val_acc[::2]
                         val_accs.append(val_acc)
                         test_accs.append(data['final_test_acc'])
@@ -181,7 +182,7 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                             raise ValueError(
                                 "The stored results don't match the parameters given to this function. "
                                 "Check the number of epochs in the above mentioned runs.")
-                        cu_train_accs.append(cu_train_acc)
+                        cu_train_accs.append(np.array(cu_train_acc))
                         lists = sorted(cu_data['metrics_test0'].items())
                         _, cu_val_acc = zip(*lists)
                         # for troubleshooting in case the stored results don't match the parameters given to this function
@@ -221,9 +222,9 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                             zs_data = pickle.load(open(file_path, 'rb'))
 
                         # accuracies
-                        lists = sorted(data['metrics_train0'].items())
+                        lists = sorted(zs_data['metrics_train0'].items())
                         _, zs_train_acc = zip(*lists)
-                        lists = sorted(data['metrics_test0'].items())
+                        lists = sorted(zs_data['metrics_test0'].items())
                         _, zs_val_acc = zip(*lists)
 
                         # message lengths
@@ -255,9 +256,9 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                             cu_zs_data = pickle.load(open(file_path, 'rb'))
 
                         # accuracies
-                        lists = sorted(data['metrics_train0'].items())
+                        lists = sorted(cu_zs_data['metrics_train0'].items())
                         _, cu_zs_train_acc = zip(*lists)
-                        lists = sorted(data['metrics_test0'].items())
+                        lists = sorted(cu_zs_data['metrics_test0'].items())
                         _, cu_zs_val_acc = zip(*lists)
 
                         # message lengths
@@ -328,7 +329,7 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
     return result_dict
 
 
-def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=False):
+def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=False, rsa=False, rsa_test=None):
     """ loads all entropy scores into a dictionary"""
 
     if length_cost:
@@ -341,6 +342,11 @@ def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=False
             setting = 'context_unaware'
         else:
             setting = 'standard'
+
+    if rsa:
+        rsa_path_addition = 'rsa/' + rsa_test + '/'
+    else:
+        rsa_path_addition = ""
 
     result_dict = {'NMI': [], 'effectiveness': [], 'consistency': [],
                    'NMI_hierarchical': [], 'effectiveness_hierarchical': [], 'consistency_hierarchical': [],
@@ -356,7 +362,7 @@ def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=False
         NMIs_conc_x_cont, effectiveness_conc_x_cont, consistency_conc_x_cont = [], [], []
 
         for run in range(n_runs):
-            standard_path = path + '/' + setting + '/' + str(run) + '/'
+            standard_path = path + '/' + setting + '/' + str(run) + '/' + rsa_path_addition
             data = pickle.load(open(standard_path + 'entropy_scores.pkl', 'rb'))
             NMIs.append(data['normalized_mutual_info'])
             effectiveness_scores.append(data['effectiveness'])
@@ -390,7 +396,7 @@ def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=False
     return result_dict
 
 
-def load_entropies_zero_shot(all_paths, n_runs=5, context_unaware=False, length_cost=False):
+def load_entropies_zero_shot(all_paths, n_runs=5, context_unaware=False, length_cost=False, test_interactions=False):
     """ loads all entropy scores into a dictionary"""
 
     if length_cost:
@@ -424,7 +430,10 @@ def load_entropies_zero_shot(all_paths, n_runs=5, context_unaware=False, length_
 
             for run in range(n_runs):
                 standard_path = path + '/' + setting + '/' + cond + '/' + str(run) + '/'
-                data = pickle.load(open(standard_path + 'entropy_scores.pkl', 'rb'))
+                if not test_interactions:
+                    data = pickle.load(open(standard_path + 'entropy_scores.pkl', 'rb'))
+                else:
+                    data = pickle.load(open(standard_path + 'entropy_scores_test.pkl', 'rb'))
                 NMIs.append(data['normalized_mutual_info'])
                 effectiveness_scores.append(data['effectiveness'])
                 consistency_scores.append(data['consistency'])

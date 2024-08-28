@@ -109,10 +109,10 @@ def plot_heatmap_concept_x_context(result_list,
     # 6 datasets
     for i in range(np.prod(plot_dims)):
         # D(3,4), D(3,8), D(3,16)
-        if i < 3:
+        if titles[i] == 'D(3,4)' or titles[i] == 'D(3,8)' or titles[i] == 'D(3,16)':
             matrix_indices = sorted(list(itertools.product(range(3), repeat=2)), key=lambda x: x[1])
         # D(4,4), D(4,8)
-        elif i == 3 or i == 4:
+        elif titles[i] == 'D(4,4)' or titles[i] == 'D(4,8)':
             matrix_indices = sorted(list(itertools.product(range(4), repeat=2)), key=lambda x: x[1])
         else:
             matrix_indices = sorted(list(itertools.product(range(5), repeat=2)), key=lambda x: x[1])
@@ -200,10 +200,10 @@ def plot_heatmap_concept_x_context_errors(result_list,
     # 6 datasets
     for i in range(np.prod(plot_dims)):
         # D(3,4), D(3,8), D(3,16)
-        if i < 3:
+        if titles[i] == 'D(3,4)' or titles[i] == 'D(3,8)' or titles[i] == 'D(3,16)':
             matrix_indices = sorted(list(itertools.product(range(3), repeat=2)), key=lambda x: x[1])
         # D(4,4), D(4,8)
-        elif i == 3 or i == 4:
+        elif titles[i] == 'D(4,4)' or titles[i] == 'D(4,8)':
             matrix_indices = sorted(list(itertools.product(range(4), repeat=2)), key=lambda x: x[1])
         else:
             matrix_indices = sorted(list(itertools.product(range(5), repeat=2)), key=lambda x: x[1])
