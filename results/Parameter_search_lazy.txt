@@ -98,6 +98,7 @@ step -1 !!! with_eos = False
 
 ***********************
 Check duration for 2 episodes
+
 **********************
 --dimensions 4 4 4 --n_epochs 2 --length_cost 0.1 --lazy_threshold 45 --lazimpa_impatience True
 - D(3,4): Dauer:  0:00:02.359712  Dauer für 300 epochs:  0:05:53.956800 + 00:02 Dataset creation

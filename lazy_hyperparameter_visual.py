@@ -32,13 +32,13 @@ def something(threshold, cost,length,l_threshold):
 
 # data to use
 setting = "lazimpa_context_aware"
-path = 'results/(3,4)_game_size_10_vsf_3'
+path = 'd:/OneDrive/Dokumente/UNI Osnabrück/bachelorthesis/InfosKristina/Code/emergent-abstractions/results/(3,4)_game_size_10_vsf_3'
 n_epochs = 300
-dataset = 3
+dataset = 0
 type_data = "pkl" # "old" or "interaction" "pkl"
-metrics_order = [0,2,3] # acc, original_loss, pressure 
-#metrics_order = [1,0,3] # only for lazy_context_aware with run 0: Test run!!
-with_eos = False# whether estimation is + 1 (for eos) Important if pressure is +1
+#metrics_order = [0,2,3] # acc, original_loss, pressure 
+metrics_order = [1,0,3] # only for lazy_context_aware with run 0: Test run!!
+with_eos = True# whether estimation is + 1 (for eos) Important if pressure is +1
 train_or_test = 'train' #str
 
 # function to use
