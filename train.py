@@ -94,13 +94,16 @@ def get_params(params):
                         help="Minimum validation accuracy that needs to reached before early stopping can apply.")
     parser.add_argument("--save_test_interactions", type=bool, default=False,
                         help="Use to save test interactions.")
+    parser.add_argument("--save_test_interactions_as", type=str, default="test",
+                        help="Specify folder in which to save the test interactions (useful for comparing multiple "
+                             "scenarios).")
     parser.add_argument("--load_checkpoint", type=bool, default=False,
                         help="Skip training and load pretrained models from checkpoint.")
     parser.add_argument("--load_interaction", type=bool, default=False,
                         help="If given, load all interactions from previous runs in the folder. Else, take interaction"
                              "from the current run.")
     parser.add_argument("--limit_utterances", type=int, default=0,
-                        help="Limit loaded or generated utterances to given number. 0 means all.")
+                        help="Limit loaded or generated utterances to given number for RSA. 0 means all.")
     parser.add_argument("--test_rsa", type=str, default=None,
                         help="Use for testing the RSA speaker after training. Can be 'train', 'validation' or 'test'.")
     parser.add_argument("--cost-factor", type=float, default=0.01,
@@ -267,7 +270,7 @@ def train(opts, datasets, verbose_callbacks=False):
                 pickle.dump(loss_and_metrics, open(opts.save_path + '/loss_and_metrics.pkl', 'wb'))
             else:
                 pickle.dump(loss_and_metrics, open(opts.save_path + '/loss_and_metrics_test.pkl', 'wb'))
-                InteractionSaver.dump_interactions(interaction, mode="test", epoch=0,
+                InteractionSaver.dump_interactions(interaction, mode=opts.save_test_interactions_as, epoch=0,
                                                    rank=str(trainer.distributed_context.rank),
                                                    dump_dir=opts.save_interactions_path)
         if opts.test_rsa:
