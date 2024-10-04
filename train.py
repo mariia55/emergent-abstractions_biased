@@ -111,6 +111,8 @@ def get_params(params):
     parser.add_argument('--sample_context', type=bool, default=False,
                         help="Use for sampling context condition in dataset generation. (Otherwise, each context "
                              "condition is added for each concept.)")
+    parser.add_argument('--granularity', type=str, default='mixed',
+                        help='Granularity of the context. Possible values are: mixed, coarse and fine')
 
     args = core.init(parser, params)
 
@@ -142,7 +144,7 @@ def train(opts, datasets, verbose_callbacks=False):
     """
 
     if opts.save:
-        if not opts.test_rsa and not opts.save_test_interactions:
+        if not opts.test_rsa and not opts.save_test_interactions and not opts.zero_shot:
             # make folder for new run
             latest_run = len(os.listdir(opts.game_path))
             opts.save_path = os.path.join(opts.game_path, str(latest_run))
@@ -353,8 +355,17 @@ def main(params):
             else:
                 opts.game_setting = 'length_cost/no_cost_context_aware'
 
-    opts.game_path = os.path.join(opts.path, folder_name, opts.game_setting)
-    opts.save_path = opts.game_path  # Used later to load all runs
+    # create subfolders if necessary
+    # The granularity subfolders are created only when the granularity is not 'mixed'
+    if opts.granularity != 'mixed' and not opts.zero_shot:
+        granularity_subfolder = f"granularity_{opts.granularity}"
+        opts.game_path = os.path.join(opts.path, folder_name, opts.game_setting, granularity_subfolder)
+    elif opts.sample_context and not opts.zero_shot:
+        sample_context_subfolder = "sampled_context"
+        opts.game_path = os.path.join(opts.path, folder_name, opts.game_setting, sample_context_subfolder)
+    else:
+        opts.game_path = os.path.join(opts.path, folder_name, opts.game_setting)
+    opts.save_path = opts.game_path  # Keep game path for calculating which run, i.e. folder to save in
 
     # if name of precreated data set is given, load dataset
     if opts.load_dataset:
@@ -373,7 +384,8 @@ def main(params):
                                        game_size=opts.game_size,
                                        scaling_factor=opts.scaling_factor,
                                        device=opts.device,
-                                       sample_context=opts.sample_context)
+                                       sample_context=opts.sample_context,
+                                       granularity=opts.granularity)
 
             # save folder for opts rsa is already specified above
             if not opts.test_rsa and not opts.save_test_interactions:
@@ -412,7 +424,7 @@ def main(params):
             else:
                 raise ValueError("--test_rsa must be 'train', 'validation', or 'test'")
 
-        if opts.save_test_interactions:
+        if opts.save_test_interactions and opts.zero_shot:
             # create subfolder if necessary
             opts.save_interactions_path = os.path.join(opts.game_path, 'zero_shot',
                                               opts.zero_shot_test, str(run), "interactions")
@@ -426,8 +438,17 @@ def main(params):
             if opts.zero_shot_test is not None:
                 if not opts.save_test_interactions:
                     # create subfolder if necessary
-                    opts.save_path = os.path.join(opts.game_path, 'zero_shot',
-                                                  opts.zero_shot_test)
+                    if opts.granularity != 'mixed':
+                        granularity_subfolder = f"granularity_{opts.granularity}"
+                        opts.save_path = os.path.join(opts.game_path, 'zero_shot',
+                                                      opts.zero_shot_test, granularity_subfolder, str(run))
+                    elif opts.sample_context:
+                        opts.save_path = os.path.join(opts.game_path, 'zero_shot',
+                                                         opts.zero_shot_test, "sampled_context", str(run))
+                    elif opts.granularity == 'mixed' and not opts.sample_context:
+                        opts.save_path = os.path.join(opts.game_path, 'zero_shot',
+                                                      opts.zero_shot_test, str(run))
+
                 if not os.path.exists(opts.save_path) and opts.save:
                     os.makedirs(opts.save_path)
                 if not opts.load_dataset:
@@ -437,14 +458,20 @@ def main(params):
                                                device=opts.device,
                                                zero_shot=True,
                                                zero_shot_test=opts.zero_shot_test,
-                                               sample_context=opts.sample_context)
+                                               sample_context=opts.sample_context,
+                                               granularity=opts.granularity)
             # or both test conditions are generated        
             else:
                 # implement two zero-shot conditions: test on most generic vs. test on most specific dataset
                 for cond in ['generic', 'specific']:
                     print("Zero-shot condition:", cond)
                     # create subfolder if necessary
-                    opts.save_path = os.path.join(opts.game_path, 'zero_shot', cond)
+                    opts.zs_game_path = os.path.join(opts.game_path, 'zero_shot', cond)
+                    if opts.granularity != 'mixed':
+                        granularity_subfolder = f"granularity_{opts.granularity}"
+                        opts.save_path = os.path.join(opts.zs_game_path, granularity_subfolder, str(run))
+                    elif opts.sample_context:
+                        opts.save_path = os.path.join(opts.zs_game_path, "context_sampled", str(run))
                     if not os.path.exists(opts.save_path) and opts.save:
                         os.makedirs(opts.save_path)
                     data_set = dataset.DataSet(opts.dimensions,
@@ -453,7 +480,8 @@ def main(params):
                                                device=opts.device,
                                                zero_shot=True,
                                                zero_shot_test=cond,
-                                               sample_context=opts.sample_context)
+                                               sample_context=opts.sample_context,
+                                               granularity=opts.granularity)
                     train(opts, data_set, verbose_callbacks=False)
 
             # set checkpoint path
