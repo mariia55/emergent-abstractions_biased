@@ -22,11 +22,6 @@ def added(threshold, cost,length,l_threshold):
     pressure = np.array(acc_data).T ** threshold * cost * (length + int(with_eos)) ** l_threshold
     return np.array(acc_data) , pressure + loss_data
 
-def something(threshold, cost,length,l_threshold):
-    """ try harsh pressure, evtl need different hyperparameter"""
-    pressure = np.array(acc_data).T ** threshold * cost * (length) **((length-prediction)*0.5)
-    return np.array(acc_data) , pressure + loss_data
-
 #Change this area
 #********************
 
@@ -36,9 +31,8 @@ path = 'd:/OneDrive/Dokumente/UNI Osnabrück/bachelorthesis/InfosKristina/Code/e
 n_epochs = 300
 dataset = 0
 type_data = "pkl" # "old" or "interaction" "pkl"
-#metrics_order = [0,2,3] # acc, original_loss, pressure 
-metrics_order = [1,0,3] # only for lazy_context_aware with run 0: Test run!!
-with_eos = True# whether estimation is + 1 (for eos) Important if pressure is +1
+metrics_order = [0,2,3] # acc, original_loss, pressure 
+with_eos = True # whether estimation is + 1 (for eos) Important if pressure is +1
 train_or_test = 'train' #str
 
 # function to use
@@ -100,7 +94,7 @@ def calc_min(att,val):
         else:
             summe += number_of_concepts_left * length
             break
-    return summe / sum([val ** f for f in range(1,att+1)])
+    return summe / sum([val ** f for f in range(1,att+1)]) + with_eos
 
 def calc_weighted_pred(att,val):
     """ calculates a basic predicted weighted message length, so that each concept gets a message. One message with message length 0. Uses the average message length per needed to communicated depending on context. The less information in message the shorter made here. """
@@ -132,7 +126,7 @@ def calc_weighted_pred(att,val):
         nr_concept_x_context += nr_for_this_context
         summe2 += nr_for_this_context * coarse[cx-1]
 
-    return summe2 / nr_concept_x_context
+    return summe2 / nr_concept_x_context + with_eos
 
 prediction = calc_weighted_pred(game[0],game[1])
 
