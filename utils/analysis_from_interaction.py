@@ -391,7 +391,7 @@ def message_length_per_hierarchy_level(interaction, n_attributes):
 
 def symbol_frequency(interaction, n_attributes, n_values, vocab_size, is_gumbel=True):
     messages = interaction.message.argmax(dim=-1) if is_gumbel else interaction.message
-    messages = messages[:, :-1]
+    messages = messages[:, :-1] # excluding EOS symbol 0
     sender_input = interaction.sender_input
     n_objects = sender_input.shape[1]
     n_targets = int(n_objects / 2)
