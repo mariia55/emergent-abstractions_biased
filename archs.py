@@ -136,8 +136,10 @@ class RSASender(nn.Module):
         n_obj = x.shape[1]
         n_targets = int(n_obj / 2)
         # Using -1 to get the logits for the last RNN time step
-        target_score = torch.sum(logits[:, -1, :n_targets], dim=1)
-        distractor_score = torch.sum(logits[:, -1, n_targets:], dim=1)
+        # KK: added "/n_target" for averaging instead of summing. With summing, the values get very large (-150) which
+        # is not good with respect to the cost calculation (which only subtracts a very small value in comparison).
+        target_score = torch.sum(logits[:, -1, :n_targets], dim=1)/n_targets
+        distractor_score = torch.sum(logits[:, -1, n_targets:], dim=1)/n_targets
         overall_score = target_score - distractor_score
 
         return overall_score - self.cost_factor * cost
