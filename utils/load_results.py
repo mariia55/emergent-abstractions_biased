@@ -1,10 +1,11 @@
+import os.path
 import pickle
 import numpy as np
 import copy
 
 
 def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=False, context_unaware=False,
-                    length_cost=False, early_stopping=False, rsa=False, rsa_test=None):
+                    length_cost=False, early_stopping=False, rsa=False, rsa_test=None, zero_shot_test_ds=None):
     """ loads all accuracies into a dictionary, val_steps should be set to the same as val_frequency during training
     """
     result_dict = {'train_acc': [], 'val_acc': [], 'test_acc': [],
@@ -65,6 +66,9 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
         if rsa:
             rsa_path = str("rsa/" + rsa_test)
         file_name = "loss_and_metrics"
+        file_name_zs_default = "loss_and_metrics"
+        if zero_shot_test_ds is not None:
+            file_name_zs = str("loss_and_metrics_" + zero_shot_test_ds)
         file_extension = "pkl"
 
         for run in range(n_runs):
@@ -214,71 +218,122 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                 for cond in ['specific', 'generic']:
                     if not context_unaware:
                         if not length_cost:
-                            file_path = f"{path}/{standard_path}/{zero_shot_path}/{cond}/{run_path}/{file_name}.{file_extension}"
-                            # zero shot accuracy (standard)
-                            zs_data = pickle.load(open(file_path, 'rb'))
+                            if zero_shot_test_ds is None:
+                                file_path = f"{path}/{standard_path}/{zero_shot_path}/{cond}/{run_path}/{file_name_zs_default}.{file_extension}"
+                                zs_data = pickle.load(open(file_path, 'rb'))
+                            else:
+                                try:
+                                    file_path = f"{path}/{standard_path}/{zero_shot_path}/{cond}/{run_path}/{file_name_zs}.{file_extension}"
+                                    zs_data = pickle.load(open(file_path, 'rb'))
+                                except FileNotFoundError:
+                                    file_path = f"{path}/{standard_path}/{zero_shot_path}/{cond}/{run_path}/{file_name_zs_default}.{file_extension}"
+                                    zs_data = pickle.load(open(file_path, 'rb'))
+                                    print("Metrics loaded from " + file_path + " for condition " + str(cond) +
+                                          ". Tried to load file " + file_name_zs + " unsuccessfully.")
                         else:
-                            file_path = f"{path}/{length_cost_path}/{context_aware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name}.{file_extension}"
-                            zs_data = pickle.load(open(file_path, 'rb'))
+                            if zero_shot_test_ds is None:
+                                file_path = f"{path}/{length_cost_path}/{context_aware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name_zs_default}.{file_extension}"
+                                zs_data = pickle.load(open(file_path, 'rb'))
+                            else:
+                                try:
+                                    file_path = f"{path}/{length_cost_path}/{context_aware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name_zs}.{file_extension}"
+                                    zs_data = pickle.load(open(file_path, 'rb'))
+                                except FileNotFoundError:
+                                    file_path = f"{path}/{length_cost_path}/{context_aware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name_zs_default}.{file_extension}"
+                                    zs_data = pickle.load(open(file_path, 'rb'))
+                                    print("Metrics loaded from " + file_path + " for condition " + str(cond) +
+                                          ". Tried to load file " + file_name_zs + " unsuccessfully.")
 
-                        # accuracies
-                        lists = sorted(zs_data['metrics_train0'].items())
-                        _, zs_train_acc = zip(*lists)
-                        lists = sorted(zs_data['metrics_test0'].items())
-                        _, zs_val_acc = zip(*lists)
+                        if zero_shot_test_ds is None:
+                            # accuracies
+                            lists = sorted(zs_data['metrics_train0'].items())
+                            _, zs_train_acc = zip(*lists)
+                            lists = sorted(zs_data['metrics_test0'].items())
+                            _, zs_val_acc = zip(*lists)
 
-                        # message lengths
-                        lists = sorted(zs_data['metrics_train1'].items())
-                        _, train_message_length = zip(*lists)
-                        lists = sorted(zs_data['metrics_test1'].items())
-                        _, val_message_length = zip(*lists)
+                            # message lengths
+                            lists = sorted(zs_data['metrics_train1'].items())
+                            _, train_message_length = zip(*lists)
+                            lists = sorted(zs_data['metrics_test1'].items())
+                            _, val_message_length = zip(*lists)
 
-                        if cond == 'specific':
-                            zs_specific_train_accs.append(zs_train_acc)
-                            zs_specific_val_accs.append(zs_val_acc)
-                            zs_specific_test_accs.append(zs_data['final_test_acc'])
-                            zs_specific_train_message_lengths.append(train_message_length)
-                            zs_specific_val_message_lengths.append(val_message_length)
+                            if cond == 'specific':
+                                zs_specific_train_accs.append(zs_train_acc)
+                                zs_specific_val_accs.append(zs_val_acc)
+                                zs_specific_test_accs.append(zs_data['final_test_acc'])
+                                zs_specific_train_message_lengths.append(train_message_length)
+                                zs_specific_val_message_lengths.append(val_message_length)
+                            else:
+                                zs_generic_train_accs.append(zs_train_acc)
+                                zs_generic_val_accs.append(zs_val_acc)
+                                zs_generic_test_accs.append(zs_data['final_test_acc'])
+                                zs_generic_train_message_lengths.append(train_message_length)
+                                zs_generic_val_message_lengths.append(val_message_length)
                         else:
-                            zs_generic_train_accs.append(zs_train_acc)
-                            zs_generic_val_accs.append(zs_val_acc)
-                            zs_generic_test_accs.append(zs_data['final_test_acc'])
-                            zs_generic_train_message_lengths.append(train_message_length)
-                            zs_generic_val_message_lengths.append(val_message_length)
+                            if cond == 'specific':
+                                zs_specific_test_accs.append(zs_data['final_test_acc'])
+                            else:
+                                zs_generic_test_accs.append(zs_data['final_test_acc'])
 
                     # zero-shot accuracy (context-unaware)
                     else:
                         if not length_cost:
-                            file_path = f"{path}/{context_unaware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name}.{file_extension}"
-                            cu_zs_data = pickle.load(open(file_path, 'rb'))
+                            if zero_shot_test_ds is None:
+                                file_path = f"{path}/{context_unaware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name_zs_default}.{file_extension}"
+                                cu_zs_data = pickle.load(open(file_path, 'rb'))
+                            else:
+                                try:
+                                    file_path = f"{path}/{context_unaware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name_zs}.{file_extension}"
+                                    cu_zs_data = pickle.load(open(file_path, 'rb'))
+                                except FileNotFoundError:
+                                    file_path = f"{path}/{context_unaware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name_zs_default}.{file_extension}"
+                                    cu_zs_data = pickle.load(open(file_path, 'rb'))
+                                    print("Metrics loaded from " + file_path + " for condition " + str(cond) +
+                                          ". Tried to load file " + file_name_zs + " unsuccessfully.")
                         else:
-                            file_path = f"{path}/{length_cost_path}/{context_unaware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name}.{file_extension}"
-                            cu_zs_data = pickle.load(open(file_path, 'rb'))
+                            if zero_shot_test_ds is None:
+                                file_path = f"{path}/{length_cost_path}/{context_unaware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name_zs}.{file_extension}"
+                                cu_zs_data = pickle.load(open(file_path, 'rb'))
+                            else:
+                                try:
+                                    file_path = f"{path}/{length_cost_path}/{context_unaware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name_zs}.{file_extension}"
+                                    cu_zs_data = pickle.load(open(file_path, 'rb'))
+                                except FileNotFoundError:
+                                    file_path = f"{path}/{length_cost_path}/{context_unaware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name_zs}.{file_extension}"
+                                    cu_zs_data = pickle.load(open(file_path, 'rb'))
+                                    print("Metrics loaded from " + file_path + " for condition " + str(cond) +
+                                          ". Tried to load file " + file_name_zs + " unsuccessfully.")
 
-                        # accuracies
-                        lists = sorted(cu_zs_data['metrics_train0'].items())
-                        _, cu_zs_train_acc = zip(*lists)
-                        lists = sorted(cu_zs_data['metrics_test0'].items())
-                        _, cu_zs_val_acc = zip(*lists)
+                        if zero_shot_test_ds is None:
+                            # accuracies
+                            lists = sorted(cu_zs_data['metrics_train0'].items())
+                            _, cu_zs_train_acc = zip(*lists)
+                            lists = sorted(cu_zs_data['metrics_test0'].items())
+                            _, cu_zs_val_acc = zip(*lists)
 
-                        # message lengths
-                        lists = sorted(cu_zs_data['metrics_train1'].items())
-                        _, train_message_length = zip(*lists)
-                        lists = sorted(cu_zs_data['metrics_test1'].items())
-                        _, val_message_length = zip(*lists)
+                            # message lengths
+                            lists = sorted(cu_zs_data['metrics_train1'].items())
+                            _, train_message_length = zip(*lists)
+                            lists = sorted(cu_zs_data['metrics_test1'].items())
+                            _, val_message_length = zip(*lists)
 
-                        if cond == 'specific':
-                            cu_zs_specific_train_accs.append(cu_zs_train_acc)
-                            cu_zs_specific_val_accs.append(cu_zs_val_acc)
-                            cu_zs_specific_test_accs.append(cu_zs_data['final_test_acc'])
-                            cu_zs_specific_train_message_lengths.append(train_message_length)
-                            cu_zs_specific_val_message_lengths.append(val_message_length)
+                            if cond == 'specific':
+                                cu_zs_specific_train_accs.append(cu_zs_train_acc)
+                                cu_zs_specific_val_accs.append(cu_zs_val_acc)
+                                cu_zs_specific_test_accs.append(cu_zs_data['final_test_acc'])
+                                cu_zs_specific_train_message_lengths.append(train_message_length)
+                                cu_zs_specific_val_message_lengths.append(val_message_length)
+                            else:
+                                cu_zs_generic_train_accs.append(cu_zs_train_acc)
+                                cu_zs_generic_val_accs.append(cu_zs_val_acc)
+                                cu_zs_generic_test_accs.append(cu_zs_data['final_test_acc'])
+                                cu_zs_generic_train_message_lengths.append(train_message_length)
+                                cu_zs_generic_val_message_lengths.append(val_message_length)
                         else:
-                            cu_zs_generic_train_accs.append(cu_zs_train_acc)
-                            cu_zs_generic_val_accs.append(cu_zs_val_acc)
-                            cu_zs_generic_test_accs.append(cu_zs_data['final_test_acc'])
-                            cu_zs_generic_train_message_lengths.append(train_message_length)
-                            cu_zs_generic_val_message_lengths.append(val_message_length)
+                            if cond == 'specific':
+                                cu_zs_specific_test_accs.append(cu_zs_data['final_test_acc'])
+                            else:
+                                cu_zs_generic_test_accs.append(cu_zs_data['final_test_acc'])
 
         if not context_unaware and not zero_shot:
             if rsa_test is None:
@@ -396,7 +451,8 @@ def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=False
     return result_dict
 
 
-def load_entropies_zero_shot(all_paths, n_runs=5, context_unaware=False, length_cost=False, test_interactions=False):
+def load_entropies_zero_shot(all_paths, n_runs=5, context_unaware=False, length_cost=False, test_interactions=False,
+                             zero_shot_test_ds='test'):
     """ loads all entropy scores into a dictionary"""
 
     if length_cost:
@@ -433,7 +489,7 @@ def load_entropies_zero_shot(all_paths, n_runs=5, context_unaware=False, length_
                 if not test_interactions:
                     data = pickle.load(open(standard_path + 'entropy_scores.pkl', 'rb'))
                 else:
-                    data = pickle.load(open(standard_path + 'entropy_scores_test.pkl', 'rb'))
+                    data = pickle.load(open(standard_path + 'entropy_scores_' + zero_shot_test_ds + '.pkl', 'rb'))
                 NMIs.append(data['normalized_mutual_info'])
                 effectiveness_scores.append(data['effectiveness'])
                 consistency_scores.append(data['consistency'])
