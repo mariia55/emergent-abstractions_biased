@@ -311,8 +311,23 @@ def retrieve_concepts_context(interaction,n_values):
     
     return concepts, context_conds
 
-def load_listener(path, setting, run, n_attributes, n_values, context_unaware, game_size = 10, loss = train.loss, vocab_size_factor = 3, hidden_size = 128,sender_cell='gru',receiver_cell='gru'):
-    """ loads the trained listener """
+def load_listener(path, setting, run, n_attributes, n_values, context_unaware, game_size = 10, loss = train.loss, vocab_size_factor = 3, hidden_size = 128,sender_cell='gru',receiver_cell='gru',device='cpu'):
+    """ loads the trained listener 
+    
+    :param path:
+    :param setting:
+    :param run:
+    :param n_attributes:
+    :param n_values:
+    :param context unaware:
+    :param game_size:
+    :param loss:
+    :param vocab_size_factor:
+    :param hidden_size:
+    :param sender_cell:
+    :param receiver_cell:
+    :param device: 'cpu' or 'gpu' to load all listeners on the same device and not on the one they were trained on.
+    """
     
     dimensions = list(itertools.repeat(n_values, n_attributes))
     minimum_vocab_size = dimensions[0] + 1
@@ -343,7 +358,10 @@ def load_listener(path, setting, run, n_attributes, n_values, context_unaware, g
     if not os.path.exists(checkpoint_path):
         raise ValueError(
             f"Checkpoint file {checkpoint_path} not found.")
-    checkpoint = torch.load(checkpoint_path)
+    if device != None:
+        checkpoint = torch.load(checkpoint_path,map_location=torch.device(device))
+    else:
+        checkpoint = torch.load(checkpoint_path)
 
     game.load_state_dict(checkpoint[1])
 
