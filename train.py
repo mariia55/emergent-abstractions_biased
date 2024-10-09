@@ -259,7 +259,8 @@ def train(opts, datasets, verbose_callbacks=False):
             if not opts.save_test_interactions:
                 loss_and_metrics_path = os.path.join(opts.save_path, 'loss_and_metrics.pkl')
             else:
-                loss_and_metrics_path = os.path.join(opts.save_path, 'loss_and_metrics_test.pkl')
+                loss_and_metrics_path = os.path.join(opts.save_path, 'loss_and_metrics_' +
+                                                     opts.save_test_interactions_as + '.pkl')
             if os.path.exists(loss_and_metrics_path):
                 with open(loss_and_metrics_path, 'rb') as pickle_file:
                     loss_and_metrics = pickle.load(pickle_file)
@@ -271,7 +272,8 @@ def train(opts, datasets, verbose_callbacks=False):
             if not opts.save_test_interactions:
                 pickle.dump(loss_and_metrics, open(opts.save_path + '/loss_and_metrics.pkl', 'wb'))
             else:
-                pickle.dump(loss_and_metrics, open(opts.save_path + '/loss_and_metrics_test.pkl', 'wb'))
+                pickle.dump(loss_and_metrics, open(opts.save_path + '/loss_and_metrics_' +
+                                                   opts.save_test_interactions_as + '.pkl', 'wb'))
                 InteractionSaver.dump_interactions(interaction, mode=opts.save_test_interactions_as, epoch=0,
                                                    rank=str(trainer.distributed_context.rank),
                                                    dump_dir=opts.save_interactions_path)
