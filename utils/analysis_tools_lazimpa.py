@@ -8,6 +8,7 @@
 # ********************
 
 import torch
+import numpy as np
 from language_analysis_local import MessageLengthHierarchical
 from utils.analysis_from_interaction import *
 import egg.core as core
@@ -17,12 +18,13 @@ import os
 import train
 import pickle
 
-def mean_message_length_from_interaction(interaction):
+def mean_message_length_from_interaction(interaction, remove_after_eos = True):
     """ Calculates the average message length, with only accounting for each individual message one time. 
     
     :param interaction: interaction (EGG class)
     """
-    messages = interaction.message.argmax(dim=-1)
+    #messages = interaction.message.argmax(dim=-1)
+    messages = retrieve_messages(interaction,as_list=False,remove_after_eos=remove_after_eos,eos_token=0.0)
     unique_messages = torch.unique(messages,dim=0)
     message_length = MessageLengthHierarchical.compute_message_length(unique_messages)
     av_message_length = torch.mean(message_length.float())
@@ -33,7 +35,7 @@ def mean_weighted_message_length_from_interaction(interaction):
     
     :param interaction: interaction (EGG class)
     """
-    messages = interaction.message.argmax(dim=-1)
+    messages = retrieve_messages(interaction,as_list=False,remove_after_eos=True,eos_token=0.0)
     message_length = MessageLengthHierarchical.compute_message_length(messages)
     av_message_length = torch.mean(message_length.float())
     return av_message_length
@@ -46,8 +48,17 @@ def mean_weighted_message_length(length,frequency): # TODO analyse context x con
     """
     return torch.sum(((length * frequency)/torch.sum(frequency)).float())
 
+def mean_message_length_context_x_concept(interaction,attributes):
+    """ Calculates the average message length, with all messages used in a certain context x concept condition
+    
+    :param interaction: interaction (EGG class)
+    :param values: int
+    """
+    messages = retrieve_messages(interaction,as_list=False,remove_after_eos=True,eos_token=0.0)
+    concepts, context_condition = retrieve_concepts_context(interaction,attributes)
 
-def ZLA_significance_score(interaction,num_permutations = 1000, remove_after_eos = True):
+
+def ZLA_significance_score(interaction,attributes,num_permutations = 1000, remove_after_eos = True):
     """ Calculates to which degree mean_weighted_message_length is lower than a random permutation of its frequency length mapping 
     
     :param interaction: interaction (EGG class)
@@ -75,11 +86,15 @@ def ZLA_significance_score(interaction,num_permutations = 1000, remove_after_eos
     bool_list = (torch.tensor(permuted_L_tokens) <= original_L_token)
     pZLA = bool_list.double().mean()
 
-    score_dict = {'mean_message_length':L_type,
-                  'mean_weighted_message_length':original_L_token,
-                  'p_zla':pZLA,
-                  'min_bool_value': bool_list.min(),
-                  'max_bool_value': bool_list.max()}
+    # calculate weighted message length context x concept
+    messages_length_context_x_concept = mean_message_length_context_x_concept(interaction,attributes)
+
+    score_dict = {'mean_message_length':L_type.tolist(),
+                  'mean_weighted_message_length':original_L_token.tolist(),
+                  'p_zla':pZLA.tolist(),
+                  'min_bool_value': int(bool_list.min().tolist()),
+                  'max_bool_value': int(bool_list.max().tolist()),
+                  'message_length_context_x_concept': messages_length_context_x_concept}
     return score_dict
 
 def optimal_coding(vocab_size,nr_messages):
@@ -215,9 +230,9 @@ def information_analysis(listener,interaction,eos_token = 0.0):
     rho_inf = information_density(Lambda_m_k,eos_mask)
 
     return_dict = {
-        "positional_encoding" : Lambda_dot_k,
-        "effective_length" : L_eff,
-        "information_density" : rho_inf
+        "positional_encoding" : Lambda_dot_k.tolist(),
+        "effective_length" : L_eff.tolist(),
+        "information_density" : rho_inf.tolist()
     }
     return return_dict
 
@@ -272,7 +287,60 @@ def percent_wrong_from_interaction(interaction):
 
     return percent_wrong, percent_wrong.bool().int()
 
-# loader from interaction or other
+def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epochs=300,color = ['b', 'g', 'r', 'c', 'm']):
+    """ This function creates a plot showing the message length as a function of the frequency rank. 
+
+    :param paths: list
+    :param setting: string
+    :param n_runs: int
+    :param n_values: Iterable
+    :param datasets: Iterable
+    :param n_epochs: int
+    :param color: Iterable with pyplot color codes with len(color) = (len(path) + set(n_values))
+    """
+    import matplotlib.pyplot as plt
+
+    for i,path in enumerate(paths):
+
+        ordered_lengths_total = []
+
+        for run in range(n_runs):
+            messages = retrieve_messages(load_interaction(path,setting,run,n_epochs),as_list=False,remove_after_eos=True,eos_token=0.0)
+            unique_messages, frequencies = torch.unique(messages,dim=0,return_counts=True)
+            message_length = MessageLengthHierarchical.compute_message_length(unique_messages).tolist()
+            frequencies = frequencies.tolist()
+
+            max_frequency = max(frequencies)
+            ordered_lengths = [list() for _ in range(max_frequency)]
+
+            # list with frequency in index
+            for f,l in zip(frequencies,message_length):
+                ordered_lengths[f-1].append(l)
+
+            # remove empty and sort by descending frequency
+            ordered_lengths = [ sum(l)/len(l) for l in ordered_lengths if len(l) > 0]
+            ordered_lengths.reverse()
+
+            ordered_lengths_total.append(ordered_lengths)
+
+        max_rank = max([len(ordered_lengths_total[i]) for i in range(len(ordered_lengths_total))])
+        ordered_lengths_mean = []
+
+        # calculate mean for each frequency rank
+        for rank in range(max_rank):
+            c = [ordered_lengths_total[run][rank] for run in range(n_runs) if len(ordered_lengths_total[run]) > rank]
+            ordered_lengths_mean.append(sum(c) / len(c))
+
+        plt.plot(list(range(max_rank)),ordered_lengths_mean,color[i],label=str(datasets[i]))
+
+    # optimal coding
+    for v,col in zip(set(n_values),color[-2:]):
+        message_length_optimal = optimal_coding(vocab_size = (v + 1)*3, nr_messages=max_rank)
+        plt.plot(list(range(len(message_length_optimal))),message_length_optimal,col,ls='--',label=f"optimal coding {str(v)} values")
+
+    plt.legend()
+
+# retrieve info from interaction
 #**************************
 
 def load_interaction(path,setting,nr=0,n_epochs=300):
@@ -329,6 +397,10 @@ def retrieve_concepts_context(interaction,n_values):
     context_conds = retrieve_context_condition(objects, fixed, distractor_objects)
     
     return concepts, context_conds
+
+# ********
+# Loader
+# ********
 
 def load_listener(path, setting, run, n_attributes, n_values, context_unaware, game_size = 10, loss = train.loss, vocab_size_factor = 3, hidden_size = 128,sender_cell='gru',receiver_cell='gru',device='cpu'):
     """ loads the trained listener 
@@ -605,3 +677,11 @@ def load_entropies_by_setting(all_paths, n_runs=5, setting = 'standard'):
         result_dict[key] = np.array(result_dict[key])
 
     return result_dict
+
+def load_ZLA_significance(paths,n_runs,setting):
+    """ """
+    pass
+
+def load_symbol_informativeness():
+    """ """
+    pass
