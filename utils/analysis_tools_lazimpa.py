@@ -48,20 +48,60 @@ def mean_weighted_message_length(length,frequency): # TODO analyse context x con
     """
     return torch.sum(((length * frequency)/torch.sum(frequency)).float())
 
-def mean_message_length_context_x_concept(interaction,attributes):
+def mean_message_length_context_dep(interaction,values):
+    """ Calculates the average message length, with all messages used in a certain context condition
+    
+    :param interaction: interaction (EGG class)
+    :param values: int
+    """
+    messages = retrieve_messages(interaction,as_list=False,remove_after_eos=True,eos_token=0.0)
+    message_length = MessageLengthHierarchical.compute_message_length(messages)
+    _, context_condition = retrieve_concepts_context(interaction,values)
+
+    context_dep_lengths = []
+    for c in range(max(context_condition)+1):
+        single_context_length = message_length[torch.tensor(context_condition) == c].float()
+        context_dep_lengths.append(single_context_length)
+    message_length_step = [round(torch.mean(context_dep_lengths[i]).item(), 3) for i in range(max(context_condition)+1)]
+    return message_length_step
+
+def mean_message_length_context_x_concept(interaction, values):
+    """ Calculates the average message length, with all messages used in a certain context x concept condition
+    
+    :param interaction: interaction (EGG class)
+    :param values: int
+    """
     """ Calculates the average message length, with all messages used in a certain context x concept condition
     
     :param interaction: interaction (EGG class)
     :param values: int
     """
     messages = retrieve_messages(interaction,as_list=False,remove_after_eos=True,eos_token=0.0)
-    concepts, context_condition = retrieve_concepts_context(interaction,attributes)
+    message_length = MessageLengthHierarchical.compute_message_length(messages)
+    concepts, context_condition = retrieve_concepts_context(interaction,values)
+    fixed_num = torch.tensor([np.sum(f) for c,f in concepts]).int()
+    context = torch.tensor(context_condition)
+
+    list_context_x_fixed = []
+    for c in range(max(context_condition)+1):
+        list_fixed = []
+        single_context_length = message_length[context == c].float()
+        single_context_fixed = fixed_num[context == c]
+
+        for f in range(fixed_num.max().int()+1):
+            single_context_fixed_length = single_context_length[single_context_fixed == f]
+
+            list_fixed.append(round(torch.mean(single_context_fixed_length).item(),3))
+        list_context_x_fixed.append(list_fixed)
+    
+    return list_context_x_fixed
 
 
-def ZLA_significance_score(interaction,attributes,num_permutations = 1000, remove_after_eos = True):
+def ZLA_significance_score(interaction,values,num_permutations = 1000, remove_after_eos = True):
     """ Calculates to which degree mean_weighted_message_length is lower than a random permutation of its frequency length mapping 
     
     :param interaction: interaction (EGG class)
+    :param values: int
     :param num_permutations: int
     :param remove_after_eos: bool (should be true, as two messages should be the same if the only difference is after eos)
     """
@@ -87,13 +127,15 @@ def ZLA_significance_score(interaction,attributes,num_permutations = 1000, remov
     pZLA = bool_list.double().mean()
 
     # calculate weighted message length context x concept
-    messages_length_context_x_concept = mean_message_length_context_x_concept(interaction,attributes)
+    message_length_context_dep = mean_message_length_context_dep(interaction,values)
+    messages_length_context_x_concept = mean_message_length_context_x_concept(interaction,values)
 
     score_dict = {'mean_message_length':L_type.tolist(),
                   'mean_weighted_message_length':original_L_token.tolist(),
                   'p_zla':pZLA.tolist(),
                   'min_bool_value': int(bool_list.min().tolist()),
                   'max_bool_value': int(bool_list.max().tolist()),
+                  'message_length_context_dep': message_length_context_dep,
                   'message_length_context_x_concept': messages_length_context_x_concept}
     return score_dict
 
@@ -382,7 +424,6 @@ def retrieve_concepts_context(interaction,n_values):
     :param n_values: int
     """
     sender_input = interaction.sender_input
-    print(sender_input.shape)
     n_targets = int(sender_input.shape[1]/2)
     # get target objects and fixed vectors to re-construct concepts
     target_objects = sender_input[:, :n_targets]
@@ -679,9 +720,41 @@ def load_entropies_by_setting(all_paths, n_runs=5, setting = 'standard'):
     return result_dict
 
 def load_ZLA_significance(paths,n_runs,setting):
-    """ """
-    pass
+    """ load all data in the ZLA_significance.pkl file """
+    results_dict = {'mean_length':[],'mean_weighted_length':[],'p_ZLA':[],'message_length_context_dep':[],'message_length_context_x_concept':[]}
 
-def load_symbol_informativeness():
-    """ """
-    pass
+    for path_idx, path in enumerate(paths):
+        mean_length, mean_weighted_length, p_zla,ml_context_dep,ml_cxc = [], [], [], [], []
+
+        for run in range(n_runs):
+            data = pickle.load(open(path + '/' + setting + '/' + str(run) + '/ZLA_significance.pkl', 'rb'))
+            mean_length.append(data['mean_message_length'])
+            mean_weighted_length.append(data['mean_weighted_message_length'])
+            p_zla.append(data['p_zla'])
+            ml_context_dep.append(data['message_length_context_dep'])
+            ml_cxc.append(data['message_length_context_x_concept'])
+
+        results_dict['mean_length'].append(mean_length)
+        results_dict['mean_weighted_length'].append(mean_weighted_length)
+        results_dict['p_ZLA'].append(p_zla)
+        results_dict['message_length_context_dep'].append(ml_context_dep)
+        results_dict['message_length_context_x_concept'].append(ml_cxc)
+    return results_dict
+
+def load_symbol_informativeness(paths, n_runs, setting):
+    """ Loads all data in symbol_informativeness.pkl """
+    results_dict = {'positional_encoding':[],'effective_length':[],'information_density':[]}
+
+    for path_idx, path in enumerate(paths):
+        pe, el, id = [], [], []
+
+        for run in range(n_runs):
+            data = pickle.load(open(path + '/' + setting + '/' + str(run) + '/symbol_informativeness.pkl', 'rb'))
+            pe.append(data['positional_encoding'])
+            el.append(data['effective_length'])
+            id.append(data['information_density'])
+
+        results_dict['positional_encoding'].append(pe)
+        results_dict['effective_length'].append(el)
+        results_dict['information_density'].append(id)
+    return results_dict
