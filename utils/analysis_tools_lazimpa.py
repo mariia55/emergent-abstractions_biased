@@ -17,6 +17,7 @@ from models_lazimpa import LazImpaSenderReceiverRnnGS
 import os
 import train
 import pickle
+import matplotlib.pyplot as plt
 
 def mean_message_length_from_interaction(interaction, remove_after_eos = True):
     """ Calculates the average message length, with only accounting for each individual message one time. 
@@ -96,6 +97,15 @@ def mean_message_length_context_x_concept(interaction, values):
     
     return list_context_x_fixed
 
+def count_message_lengths(interaction,max_length):
+    """ return the occuring message lengths and their frequency """
+    messages = retrieve_messages(interaction,False,True)
+    which, frequencies = torch.unique(MessageLengthHierarchical.compute_message_length(messages),return_counts=True)
+    
+    output = torch.zeros((max_length,),dtype=frequencies.dtype)
+    for w,f in zip(which, frequencies):
+        output[w]=f
+    return (list(range(max_length)), output)
 
 def ZLA_significance_score(interaction,values,num_permutations = 1000, remove_after_eos = True):
     """ Calculates to which degree mean_weighted_message_length is lower than a random permutation of its frequency length mapping 
@@ -129,6 +139,7 @@ def ZLA_significance_score(interaction,values,num_permutations = 1000, remove_af
     # calculate weighted message length context x concept
     message_length_context_dep = mean_message_length_context_dep(interaction,values)
     messages_length_context_x_concept = mean_message_length_context_x_concept(interaction,values)
+    message_length_frequency = count_message_lengths(interaction,max_length=len(messages[0]))
 
     score_dict = {'mean_message_length':L_type.tolist(),
                   'mean_weighted_message_length':original_L_token.tolist(),
@@ -136,7 +147,8 @@ def ZLA_significance_score(interaction,values,num_permutations = 1000, remove_af
                   'min_bool_value': int(bool_list.min().tolist()),
                   'max_bool_value': int(bool_list.max().tolist()),
                   'message_length_context_dep': message_length_context_dep,
-                  'message_length_context_x_concept': messages_length_context_x_concept}
+                  'message_length_context_x_concept': messages_length_context_x_concept,
+                  'message_length_frequency': message_length_frequency}
     return score_dict
 
 def optimal_coding(vocab_size,nr_messages):
@@ -340,7 +352,8 @@ def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epo
     :param n_epochs: int
     :param color: Iterable with pyplot color codes with len(color) = (len(path) + set(n_values))
     """
-    import matplotlib.pyplot as plt
+
+    max_rank_list = []
 
     for i,path in enumerate(paths):
 
@@ -366,6 +379,7 @@ def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epo
             ordered_lengths_total.append(ordered_lengths)
 
         max_rank = max([len(ordered_lengths_total[i]) for i in range(len(ordered_lengths_total))])
+        max_rank_list.append(max_rank)
         ordered_lengths_mean = []
 
         # calculate mean for each frequency rank
@@ -377,10 +391,117 @@ def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epo
 
     # optimal coding
     for v,col in zip(set(n_values),color[-2:]):
-        message_length_optimal = optimal_coding(vocab_size = (v + 1)*3, nr_messages=max_rank)
+        message_length_optimal = optimal_coding(vocab_size = (v + 1)*3, nr_messages=max(max_rank_list))
         plt.plot(list(range(len(message_length_optimal))),message_length_optimal,col,ls='--',label=f"optimal coding {str(v)} values")
 
-    plt.legend()
+    plt.xlabel('frequency rank',fontsize=16)
+    plt.ylabel('message length',fontsize=15)
+    plt.legend(fontsize=15)
+
+def plot_heatmap_concept_x_context_variable_datasets(result_list,
+                                    mode,
+                                    score,
+                                    plot_dims=(2, 3),
+                                    heatmap_size=(3, 3),
+                                    figsize=(7, 7),
+                                    ylims=(0.6, 1.0),
+                                    titles=('D(3,4)', 'D(3,8)', 'D(3,16)', 'D(4,4)', 'D(4,8)', 'D(5,4)'),
+                                    suptitle=None,
+                                    suptitle_position=1.03,
+                                    different_ylims=False,
+                                    n_runs=5,
+                                    matrix_indices=None,
+                                    fontsize=18,
+                                    inner_fontsize_fctr=0,
+                                    one_dataset=False,
+                                    attributes=[4]):
+    """ Plot heatmaps in matrix arrangement for single values (e.g. final accuracies).
+    Allows for plotting multiple matrices according to plot_dims, and allows different modes:
+    'max', 'min', mean', 'median', each across runs. 
+    
+    :param attributes: list with number of attributes for every dataset
+    """
+
+    if score == 'NMI':
+        score_idx = 0
+    elif score == 'effectiveness':
+        score_idx = 1
+    elif score == 'consistency':
+        score_idx = 2
+    elif score == 'bosdis' or score == 'posdis':
+        pass
+    else:
+        raise AssertionError("Score should be one of the following: 'NMI','effectiveness', 'consistency'.")
+
+    plt.figure(figsize=figsize)
+
+    # 6 datasets
+    for i,a in zip(range(np.prod(plot_dims)),attributes):
+        # D(3,4), D(3,8), D(3,16)
+        #if i < 3:
+            #matrix_indices = sorted(list(itertools.product(range(3), repeat=2)), key=lambda x: x[1])
+        # D(4,4), D(4,8)
+        #elif i == 3 or i == 4:
+            #matrix_indices = sorted(list(itertools.product(range(4), repeat=2)), key=lambda x: x[1])
+        #else:
+            #matrix_indices = sorted(list(itertools.product(range(5), repeat=2)), key=lambda x: x[1])
+        #if one_dataset:
+        matrix_indices = sorted(list(itertools.product(range(a), repeat=2)), key=lambda x: x[1])
+
+        if different_ylims:
+            y_lim = ylims[i]
+        else:
+            y_lim = ylims
+
+        heatmap = np.empty(heatmap_size)
+        heatmap[:] = np.nan
+        if score == 'bosdis' or score == 'posdis':
+            results = result_list[i]
+        else:
+            results = result_list[score_idx][i]
+            if results.shape[-1] > n_runs:
+                results = results[:, :, -1]
+            
+        plt.subplot(plot_dims[0], plot_dims[1], i + 1)
+
+        results_ls = [res.tolist() for res in results]
+
+        if mode == 'mean':
+            values = np.nanmean(results_ls, axis=0)
+        elif mode == 'max':
+            values = np.nanmax(results, axis=-1)
+        elif mode == 'min':
+            values = np.nanmin(results, axis=-1)
+        elif mode == 'median':
+            values = np.nanmedian(results, axis=-1)
+
+        for p, pos in enumerate(matrix_indices):
+            try:
+                heatmap[pos] = values[p]
+            except:
+                IndexError
+
+        im = plt.imshow(heatmap, vmin=y_lim[0], vmax=y_lim[1])
+        plt.title(titles[i], fontsize=fontsize)
+        plt.xlabel('# Fixed Attributes', fontsize=fontsize)
+        plt.ylabel('# Shared Attributes', fontsize=fontsize)
+        plt.xticks(ticks=list(range(len(heatmap))), labels=list(range(1, len(heatmap)+1)), fontsize=fontsize-1)
+        plt.yticks(ticks=list(range(len(heatmap))), labels=list(range(len(heatmap))), fontsize=fontsize-1)
+        cbar = plt.colorbar(im, fraction=0.046, pad=0.04)
+        cbar.ax.get_yaxis().set_ticks(y_lim)
+        cbar.ax.tick_params(labelsize=fontsize-2)
+
+        for col in range(len(heatmap)):
+            for row in range(len(heatmap[0])):
+                if not np.isnan(heatmap[row, col]):
+                    ax = plt.gca()
+                    _ = ax.text(col, row, np.round(heatmap[row, col], 2), ha="center", va="center", color="k",
+                                fontsize=fontsize+inner_fontsize_fctr)
+
+        if suptitle:
+            plt.suptitle(suptitle, fontsize=fontsize+1, y=suptitle_position)
+
+    plt.tight_layout()
 
 # retrieve info from interaction
 #**************************
@@ -721,10 +842,10 @@ def load_entropies_by_setting(all_paths, n_runs=5, setting = 'standard'):
 
 def load_ZLA_significance(paths,n_runs,setting):
     """ load all data in the ZLA_significance.pkl file """
-    results_dict = {'mean_length':[],'mean_weighted_length':[],'p_ZLA':[],'message_length_context_dep':[],'message_length_context_x_concept':[]}
+    results_dict = {'mean_length':[],'mean_weighted_length':[],'p_ZLA':[],'message_length_context_dep':[],'message_length_context_x_concept':[],'message_length_frequency':[]}
 
     for path_idx, path in enumerate(paths):
-        mean_length, mean_weighted_length, p_zla,ml_context_dep,ml_cxc = [], [], [], [], []
+        mean_length, mean_weighted_length, p_zla,ml_context_dep,ml_cxc, mlf = [], [], [], [], [], []
 
         for run in range(n_runs):
             data = pickle.load(open(path + '/' + setting + '/' + str(run) + '/ZLA_significance.pkl', 'rb'))
@@ -733,12 +854,14 @@ def load_ZLA_significance(paths,n_runs,setting):
             p_zla.append(data['p_zla'])
             ml_context_dep.append(data['message_length_context_dep'])
             ml_cxc.append(data['message_length_context_x_concept'])
+            mlf.append(data['message_length_frequency'])
 
         results_dict['mean_length'].append(mean_length)
         results_dict['mean_weighted_length'].append(mean_weighted_length)
         results_dict['p_ZLA'].append(p_zla)
         results_dict['message_length_context_dep'].append(ml_context_dep)
         results_dict['message_length_context_x_concept'].append(ml_cxc)
+        results_dict['message_length_frequency'].append(mlf)
     return results_dict
 
 def load_symbol_informativeness(paths, n_runs, setting):
