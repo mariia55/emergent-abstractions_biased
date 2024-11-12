@@ -153,7 +153,7 @@ def ZLA_significance_score(interaction,values,num_permutations = 1000, remove_af
 
 def optimal_coding(vocab_size,nr_messages):
     """ calculates optimal coding
-    
+
     :param vocab_size: how many values each position in a message can have
     :param nr_messages: how many messages to calculate
     """
@@ -341,62 +341,81 @@ def percent_wrong_from_interaction(interaction):
 
     return percent_wrong, percent_wrong.bool().int()
 
-def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epochs=300,color = ['b', 'g', 'r', 'c', 'm']):
+def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epochs=300,color = ['b', 'g'], optimal_color='r', mean_runs=True, std=False):
     """ This function creates a plot showing the message length as a function of the frequency rank. 
 
     :param paths: list
-    :param setting: string
+    :param setting: list
     :param n_runs: int
     :param n_values: Iterable
     :param datasets: Iterable
     :param n_epochs: int
-    :param color: Iterable with pyplot color codes with len(color) = (len(path) + set(n_values))
+    :param color: Iterable with pyplot color codes with len(color) = (len(setting))
     """
 
     max_rank_list = []
+    fig, axes = plt.subplots(len(datasets), 1, figsize=(8, 4 * len(datasets)), sharex=True, sharey=True)
 
-    for i,path in enumerate(paths):
+    if len(datasets) == 1:
+        axes = [axes]
 
-        ordered_lengths_total = []
+    setting = [setting] if type(setting) == str else setting
 
-        for run in range(n_runs):
-            messages = retrieve_messages(load_interaction(path,setting,run,n_epochs),as_list=False,remove_after_eos=True,eos_token=0.0)
-            unique_messages, frequencies = torch.unique(messages,dim=0,return_counts=True)
-            message_length = MessageLengthHierarchical.compute_message_length(unique_messages).tolist()
-            frequencies = frequencies.tolist()
+    for i,( path, ax) in enumerate(zip(paths,axes)):
 
-            max_frequency = max(frequencies)
-            ordered_lengths = [list() for _ in range(max_frequency)]
+        for si, s in enumerate(setting):
 
-            # list with frequency in index
-            for f,l in zip(frequencies,message_length):
-                ordered_lengths[f-1].append(l)
+            ordered_lengths_total = []
 
-            # remove empty and sort by descending frequency
-            ordered_lengths = [ sum(l)/len(l) for l in ordered_lengths if len(l) > 0]
-            ordered_lengths.reverse()
+            for run in range(n_runs):
+                messages = retrieve_messages(load_interaction(path,s,run,n_epochs),as_list=False,remove_after_eos=True,eos_token=0.0)
+                unique_messages, frequencies = torch.unique(messages,dim=0,return_counts=True)
+                message_length = MessageLengthHierarchical.compute_message_length(unique_messages)#.tolist()
+                #frequencies = frequencies.tolist()
 
-            ordered_lengths_total.append(ordered_lengths)
+                sorted_frequencies, sorted_indices = torch.sort(frequencies, descending=True)
+                ordered_lengths = message_length[sorted_indices]
 
-        max_rank = max([len(ordered_lengths_total[i]) for i in range(len(ordered_lengths_total))])
-        max_rank_list.append(max_rank)
-        ordered_lengths_mean = []
+                ordered_lengths_total.append(ordered_lengths)
 
-        # calculate mean for each frequency rank
-        for rank in range(max_rank):
-            c = [ordered_lengths_total[run][rank] for run in range(n_runs) if len(ordered_lengths_total[run]) > rank]
-            ordered_lengths_mean.append(sum(c) / len(c))
+            max_rank = max([len(ordered_lengths_total[i]) for i in range(n_runs)])
+            max_rank_list.append(max_rank)
 
-        plt.plot(list(range(max_rank)),ordered_lengths_mean,color[i],label=str(datasets[i]))
+            if mean_runs:
+                ordered_lengths_mean = []
 
-    # optimal coding
-    for v,col in zip(set(n_values),color[-2:]):
-        message_length_optimal = optimal_coding(vocab_size = (v + 1)*3, nr_messages=max(max_rank_list))
-        plt.plot(list(range(len(message_length_optimal))),message_length_optimal,col,ls='--',label=f"optimal coding {str(v)} values")
+                # calculate mean for each frequency rank
+                for rank in range(max_rank):
+                    c = [ordered_lengths_total[run][rank] for run in range(n_runs) if len(ordered_lengths_total[run]) > rank]
+                    ordered_lengths_mean.append(sum(c) / len(c))
 
-    plt.xlabel('frequency rank',fontsize=16)
-    plt.ylabel('message length',fontsize=15)
-    plt.legend(fontsize=15)
+                ax.plot(list(range(max_rank)),ordered_lengths_mean,color[si],label=s)
+
+                if std:
+                    # calculate std:
+                    ordered_lengths_std = []
+                    for rank in range(max_rank):
+                        c = [ordered_lengths_total[run][rank] for run in range(n_runs) if len(ordered_lengths_total[run]) > rank]
+                        ordered_lengths_std.append(np.std(c))
+                    ax.fill_between(list(range(max_rank)), 
+                                    np.array(ordered_lengths_mean) - np.array(ordered_lengths_std), 
+                                    np.array(ordered_lengths_mean) + np.array(ordered_lengths_std), 
+                                    color=color[si], alpha=0.3)
+            else:
+                for olt in ordered_lengths_total:
+                    ax.plot(list(range(len(olt))), olt,color[si])
+
+        # optimal coding
+        message_length_optimal = optimal_coding(vocab_size = (n_values[i] + 1)*3, nr_messages=max(max_rank_list))
+        ax.plot(list(range(len(message_length_optimal))),message_length_optimal,optimal_color,ls='--',label=f"optimal coding {n_values[i]} values")
+
+        ax.set_title(f"Dataset: {datasets[i]}", fontsize=16)
+        ax.legend(fontsize=15)
+        ax.set_xlabel('frequency rank')
+        ax.set_ylabel('message length')
+        ax.tick_params(axis='x', which='both', labelbottom=True)
+
+    plt.tight_layout()
 
 def plot_heatmap_concept_x_context_variable_datasets(result_list,
                                     mode,
@@ -430,6 +449,8 @@ def plot_heatmap_concept_x_context_variable_datasets(result_list,
         score_idx = 2
     elif score == 'bosdis' or score == 'posdis':
         pass
+    elif score == 'message_length':
+        score_idx = 0
     else:
         raise AssertionError("Score should be one of the following: 'NMI','effectiveness', 'consistency'.")
 
