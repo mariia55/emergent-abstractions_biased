@@ -341,7 +341,24 @@ def percent_wrong_from_interaction(interaction):
 
     return percent_wrong, percent_wrong.bool().int()
 
-def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epochs=300,color = ['b', 'g'], optimal_color='r', mean_runs=True, std=False,frequency='messages'):
+def flatten_and_clean(arr,max=None):
+    """ 
+    flattens a data strucutre of dimensionalty: (dataset,run,values)
+    Used to prepare context x concept dependent data for calculating pearsons correlation coefficient.
+
+    :param arr: list / np.array
+    :param max: list with len(list) = arr.shape[0]; a max value the values are deviated through
+    """
+    flattened = []
+    for idx, dataset in enumerate(arr):
+        for run in dataset:
+            cleaned_values = run[~ np.isnan(run)]
+            if max:
+                cleaned_values = cleaned_values/max[idx]
+            flattened.extend(cleaned_values)
+    return np.array(flattened)
+
+def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epochs=300,color = ['b', 'g'], optimal_color='r', mean_runs=True, smoothing = False, std=False,frequency='message'):
     """ This function creates a plot showing the message length as a function of the frequency rank. 
 
     :param paths: list
@@ -351,6 +368,11 @@ def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epo
     :param datasets: Iterable
     :param n_epochs: int
     :param color: Iterable with pyplot color codes with len(color) = (len(setting))
+    :param optimal_color: str, Color for optimal coding, if None, there is no optimal coding
+    :param mean_runs: If True calculate mean over runs, if false plot all runs 
+    :param smoothing: bool
+    :param std: if mean_runs == True, whether to add an std around the mean
+    :param frequency: str, one of 'message','input_concept','input_concept_x_context'
     """
 
     max_rank_list = []
@@ -368,10 +390,25 @@ def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epo
             ordered_lengths_total = []
 
             for run in range(n_runs): # retrieve inputs instead of messages, but still need messages to calculate average length
-                messages = retrieve_messages(load_interaction(path,s,run,n_epochs),as_list=False,remove_after_eos=True,eos_token=0.0)
-                if frequency == 'messages':
+                interaction = load_interaction(path,s,run,n_epochs)
+                messages = retrieve_messages(interaction,as_list=False,remove_after_eos=True,eos_token=0.0)
+                if frequency == 'message':
                     unique_values, frequencies = torch.unique(messages,dim=0,return_counts=True)
                     message_length = MessageLengthHierarchical.compute_message_length(unique_values)
+                elif frequency == 'input_concept' or frequency == 'input_concept_x_context':
+                    concepts, context_conds = retrieve_concepts_context(interaction,n_values[0])
+                    if frequency == 'input_concept':
+                        inputs = torch.tensor([np.where(f,o[0],-1.) for o,f in concepts])
+                    else: # append context to input
+                        inputs = torch.tensor([np.append(np.where(f,o[0],-1.),c) for (o,f),c in zip(concepts,context_conds)])
+                    unique_values, frequencies = torch.unique(inputs,dim=0,return_counts=True)
+
+                    message_length_dict = {tuple(uv.tolist()): [] for uv in unique_values}
+                    for idx, input_val in enumerate(inputs):
+                        message_length_dict[tuple(input_val.tolist())].append(MessageLengthHierarchical.compute_message_length(messages[idx].unsqueeze(0)))
+                    message_length = torch.tensor([torch.mean(torch.tensor(message_length_dict[tuple(uv.tolist())],dtype=torch.float32)).item() for uv in unique_values])
+                else:
+                    return -1
 
                 sorted_frequencies, sorted_indices = torch.sort(frequencies, descending=True)
                 ordered_lengths = message_length[sorted_indices]
@@ -406,8 +443,9 @@ def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epo
                     ax.plot(list(range(len(olt))), olt,color[si])
 
         # optimal coding
-        message_length_optimal = optimal_coding(vocab_size = (n_values[i] + 1)*3, nr_messages=max(max_rank_list))
-        ax.plot(list(range(len(message_length_optimal))),message_length_optimal,optimal_color,ls='--',label=f"optimal coding {n_values[i]} values")
+        if optimal_color != None:
+            message_length_optimal = optimal_coding(vocab_size = (n_values[i] + 1)*3, nr_messages=max(max_rank_list))
+            ax.plot(list(range(len(message_length_optimal))),message_length_optimal,optimal_color,ls='--',label=f"optimal coding {n_values[i]} values")
 
         ax.set_title(f"Dataset: {datasets[i]}", fontsize=16)
         ax.legend(fontsize=15)
