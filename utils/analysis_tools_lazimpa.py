@@ -170,12 +170,13 @@ def optimal_coding(vocab_size,nr_messages):
 # positional encoding as described by Rita et al. (2020)
 # *************************************
 
-def symbol_informativeness(listener,interaction,eos_token = 0.0):
+def symbol_informativeness(listener,interaction,eos_token = 0.0,uniform_messages = False):
     """ Calculates for each symbol if it is informative or not by switching its value with a random other symbols value for the same position (except eos) and observing if the prediction (until eos) of the listener changes. 
     
     :param listener:
     :param interaction: interaction (EGG class)
     :param eos_token: float
+    :param uniform_messages: bool(Whether to use messages in occuring)
 
     Example switch for position 1 in message with message length 2, switch max = 2 with switch_index = 1 (here only option as eos and max are excluded)
     original_message = tensor([[0.2,0.3,0.5],[0.3,0.5,0.2]]) -> message = [2,1]
@@ -183,6 +184,8 @@ def symbol_informativeness(listener,interaction,eos_token = 0.0):
     """
 
     messages = messages_without_after_eos(interaction.message,eos_token)
+    if uniform_messages:
+        messages = torch.unique(messages,dim=0,return_counts=False)
     num_messages, message_length, vocab_size = messages.shape
 
     # values to be switched
@@ -269,15 +272,16 @@ def information_density(Lambda_m_k,eos_cumulative):
     nr_informative = Lambda_m_k.sum()
     return nr_informative / nr_non_eos
 
-def information_analysis(listener,interaction,eos_token = 0.0):
+def information_analysis(listener,interaction,eos_token = 0.0,unique_messages=False):
     """ Calculates positional_encoding, effective_length and information_density. by messages in language, not individual messages
     
     :param listener:
     :param interaction: interaction
     :param eos_token: float
+    :param uniform_messages: bool(Whether to use messages in occuring)
     """
 
-    Lambda_m_k, eos_mask = symbol_informativeness(listener,interaction,eos_token)
+    Lambda_m_k, eos_mask = symbol_informativeness(listener,interaction,eos_token,unique_messages)
 
     Lambda_dot_k = positional_encoding(Lambda_m_k, eos_mask)
     L_eff = effective_length(Lambda_m_k, eos_mask)

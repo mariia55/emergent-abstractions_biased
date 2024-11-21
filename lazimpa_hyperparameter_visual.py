@@ -27,7 +27,7 @@ def added(threshold, cost,length,l_threshold):
 
 # data to use
 setting = "lazimpa_context_aware"
-path = 'd:/OneDrive/Dokumente/UNI Osnabrück/bachelorthesis/InfosKristina/Code/emergent-abstractions/results/(3,4)_game_size_10_vsf_3'
+path = 'D:\Documents\GitHub\emergent-abstractions/results/(3,4)_game_size_10_vsf_3'
 n_epochs = 300
 dataset = 0
 type_data = "pkl" # "old" or "interaction" "pkl"
