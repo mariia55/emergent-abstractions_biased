@@ -362,7 +362,7 @@ def flatten_and_clean(arr,max=None):
             flattened.extend(cleaned_values)
     return np.array(flattened)
 
-def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epochs=300,color = ['b', 'g'], optimal_color='r', mean_runs=True, smoothing = False, std=False,frequency='message'):
+def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epochs=300,color = ['b', 'g'], optimal_color='r', mean_runs=True, smoothing = False, std=False,frequency='message',plot_frequency=False):
     """ This function creates a plot showing the message length as a function of the frequency rank. 
 
     :param paths: list
@@ -377,6 +377,7 @@ def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epo
     :param smoothing: bool
     :param std: if mean_runs == True, whether to add an std around the mean
     :param frequency: str, one of 'message','input_concept','input_concept_x_context'
+    :param plot_frequency: bool
     """
 
     max_rank_list = []
@@ -389,9 +390,13 @@ def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epo
 
     for i,( path, ax) in enumerate(zip(paths,axes)):
 
+        if plot_frequency:
+            ax2 = ax.twinx()
+
         for si, s in enumerate(setting):
 
             ordered_lengths_total = []
+            ordered_frequencies_total = []
 
             for run in range(n_runs): # retrieve inputs instead of messages, but still need messages to calculate average length
                 interaction = load_interaction(path,s,run,n_epochs)
@@ -415,22 +420,31 @@ def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epo
                     return -1
 
                 sorted_frequencies, sorted_indices = torch.sort(frequencies, descending=True)
+                relative_sorted_frequencies = sorted_frequencies / sum(sorted_frequencies)
                 ordered_lengths = message_length[sorted_indices]
 
                 ordered_lengths_total.append(ordered_lengths)
+                ordered_frequencies_total.append(relative_sorted_frequencies)
 
             max_rank = max([len(ordered_lengths_total[i]) for i in range(n_runs)])
             max_rank_list.append(max_rank)
 
             if mean_runs:
                 ordered_lengths_mean = []
+                ordered_frequencies_mean = []
 
                 # calculate mean for each frequency rank
                 for rank in range(max_rank):
                     c = [ordered_lengths_total[run][rank] for run in range(n_runs) if len(ordered_lengths_total[run]) > rank]
                     ordered_lengths_mean.append(sum(c) / len(c))
 
+                    if plot_frequency:
+                        freq = [ordered_frequencies_total[run][rank] for run in range(n_runs) if len(ordered_frequencies_total[run]) > rank]
+                        ordered_frequencies_mean.append(sum(freq)/ len(freq))
+
                 ax.plot(list(range(max_rank)),ordered_lengths_mean,color[si],label=s)
+                if plot_frequency:
+                    ax2.plot(list(range(max_rank)),ordered_frequencies_mean,color[si],label=s,ls='-.')
 
                 if std:
                     # calculate std:
@@ -445,6 +459,9 @@ def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epo
             else:
                 for olt in ordered_lengths_total:
                     ax.plot(list(range(len(olt))), olt,color[si])
+                if plot_frequency:
+                    for oft in ordered_frequencies_total:
+                        ax2.plot(list(range(len(olt))), oft,color[si],ls='-.')
 
         # optimal coding
         if optimal_color != None:
@@ -452,10 +469,100 @@ def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epo
             ax.plot(list(range(len(message_length_optimal))),message_length_optimal,optimal_color,ls='--',label=f"optimal coding {n_values[i]} values")
 
         ax.set_title(f"Dataset: {datasets[i]}", fontsize=16)
-        ax.legend(fontsize=15)
+        ax.legend(title='Message Length', fontsize=13,loc='lower right')
         ax.set_xlabel('frequency rank')
         ax.set_ylabel('message length')
         ax.tick_params(axis='x', which='both', labelbottom=True)
+        if plot_frequency:
+            ax2.set_ylabel('frequency count')
+            ax2.legend(title='Frequency count',fontsize=13,loc='upper right')
+
+    plt.tight_layout()
+
+def plot_frequency(paths,setting,n_runs,n_values,datasets,n_epochs=300,color = ['b', 'r'], mean_runs=True, std=False,frequency='message'):
+    """ This function creates a plot showing the message length as a function of the frequency rank. 
+
+    :param paths: list
+    :param setting: list
+    :param n_runs: int
+    :param n_values: Iterable
+    :param datasets: Iterable
+    :param n_epochs: int
+    :param color: Iterable with pyplot color codes with len(color) = (len(setting))
+    :param mean_runs: If True calculate mean over runs, if false plot all runs 
+    :param std: if mean_runs == True, whether to add an std around the mean
+    :param frequency: str, one of 'message','input_concept','input_concept_x_context'
+    """
+
+    max_rank_list = []
+    fig, axes = plt.subplots(len(datasets), 1, figsize=(8, 4 * len(datasets)), sharex=True, sharey=True)
+
+    if len(datasets) == 1:
+        axes = [axes]
+
+    setting = [setting] if type(setting) == str else setting
+
+    for i,( path, ax) in enumerate(zip(paths,axes)):
+
+        for si, s in enumerate(setting):
+
+            ordered_frequencies_total = []
+
+            for run in range(n_runs): # retrieve inputs instead of messages, but still need messages to calculate average length
+                interaction = load_interaction(path,s,run,n_epochs)
+                messages = retrieve_messages(interaction,as_list=False,remove_after_eos=True,eos_token=0.0)
+                if frequency == 'message':
+                    unique_values, frequencies = torch.unique(messages,dim=0,return_counts=True)
+                elif frequency == 'input_concept' or frequency == 'input_concept_x_context':
+                    concepts, context_conds = retrieve_concepts_context(interaction,n_values[0])
+                    if frequency == 'input_concept':
+                        inputs = torch.tensor([np.where(f,o[0],-1.) for o,f in concepts])
+                    else: # append context to input
+                        inputs = torch.tensor([np.append(np.where(f,o[0],-1.),c) for (o,f),c in zip(concepts,context_conds)])
+                    unique_values, frequencies = torch.unique(inputs,dim=0,return_counts=True)
+
+                    message_length_dict = {tuple(uv.tolist()): [] for uv in unique_values}
+                    for idx, input_val in enumerate(inputs):
+                        message_length_dict[tuple(input_val.tolist())].append(MessageLengthHierarchical.compute_message_length(messages[idx].unsqueeze(0)))
+                else:
+                    return -1
+
+                sorted_frequencies, sorted_indices = torch.sort(frequencies, descending=True)
+                relative_sorted_frequencies = sorted_frequencies / sum(sorted_frequencies)
+                ordered_frequencies_total.append(relative_sorted_frequencies)
+
+            max_rank = max([len(ordered_frequencies_total[i]) for i in range(n_runs)])
+            max_rank_list.append(max_rank)
+
+            if mean_runs:
+                ordered_frequencies_mean = []
+
+                # calculate mean for each frequency rank
+                for rank in range(max_rank):
+                    freq = [ordered_frequencies_total[run][rank] for run in range(n_runs) if len(ordered_frequencies_total[run]) > rank]
+                    ordered_frequencies_mean.append(sum(freq)/ len(freq))
+
+                ax.plot(list(range(max_rank)),ordered_frequencies_mean,color[si],label=s,ls='-.')
+
+                if std:
+                    # calculate std:
+                    ordered_f_std = []
+                    for rank in range(max_rank):
+                        c = [ordered_frequencies_total[run][rank] for run in range(n_runs) if len(ordered_frequencies_total[run]) > rank]
+                        ordered_f_std.append(np.std(c))
+                    ax.fill_between(list(range(max_rank)), 
+                                    np.array(ordered_frequencies_mean) - np.array(ordered_f_std), 
+                                    np.array(ordered_frequencies_mean) + np.array(ordered_f_std), 
+                                    color=color[si], alpha=0.3)
+            else:
+                for oft in ordered_frequencies_total:
+                    ax.plot(list(range(len(oft))), oft,color[si],ls='-.')
+
+        ax.set_title(f"Dataset: {datasets[i]}", fontsize=16)
+        ax.set_xlabel('rank')
+        ax.tick_params(axis='x', which='both', labelbottom=True)
+        ax.set_ylabel('relative frequency')
+        ax.legend(fontsize=13,loc='lower right')
 
     plt.tight_layout()
 
