@@ -122,6 +122,20 @@ class MessageLengthHierarchical(Callback):
 
         return message_length_step
 
+    @staticmethod
+    def compute_message_length_over_context(messages, fixed_vectors, context_conds):
+
+        message_length = MessageLengthHierarchical.compute_message_length(messages)
+        n_attributes = fixed_vectors.shape[1]
+
+        message_lengths = []
+        for n in range(0, n_attributes):
+            hierarchical_length = message_length[context_conds == n].float()
+            message_lengths.append(hierarchical_length)
+        message_length_step = [round(torch.mean(message_lengths[i]).item(), 3) for i in range(n_attributes)]
+
+        return message_length_step
+
     def print_difference_length_relevance(self, logs: Interaction, tag: str, epoch: int):
 
         message = logs.message.argmax(dim=-1) if self.is_gumbel else logs.message
