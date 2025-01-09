@@ -23,6 +23,7 @@ class Sender(nn.Module):
         self.fc1 = nn.Linear(n_features * n_targets, n_hidden)
         self.fc2 = nn.Linear(n_features * n_targets, n_hidden)
         self.fc3 = nn.Linear(2 * n_hidden, n_hidden)
+        self.bn1 = nn.BatchNorm1d(n_hidden)
         self.context_unaware = context_unaware
 
     def forward(self, x, aux_input=None):
@@ -48,8 +49,8 @@ class Sender(nn.Module):
             distractor_feature_embedding = F.relu(self.fc2(distractors_flat))
 
             # create joint embedding
-            joint_embedding = self.fc3(
-                torch.cat([target_feature_embedding, distractor_feature_embedding], dim=1)).tanh()
+            joint_embedding = self.fc3(torch.cat([target_feature_embedding, distractor_feature_embedding], dim=1))
+            joint_embedding = self.bn1(joint_embedding).tanh() # [32, 1024]
             return joint_embedding
 
 
@@ -66,11 +67,14 @@ class Receiver(nn.Module):
         super(Receiver, self).__init__()
         # embedding layer
         self.fc1 = nn.Linear(n_features, n_hidden)
+        self.bn1 = nn.BatchNorm1d(n_hidden)
 
     def forward(self, x, input, _aux_input=None):
         # from EGG: the rationale for the non-linearity here is that the RNN output will also be the 
         # outcome of a non-linearity
-        embedded_input = self.fc1(input).tanh()  # [32, 20, 256]
+        embedded_input = self.fc1(input)
+        embedded_input = self.bn1(embedded_input.swapaxes(1, 2)).swapaxes(1, 2)
+        embedded_input = embedded_input.tanh()  # [32, 20, 256]
         dots = torch.matmul(embedded_input, torch.unsqueeze(x, dim=-1))
         return dots.squeeze()  # [32, 20]
 
