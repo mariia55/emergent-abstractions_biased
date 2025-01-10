@@ -1,14 +1,15 @@
 {
 	"attributes": [3, 5],
 	"values": [4, 16],
+	"context_unaware": ["False", "True"],
 	"game_size": [10],
 	"vocab_size_factor": [3],
 	"n_epochs": [60],
-  "batch_size": [32],
-	"learning_rate": [0.0010],
+    "batch_size": [32],
+	"learning_rate": [0.001],
 	"hidden_size": [128],
 	"temp_update": [0.99],
 	"temperature": [2],
-    "length_cost": [0.01, 0.005, 0.001],
-	"max_mess_len": [3, 5, 10, 30]
+    "length_cost": [0.005, 0.001, 0.0005],
+	"max_mess_len": [3, 5, 10, 20, 30]
 }

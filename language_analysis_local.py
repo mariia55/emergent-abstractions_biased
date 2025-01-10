@@ -4,12 +4,13 @@
 
 import numpy as np
 import torch
-from egg.core.callbacks import Callback, ConsoleLogger
+from egg.core.callbacks import Callback, ConsoleLogger, InteractionSaver
+from egg.core.early_stopping import EarlyStopper
 from egg.core.interaction import Interaction
 import json
 import editdistance
 from scipy.spatial import distance
-#from hausdorff import hausdorff_distance
+# from hausdorff import hausdorff_distance
 from scipy.stats import spearmanr
 from typing import Union, Callable
 import pickle
@@ -17,6 +18,7 @@ import pickle
 
 class SavingConsoleLogger(ConsoleLogger):
     """Console logger that also stores the reported values"""
+
     def __init__(self, print_train_loss=False, as_json=False, n_metrics=2,
                  save_path: str = '', save_epoch: int = None):
         super(SavingConsoleLogger, self).__init__(print_train_loss, as_json)
@@ -54,14 +56,8 @@ class SavingConsoleLogger(ConsoleLogger):
                 with open(self.save_path + '/loss_and_metrics.pkl', 'wb') as handle:
                     pickle.dump(self.save_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-    def on_early_stopping(
-        self,
-        train_loss: float,
-        train_logs: Interaction,
-        epoch: int,
-        test_loss: float = None,
-        test_logs: Interaction = None,
-    ):
+    def on_early_stopping(self, train_loss: float = None, train_logs: Interaction = None, epoch: int = None,
+                          test_loss: float = None, test_logs: Interaction = None):
         if self.save:
             with open(self.save_path + '/loss_and_metrics.pkl', 'wb') as handle:
                 pickle.dump(self.save_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -98,16 +94,16 @@ class MessageLengthHierarchical(Callback):
     @staticmethod
     def compute_message_length(messages):
         max_len = messages.shape[1]
-        #print(max_len)
+        # print(max_len)
         # replace all symbols with zeros from first zero element
         for m_idx, m in enumerate(messages):
             first_zero_index = torch.where(m == 0)[0][0]
-            #print(torch.where(m==0))
-            #print(first_zero_index)
+            # print(torch.where(m==0))
+            # print(first_zero_index)
             messages[m_idx, first_zero_index:] = torch.zeros((1, max_len - first_zero_index))
         # calculate message length
-        print(messages)
-        print(torch.sum(messages==0, dim=1))
+        # print(messages)
+        # print(torch.sum(messages == 0, dim=1))
         message_length = max_len - torch.sum(messages == 0, dim=1)
         return message_length
 
@@ -121,6 +117,20 @@ class MessageLengthHierarchical(Callback):
         message_lengths = []
         for n in range(1, n_attributes + 1):
             hierarchical_length = message_length[number_same == n].float()
+            message_lengths.append(hierarchical_length)
+        message_length_step = [round(torch.mean(message_lengths[i]).item(), 3) for i in range(n_attributes)]
+
+        return message_length_step
+
+    @staticmethod
+    def compute_message_length_over_context(messages, fixed_vectors, context_conds):
+
+        message_length = MessageLengthHierarchical.compute_message_length(messages)
+        n_attributes = fixed_vectors.shape[1]
+
+        message_lengths = []
+        for n in range(0, n_attributes):
+            hierarchical_length = message_length[context_conds == n].float()
             message_lengths.append(hierarchical_length)
         message_length_step = [round(torch.mean(message_lengths[i]).item(), 3) for i in range(n_attributes)]
 
@@ -145,12 +155,12 @@ class MessageLengthHierarchical(Callback):
                     pickle.dump(self.save_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def on_early_stopping(
-        self,
-        train_loss: float,
-        train_logs: Interaction,
-        epoch: int,
-        test_loss: float = None,
-        test_logs: Interaction = None,
+            self,
+            train_loss: float,
+            train_logs: Interaction,
+            epoch: int,
+            test_loss: float = None,
+            test_logs: Interaction = None,
     ):
         if self.save:
             with open(self.save_path + '/message_length_hierarchical.pkl', 'wb') as handle:
@@ -180,16 +190,16 @@ def encode_target_concepts_for_topsim(sender_input):
     n_obs = sender_input.shape[0]
     n_objects = sender_input.shape[1]
     n_attributes = sender_input.shape[2]
-    n_targets = int(n_objects/2)
+    n_targets = int(n_objects / 2)
 
-    #print("sender_input", sender_input.shape)
+    # print("sender_input", sender_input.shape)
     # select targets
-    target_concepts = sender_input[:,:n_targets,:]
-    #print("target concepts", target_concepts.shape)
+    target_concepts = sender_input[:, :n_targets, :]
+    # print("target concepts", target_concepts.shape)
 
     # maybe I should just calculate pairwise hausdorff distances here?
 
-    #encoded_target_concepts = list(target_concepts)
+    # encoded_target_concepts = list(target_concepts)
 
     return target_concepts
 
@@ -202,18 +212,18 @@ def python_pdist(X, metric, **kwargs):
     """
     # number of observations
     m = len(X)
-    #print("m", m)
+    # print("m", m)
     k = 0
     dm = np.empty((m * (m - 1)) // 2, dtype=np.double)
-    #print("dm", dm.shape) # (365231,)
-    #print("metric", metric)
+    # print("dm", dm.shape) # (365231,)
+    # print("metric", metric)
     # go through all pairs of observations 
     for i in range(0, m - 1):
         for j in range(i + 1, m):
-            #print("Xi", X[i])
-            #print("Xj", X[j])
-            dm[k] = metric(X[i], X[j], **kwargs)[0] # index at zero because function returns more elements
-            #print("hd", metric(X[i], X[j])) 
+            # print("Xi", X[i])
+            # print("Xj", X[j])
+            dm[k] = metric(X[i], X[j], **kwargs)[0]  # index at zero because function returns more elements
+            # print("hd", metric(X[i], X[j]))
             k = k + 1
     return dm
 
@@ -301,7 +311,6 @@ class TopographicSimilarityConceptLevel(Callback):
         else:
             message_distance_fn_callable = message_distance_fn
 
-
         assert (
                 meaning_distance_fn and message_distance_fn
         ), f"Cannot recognize {meaning_distance_fn} \
@@ -334,7 +343,7 @@ class TopographicSimilarityConceptLevel(Callback):
 
         # NOTE: encoding function from hierarchical reference game probably not needed if I can successfully use the hausdorff distance
         # for computing distances between concepts ("relevance" should be included implicitly)
-        #encoded_sender_input = encode_input_for_topsim_hierarchical(sender_input, self.dimensions)
+        # encoded_sender_input = encode_input_for_topsim_hierarchical(sender_input, self.dimensions)
         encoded_target_concepts = encode_target_concepts_for_topsim(sender_input)
         topsim = self.compute_topsim(encoded_target_concepts, messages)
         output = json.dumps(dict(topsim=topsim, mode=mode, epoch=epoch))
@@ -348,13 +357,123 @@ class TopographicSimilarityConceptLevel(Callback):
                     pickle.dump(self.save_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def on_early_stopping(
-        self,
-        train_loss: float,
-        train_logs: Interaction,
-        epoch: int,
-        test_loss: float = None,
-        test_logs: Interaction = None,
+            self,
+            train_loss,
+            train_interaction,
+            epoch: int,
+            test_loss: float = None,
+            test_logs: Interaction = None,
     ):
         if self.save:
             with open(self.save_path + '/topsim.pkl', 'wb') as handle:
                 pickle.dump(self.save_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+class EarlyStopperLossWithPatience(EarlyStopper):
+    """
+    Implements early stopping logic that stops training when a metric did not improve for several training iterations.
+    """
+
+    def __init__(self, patience: int, min_delta: float, min_acc: float, field_name: str = "loss", validation: bool = True
+                 ) -> None:
+        """
+        :param patience: the number of epochs to wait for an iteration with an improved metric (e.g. loss) until early
+            stopping is executed
+        :param field_name: the name of the metric return by loss function which should be evaluated against stopping
+            criterion (default: "acc")
+        :param validation: whether the statistics on the validation (or training, if False) data should be checked
+        """
+        super(EarlyStopperLossWithPatience, self).__init__(validation)
+        self.best_interaction = None
+        self.patience = patience
+        self.min_acc = min_acc
+        self.do_early_stopping = None
+        self.field_name = field_name
+        self.min_delta = min_delta
+        self.wait = None
+        self.stopped_epoch = None
+        self.best = None
+        self.stop_training = None
+        self.best_epoch = None
+
+    def on_train_begin(self, logs=None):
+        self.wait = 0
+        self.stopped_epoch = 0
+        self.best = None
+        self.stop_training = False
+        self.best_epoch = 0
+        self.best_interaction = None
+        self.do_early_stopping = False
+
+    def on_epoch_end(self, loss: float, logs: Interaction, epoch: int):
+        self.epoch = epoch
+
+    def should_stop(self) -> bool:
+        if self.validation:
+            assert (
+                self.validation_stats
+            ), "Validation data must be provided for early stopping to work"
+            loss, last_epoch_interactions = self.validation_stats[-1]
+        else:
+            assert (
+                self.train_stats
+            ), "Training data must be provided for early stopping to work"
+            loss, last_epoch_interactions = self.train_stats[-1]
+
+        current = loss
+
+        # only go into early stopping mode, when min validation acc has been reached once
+        if last_epoch_interactions.aux["acc"].mean() >= self.min_acc:
+            self.do_early_stopping = True
+
+        if self.do_early_stopping:
+            # for first epoch:
+            if self.best is None:
+                self.best = current
+                self.best_epoch = self.epoch
+                self.best_interaction = last_epoch_interactions
+            # checks whether the current is smaller than the so far best value (while only treating differences larger than
+            # min_delta as a real difference)
+            elif current < self.best - self.min_delta:
+                self.best = current
+                self.wait = 0
+                self.best_epoch = self.epoch
+                self.best_interaction = last_epoch_interactions
+            else:
+                self.wait += 1
+                if self.wait >= self.patience:
+                    self.stopped_epoch = self.epoch
+                    self.stop_training = True
+                    print("Epoch %d: early stopping" % self.stopped_epoch)
+                    print("Best epoch:", self.best_epoch, "with", self.best)
+        return self.stop_training
+
+
+class InteractionSaverEarlyStopping(InteractionSaver):
+    """
+    Implements an extra function to the InteractionSaver implemented in EGG for saving interactions after early stopping.
+    """
+    def __init__(self, train_epochs, test_epochs, checkpoint_dir) -> None:
+        super(InteractionSaverEarlyStopping, self).__init__(train_epochs, test_epochs, checkpoint_dir)
+
+    def on_early_stopping(self,
+        train_loss: float,
+        train_logs: Interaction,
+        epoch: int,
+        test_loss: float = None,
+        test_logs: Interaction = None,):
+
+        if (
+                not self.aggregated_interaction
+                or self.trainer.distributed_context.is_leader
+        ):
+            rank = self.trainer.distributed_context.rank
+            self.dump_interactions(
+                test_logs, "validation", epoch, rank, self.checkpoint_dir)
+
+        if (
+                not self.aggregated_interaction
+                or self.trainer.distributed_context.is_leader
+        ):
+            rank = self.trainer.distributed_context.rank
+            self.dump_interactions(train_logs, "train", epoch, rank, self.checkpoint_dir)

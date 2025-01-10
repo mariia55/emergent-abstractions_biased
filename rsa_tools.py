@@ -2,7 +2,7 @@ import itertools
 import torch
 
 
-def get_utterances(vocab_size, max_length, interactions=None):
+def get_utterances(vocab_size, max_length, interactions=None, limit_utterances=0):
     if interactions:
         utterances = get_unique_utterances(interactions)
     else:
@@ -13,6 +13,12 @@ def get_utterances(vocab_size, max_length, interactions=None):
 
     # Convert to one-hot encoding
     utterances = torch.nn.functional.one_hot(utterances, num_classes=vocab_size).float()
+
+    # Randomly sample utterances up to limit_utterances if given
+    if limit_utterances > 0:
+        num_random_samples = min(limit_utterances, utterances.shape[0])
+        random_indices = torch.randperm(utterances.shape[0])[:num_random_samples]
+        utterances = utterances[random_indices]
 
     return utterances
 

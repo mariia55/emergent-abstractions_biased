@@ -385,15 +385,38 @@ def message_length_per_hierarchy_level(interaction, n_attributes):
 
     message = interaction.message.argmax(dim=-1)
     ml = MessageLengthHierarchical.compute_message_length(message)
-    print("message length", ml)
     ml_hierarchical = MessageLengthHierarchical.compute_message_length_hierarchical(message, torch.from_numpy(fixed))
-    print("hierarchical", ml_hierarchical)
+    return (ml, ml_hierarchical)
+
+def message_length_per_context_condition(interaction, n_attributes):
+    # Get relevant attributes
+    sender_input = interaction.sender_input
+    n_objects = sender_input.shape[1]
+    n_targets = int(n_objects / 2)
+    n_values = int(sender_input.shape[2] / n_attributes)
+
+    # get target objects and fixed vectors to re-construct concepts
+    target_objects = sender_input[:, :n_targets]
+    target_objects = k_hot_to_attributes(target_objects, n_values)
+    # concepts are defined by a list of target objects (here one sampled target object) and a fixed vector
+    (objects, fixed) = retrieve_concepts_sampling(target_objects)
+
+    # get distractor objects to re-construct context conditions
+    distractor_objects = sender_input[:, n_targets:]
+    distractor_objects = k_hot_to_attributes(distractor_objects, n_values)
+    distractor_objects = distractor_objects + 1
+    context_conds = retrieve_context_condition(objects, fixed, distractor_objects)
+
+    message = interaction.message.argmax(dim=-1)
+    ml = MessageLengthHierarchical.compute_message_length(message)
+    ml_hierarchical = MessageLengthHierarchical.compute_message_length_over_context(
+        message, torch.from_numpy(fixed), torch.from_numpy(np.array(context_conds)))
     return ml_hierarchical
 
 
 def symbol_frequency(interaction, n_attributes, n_values, vocab_size, is_gumbel=True):
     messages = interaction.message.argmax(dim=-1) if is_gumbel else interaction.message
-    messages = messages[:, :-1]
+    messages = messages[:, :-1] # excluding EOS symbol 0
     sender_input = interaction.sender_input
     n_objects = sender_input.shape[1]
     n_targets = int(n_objects / 2)
