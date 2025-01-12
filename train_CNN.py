@@ -45,7 +45,7 @@ def transform_data(data):
 def train(args):
     # first load the dataset and define all parts necessary for the training
     # try to load the dataset if it was saved before
-    dataset_path = ('dataset/complete_dataset_20241027_norm')
+    dataset_path = ('dataset/complete_dataset')
     try:
         complete_data = torch.load(dataset_path)
         print('Dataset was found and loaded successfully')
@@ -145,7 +145,7 @@ def train(args):
             test_accuracies.append(test_acc)
     
     if args.save_model:
-        model_path = 'models/vision_module_mps'
+        model_path = 'models/vision_module'
         model.cpu()
         torch.save(model.state_dict(), model_path)
         print(f'Model was saved to {model_path}')

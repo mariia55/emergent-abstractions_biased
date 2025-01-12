@@ -50,9 +50,11 @@ class DataSet(torch.utils.data.Dataset):
             self.labels = labels
             self.properties_dim = [4, 4, 4]
             self.all_objects = list(set(self.reverse_one_hot()))
+            self.encoding_func = self._sample_image_from_concept
         else:
             self.properties_dim = properties_dim
             self.all_objects = self._get_all_possible_objects(properties_dim)
+            self.encoding_func = self._many_hot_encoding
         # get all concepts
         self.concepts = self.get_all_concepts()
 
@@ -99,23 +101,23 @@ class DataSet(torch.utils.data.Dataset):
                     if self.granularity == "mixed":
                         for context_condition in range(nr_possible_contexts):
                             train_and_val.append(
-                                self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+                                self.get_item(concept_idx, context_condition, self.encoding_func, include_concept))
                     # fine context condition has n_fixed-1 shared attributes between targets and distractors
                     # n.b. the non-shared attributes is *not* fixed
                     elif self.granularity == "fine":
                         train_and_val.append(
-                            self.get_item(concept_idx, nr_possible_contexts - 1, self._many_hot_encoding,
+                            self.get_item(concept_idx, nr_possible_contexts - 1, self.encoding_func,
                                           include_concept))
                     # coarse context condition has no shared attributes between targets and distractors
                     elif self.granularity == "coarse":
                         train_and_val.append(
-                            self.get_item(concept_idx, 0, self._many_hot_encoding, include_concept))
+                            self.get_item(concept_idx, 0, self.encoding_func, include_concept))
 
                 # or sample context condition from possible context conditions
                 else:
                     context_condition = random.choice(range(nr_possible_contexts))
                     train_and_val.append(
-                        self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+                        self.get_item(concept_idx, context_condition, self.encoding_func, include_concept))
 
         # Calculating how many train
         train_samples = int(len(train_and_val) * (train_ratio / (train_ratio + val_ratio)))
@@ -132,11 +134,11 @@ class DataSet(torch.utils.data.Dataset):
                 if not self.sample_context:
                     for context_condition in range(nr_possible_contexts):
                         test.append(
-                            self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+                            self.get_item(concept_idx, context_condition, self.encoding_func, include_concept))
                 # or sample context condition from possible context conditions
                 else:
                     context_condition = random.choice(range(nr_possible_contexts))
-                    test.append(self.get_item(concept_idx, context_condition, self._many_hot_encoding, include_concept))
+                    test.append(self.get_item(concept_idx, context_condition, self.encoding_func, include_concept))
 
         return train, val, test
 
@@ -178,11 +180,11 @@ class DataSet(torch.utils.data.Dataset):
                                 assert context_condition == 0, (f'generic concepts only in coarse contexts but is '
                                                                 f'{context_condition}')
                                 test.append(
-                                    self.get_item(concept_idx, context_condition, self._many_hot_encoding,
+                                    self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
                             else:
                                 train_and_val.append(
-                                    self.get_item(concept_idx, context_condition, self._many_hot_encoding,
+                                    self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
 
                         # 2) 'specific'
@@ -190,11 +192,11 @@ class DataSet(torch.utils.data.Dataset):
                             # test dataset only contains most specific concepts
                             if nr_possible_contexts == len(self.properties_dim):
                                 test.append(
-                                    self.get_item(concept_idx, context_condition, self._many_hot_encoding,
+                                    self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
                             else:
                                 train_and_val.append(
-                                    self.get_item(concept_idx, context_condition, self._many_hot_encoding,
+                                    self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
 
                 # fine contexts only:
@@ -212,11 +214,11 @@ class DataSet(torch.utils.data.Dataset):
                         if nr_possible_contexts == 1:
                             context_condition = 0 # for generic concepts, only coarse context condition exists
                             test.append(
-                                self.get_item(concept_idx, context_condition, self._many_hot_encoding,
+                                self.get_item(concept_idx, context_condition, self.encoding_func,
                                               include_concept))
                         else:
                             train_and_val.append(
-                                self.get_item(concept_idx, context_condition, self._many_hot_encoding,
+                                self.get_item(concept_idx, context_condition, self.encoding_func,
                                               include_concept))
 
                     # 2) 'specific'
@@ -224,11 +226,11 @@ class DataSet(torch.utils.data.Dataset):
                         # test dataset only contains most specific concepts
                         if nr_possible_contexts == len(self.properties_dim):
                             test.append(
-                                self.get_item(concept_idx, context_condition, self._many_hot_encoding,
+                                self.get_item(concept_idx, context_condition, self.encoding_func,
                                               include_concept))
                         else:
                             train_and_val.append(
-                                self.get_item(concept_idx, context_condition, self._many_hot_encoding,
+                                self.get_item(concept_idx, context_condition, self.encoding_func,
                                               include_concept))
 
         # Train val split
@@ -409,9 +411,8 @@ class DataSet(torch.utils.data.Dataset):
             fixed: a tuple that denotes how many and which attributes are fixed
         """
         fixed_vectors = self.get_fixed_vectors(self.properties_dim)
-        all_objects = self._get_all_possible_objects(self.properties_dim)
         # create all possible concepts
-        all_fixed_object_pairs = list(itertools.product(all_objects, fixed_vectors))
+        all_fixed_object_pairs = list(itertools.product(self.all_objects, fixed_vectors))
 
         concepts = list()
         # go through all concepts (i.e. fixed, objects pairs)
@@ -421,7 +422,7 @@ class DataSet(torch.utils.data.Dataset):
             fixed = concept[1]
             # go through all objects and check whether they satisfy the target concept (in this example have 0 as 3rd attribute)
             target_objects = list()
-            for object in all_objects:
+            for object in self.all_objects:
                 if self.satisfies(object, concept):
                     if object not in target_objects:
                         target_objects.append(object)
@@ -443,21 +444,6 @@ class DataSet(torch.utils.data.Dataset):
                 shared[i] = 1
                 shared_vectors.append(shared)
         return shared_vectors
-
-    def get_label_to_feat_rep_map(self, labels, feat_reps):
-        # Initialize dictionary of labels to numpy array of feature representations
-        label_to_feat_rep_map = {}
-        # Iterate over all labels and feature representations
-        for label, feat_rep in zip(labels, feat_reps):
-            # Convert label to integer
-            label = int(torch.argmax(label))
-            # Add label and feature representation to dictionary
-            if label in label_to_feat_rep_map:
-                label_to_feat_rep_map[label].append(feat_rep)
-            else:
-                label_to_feat_rep_map[label] = [feat_rep]
-
-        return label_to_feat_rep_map
 
     def reverse_one_hot(self):
 
@@ -632,6 +618,13 @@ class DataSet(torch.utils.data.Dataset):
             start += dim
 
         return output
+
+    def _sample_image_from_concept(self, concept):
+        all_objects = self.reverse_one_hot()
+        indices = np.where(np.all(all_objects == np.array(concept), axis=1))[0].tolist()
+        random_index = random.choice(indices) if indices else None
+        sampled_img = self.images[random_index] if random_index is not None else None
+        return torch.tensor(sampled_img, dtype=torch.float32, device=self.device)
 
 
 def get_distractors_old(self, concept_idx):

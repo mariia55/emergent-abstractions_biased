@@ -19,7 +19,6 @@ class vision_module(nn.Module):
         self.classification = nn.Linear(in_features = 100, out_features = num_classes)
 
     def forward(self, x):
-        x = x.to(device='mps', dtype=torch.float32)
         out = self.pool(F.relu(self.conv1(x)))
         out = F.relu(self.conv2(out))
 
@@ -55,7 +54,6 @@ class feat_rep_vision_module(nn.Module):
         self.dense2 = nn.Linear(in_features = 180, out_features = 100)
     
     def forward(self, x):
-        x = x.to(device='mps', dtype=torch.float32)
         out = self.pool(F.relu(self.conv1(x)))
         out = F.relu(self.conv2(out))
 

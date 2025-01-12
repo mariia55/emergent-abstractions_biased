@@ -37,14 +37,6 @@ def generate_dataset():
     Function to create the feature representations and include them into the dataset
     """
     print("Starting to create the feature representation dataset")
-    # load the trained model from save
-    model = feat_rep_vision_module()
-    model_path = './models/vision_module'
-    dataset_path = 'dataset/complete_dataset'
-    try:
-        model.load_state_dict(torch.load(model_path), strict=False)
-    except:
-        raise ValueError(f'No trained vision module found in {model_path}. Please train the model first.')
 
     if torch.cuda.is_available():
         device = torch.device('cuda')
@@ -53,9 +45,23 @@ def generate_dataset():
     else:
         device = torch.device('cpu')
 
+    # load the trained model from save
+    model = feat_rep_vision_module().to(device)
+    model_path = './models/vision_module'
+    dataset_path = 'dataset/complete_dataset'
+    try:
+        model.load_state_dict(torch.load(model_path), strict=False)
+    except:
+        raise ValueError(f'No trained vision module found in {model_path}. Please train the model first.')
+
+    try:
+        data = torch.load(dataset_path)
+    except:
+        raise ValueError(f'ShapesDataset not found in {dataset_path}. Please train the model first, which also creates the dataset.')
+
     model.to(device)
     model.eval()
-    data = torch.load(dataset_path)
+
     data_loader = torch.utils.data.DataLoader(data,
                                               batch_size=32,
                                               shuffle=False,
@@ -67,7 +73,7 @@ def generate_dataset():
 
     with torch.no_grad():
         for i, (input, target) in enumerate(data_loader):
-            input = input.to(device)
+            input = input.to(device=device, dtype=torch.float32)
             target = target.to(device=device, dtype=torch.float32)
             
             feat_rep = model(input)
@@ -86,17 +92,39 @@ def generate_dataset():
     # for size reasons the dataset is saved twice, 
     # once as the full dataset now including the feature representations
     feat_rep_dataset_full = ShapesDataset(np.array(images), np.array(labels), np.array(feature_representations))
-    torch.save(feat_rep_dataset_full, dataset_path + '_feat_rep')
+    torch.save(feat_rep_dataset_full, dataset_path + '_feat_rep', pickle_protocol=4)
 
     # and once as a much smaller dataset with the labels and feature representations but without the original images
     feat_rep_dataset_without_images = ShapesDataset(labels=np.array(labels), feat_reps=np.array(feature_representations))
-    torch.save(feat_rep_dataset_without_images, dataset_path + '_feat_rep_no_images')
+    torch.save(feat_rep_dataset_without_images, dataset_path + '_feat_rep_no_images', pickle_protocol=4)
 
     print(f"Feature representations saved to {dataset_path + '_feat_rep'} and {dataset_path + '_feat_rep_no_images'}")
     return feat_rep_dataset_full, feat_rep_dataset_without_images
 
+def load_or_create_dataset(dataset_path, device='cpu'):
+    """
+    Loads the image representation dataset if it exists, otherwise creates it
+    dataset_path: str, path to the dataset file
+    device: str, device to load the dataset on
+
+    returns: dataset.Dataset object
+    """
+    try:
+        data_set = torch.load(dataset_path)
+    except:
+        print("Feature representations not found, creating it instead...")
+        complete_dataset, _ = generate_dataset()
+        data_set = DataSet(game_size=4,
+                           is_shapes3d=True,
+                           images=complete_dataset.feat_reps,
+                           labels=complete_dataset.labels,
+                           device=device)
+        torch.save(data_set, dataset_path, pickle_protocol=4)
+
+    return data_set
+
 if __name__ == "__main__":
-    feat_rep_dataset_path = 'dataset/complete_dataset_20241027_norm' + '_feat_rep'
+    feat_rep_dataset_path = 'dataset/complete_dataset' + '_feat_rep'
     try:
         complete_dataset = torch.load(feat_rep_dataset_path)
     except:
@@ -105,8 +133,8 @@ if __name__ == "__main__":
 
     # generate concept datasets for the communication game
     feat_rep_concept_dataset = DataSet(game_size=4, is_shapes3d=True, images=complete_dataset.feat_reps, labels=complete_dataset.labels, device='mps')
-    torch.save(feat_rep_concept_dataset, './dataset/feat_rep_concept_dataset_new')
+    torch.save(feat_rep_concept_dataset, './dataset/feat_rep_concept_dataset', pickle_protocol=4)
 
     # also for the zero_shot dataset
     feat_rep_zero_concept_dataset = DataSet(game_size=4, zero_shot=True, is_shapes3d=True, images=complete_dataset.feat_reps, labels=complete_dataset.labels, device='mps')
-    torch.save(feat_rep_zero_concept_dataset, './dataset/feat_rep_zero_concept_dataset_new')
+    torch.save(feat_rep_zero_concept_dataset, './dataset/feat_rep_zero_concept_dataset', pickle_protocol=4)

@@ -9,6 +9,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import egg.core as core
 from egg.core.language_analysis import TopographicSimilarity
+
+from create_datasets import load_or_create_dataset
 # copy language_analysis_local from hierarchical_reference_game
 from language_analysis_local import *
 import os
@@ -248,7 +250,7 @@ def train(opts, datasets, verbose_callbacks=False):
                                                        min_acc=opts.min_acc_early_stopping)])
 
     trainer = core.Trainer(game=game, optimizer=optimizer,
-                           train_data=train, validation_data=val, callbacks=callbacks)
+                           train_data=train, validation_data=val, callbacks=callbacks, device=opts.device)
 
     # if checkpoint path is given, load checkpoint and skip training
     if opts.load_checkpoint:
@@ -393,7 +395,7 @@ def main(params):
         # if not given, generate data set (new for each run for the small datasets)
         if not opts.load_dataset and not opts.zero_shot:
             if opts.shapes3d:
-                data_set = torch.load('./dataset/feat_rep_concept_dataset')
+                data_set = load_or_create_dataset('./dataset/feat_rep_concept_dataset', device=opts.device)
             else:
                 data_set = dataset.DataSet(opts.dimensions,
                                            game_size=opts.game_size,
@@ -468,7 +470,7 @@ def main(params):
                     os.makedirs(opts.save_path)
                 if not opts.load_dataset:
                     if opts.shapes3d:
-                        data_set = torch.load('./dataset/feat_rep_zero_concept_dataset')
+                        data_set = load_or_create_dataset('./dataset/feat_rep_zero_concept_dataset')
                     else:
                         data_set = dataset.DataSet(opts.dimensions,
                                                    game_size=opts.game_size,
@@ -493,7 +495,7 @@ def main(params):
                     if not os.path.exists(opts.save_path) and opts.save:
                         os.makedirs(opts.save_path)
                     if opts.shapes3d:
-                        data_set = torch.load('./dataset/feat_rep_zero_concept_dataset')
+                        data_set = load_or_create_dataset('./dataset/feat_rep_zero_concept_dataset')
                     else:
                         data_set = dataset.DataSet(opts.dimensions,
                                                    game_size=opts.game_size,
