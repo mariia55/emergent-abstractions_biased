@@ -1,5 +1,6 @@
 
 .DS_Store
+.idea/
 *.pyc
 *.tar
 **/interaction*
@@ -22,3 +23,9 @@ sunburst_plot_condition_0.html
 sunburst_plot_condition_1.html
 sunburst_plot_condition_2.html
 evaluate_metrics_copy.ipynb
+
+3dshapes/
+dataset/complete_dataset
+dataset/feat_rep_concept_dataset
+dataset/feat_rep_zero_concept_dataset
+dataset/image_concept_dataset

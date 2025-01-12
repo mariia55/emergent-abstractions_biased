@@ -9,6 +9,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import egg.core as core
 from egg.core.language_analysis import TopographicSimilarity
+
+from create_datasets import load_or_create_dataset
 # copy language_analysis_local from hierarchical_reference_game
 from language_analysis_local import *
 import os
@@ -113,6 +115,8 @@ def get_params(params):
                              "condition is added for each concept.)")
     parser.add_argument('--granularity', type=str, default='mixed',
                         help='Granularity of the context. Possible values are: mixed, coarse and fine')
+    parser.add_argument('--shapes3d', type=bool, default=False,
+                        help="Determines whether 3dshapes dataset will be used or not")
 
     args = core.init(parser, params)
 
@@ -181,8 +185,13 @@ def train(opts, datasets, verbose_callbacks=False):
             n_layers=opts.listener_n_layers,
         ))
     else:
-        sender = Sender(opts.hidden_size, sum(dimensions), opts.game_size, opts.context_unaware)
-        receiver = Receiver(sum(dimensions), opts.hidden_size)
+        if opts.shapes3d:
+            # hard coded number of features for the feature representations at the moment
+            sender = Sender(opts.hidden_size, 100, opts.game_size, opts.context_unaware)
+            receiver = Receiver(100, opts.hidden_size)
+        else:
+            sender = Sender(opts.hidden_size, sum(dimensions), opts.game_size, opts.context_unaware)
+            receiver = Receiver(sum(dimensions), opts.hidden_size)
 
     if opts.vocab_size_factor != 0:
         minimum_vocab_size = dimensions[0] + 1  # plus one for 'any'
@@ -241,7 +250,7 @@ def train(opts, datasets, verbose_callbacks=False):
                                                        min_acc=opts.min_acc_early_stopping)])
 
     trainer = core.Trainer(game=game, optimizer=optimizer,
-                           train_data=train, validation_data=val, callbacks=callbacks)
+                           train_data=train, validation_data=val, callbacks=callbacks, device=opts.device)
 
     # if checkpoint path is given, load checkpoint and skip training
     if opts.load_checkpoint:
@@ -335,6 +344,9 @@ def main(params):
         opts.dimensions = list(itertools.repeat(opts.values, opts.attributes))
 
     data_set_name = '(' + str(len(opts.dimensions)) + ',' + str(opts.dimensions[0]) + ')'
+    if opts.shapes3d:
+        data_set_name = 'shapes3d_feat_rep'
+        opts.game_size = 4
     folder_name = (data_set_name + '_game_size_' + str(opts.game_size)
                    + '_vsf_' + str(opts.vocab_size_factor))
     folder_name = os.path.join("results", folder_name)
@@ -382,12 +394,15 @@ def main(params):
 
         # if not given, generate data set (new for each run for the small datasets)
         if not opts.load_dataset and not opts.zero_shot:
-            data_set = dataset.DataSet(opts.dimensions,
-                                       game_size=opts.game_size,
-                                       scaling_factor=opts.scaling_factor,
-                                       device=opts.device,
-                                       sample_context=opts.sample_context,
-                                       granularity=opts.granularity)
+            if opts.shapes3d:
+                data_set = load_or_create_dataset('./dataset/feat_rep_concept_dataset', device=opts.device)
+            else:
+                data_set = dataset.DataSet(opts.dimensions,
+                                           game_size=opts.game_size,
+                                           scaling_factor=opts.scaling_factor,
+                                           device=opts.device,
+                                           sample_context=opts.sample_context,
+                                           granularity=opts.granularity)
 
             # save folder for opts rsa is already specified above
             if not opts.test_rsa and not opts.save_test_interactions:
@@ -454,14 +469,17 @@ def main(params):
                 if not os.path.exists(opts.save_path) and opts.save:
                     os.makedirs(opts.save_path)
                 if not opts.load_dataset:
-                    data_set = dataset.DataSet(opts.dimensions,
-                                               game_size=opts.game_size,
-                                               scaling_factor=opts.scaling_factor,
-                                               device=opts.device,
-                                               zero_shot=True,
-                                               zero_shot_test=opts.zero_shot_test,
-                                               sample_context=opts.sample_context,
-                                               granularity=opts.granularity)
+                    if opts.shapes3d:
+                        data_set = load_or_create_dataset('./dataset/feat_rep_zero_concept_dataset')
+                    else:
+                        data_set = dataset.DataSet(opts.dimensions,
+                                                   game_size=opts.game_size,
+                                                   scaling_factor=opts.scaling_factor,
+                                                   device=opts.device,
+                                                   zero_shot=True,
+                                                   zero_shot_test=opts.zero_shot_test,
+                                                   sample_context=opts.sample_context,
+                                                   granularity=opts.granularity)
             # or both test conditions are generated        
             else:
                 # implement two zero-shot conditions: test on most generic vs. test on most specific dataset
@@ -476,14 +494,17 @@ def main(params):
                         opts.save_path = os.path.join(opts.zs_game_path, "context_sampled", str(run))
                     if not os.path.exists(opts.save_path) and opts.save:
                         os.makedirs(opts.save_path)
-                    data_set = dataset.DataSet(opts.dimensions,
-                                               game_size=opts.game_size,
-                                               scaling_factor=opts.scaling_factor,
-                                               device=opts.device,
-                                               zero_shot=True,
-                                               zero_shot_test=cond,
-                                               sample_context=opts.sample_context,
-                                               granularity=opts.granularity)
+                    if opts.shapes3d:
+                        data_set = load_or_create_dataset('./dataset/feat_rep_zero_concept_dataset')
+                    else:
+                        data_set = dataset.DataSet(opts.dimensions,
+                                                   game_size=opts.game_size,
+                                                   scaling_factor=opts.scaling_factor,
+                                                   device=opts.device,
+                                                   zero_shot=True,
+                                                   zero_shot_test=cond,
+                                                   sample_context=opts.sample_context,
+                                                   granularity=opts.granularity)
                     train(opts, data_set, verbose_callbacks=False)
 
             # set checkpoint path
