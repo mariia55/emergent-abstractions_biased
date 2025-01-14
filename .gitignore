@@ -29,3 +29,8 @@ dataset/complete_dataset
 dataset/feat_rep_concept_dataset
 dataset/feat_rep_zero_concept_dataset
 dataset/image_concept_dataset
+.idea/emergent-abstractions.iml
+.idea/inspectionProfiles/profiles_settings.xml
+.idea/misc.xml
+.idea/modules.xml
+.vscode/launch.json
