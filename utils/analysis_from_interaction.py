@@ -468,6 +468,42 @@ def symbol_frequency(interaction, n_attributes, n_values, vocab_size, is_gumbel=
 
     return symbol_frequency / att_val_frequency, mutual_information
 
+def symbol_frequency_fav(interaction, n_attributes, n_values, vocab_size, is_gumbel=True):
+    messages = interaction.message.argmax(dim=-1) if is_gumbel else interaction.message
+    messages = messages[:, :-1] # without EOS
+    sender_input = interaction.sender_input
+    n_objects = sender_input.shape[1]
+    n_targets = int(n_objects / 2)
+    # k_hots = sender_input[:, :-n_attributes]
+    # objects = k_hot_to_attributes(k_hots, n_values)
+    target_objects = sender_input[:, :n_targets]
+    target_objects = k_hot_to_attributes(target_objects, n_values)
+    # intentions = sender_input[:, -n_attributes:]  # (0=same, 1=any)
+    (objects, fixed) = retrieve_concepts_sampling(target_objects)
+
+    objects[fixed == 1] = np.nan
+
+    objects = objects
+    messages = messages
+    favorite_symbol = {}
+    mutual_information = {}
+    for att in range(n_attributes):
+        for val in range(n_values):
+            object_labels = (objects[:, att] == val).astype(int)
+            max_MI = 0
+            for symbol in range(vocab_size):
+                symbol_indices = np.argwhere(messages == symbol)[0]
+                symbol_labels = np.zeros(len(messages))
+                symbol_labels[symbol_indices] = 1
+                MI = normalized_mutual_info_score(symbol_labels, object_labels)
+                if MI > max_MI:
+                    max_MI = MI
+                    max_symbol = symbol
+            favorite_symbol[str(att) + str(val)] = max_symbol
+            mutual_information[str(att) + str(val)] = max_MI
+
+    return favorite_symbol, mutual_information
+
 
 def get_fixed_vectors(sender_input, n_values, idx):
     """retrieves concepts, i.e. objects and fixed vectors from a sender input"""
@@ -619,3 +655,5 @@ def error_analysis(datasets, paths, setting, n_epochs, n_values, validation=True
 
     return (all_error_concepts, all_error_contexts, all_error_concept_x_context, all_acc_concept_x_context,
             all_total_concepts, all_total_contexts, all_total_concept_x_context)
+
+

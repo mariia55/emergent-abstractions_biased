@@ -5,7 +5,8 @@ import copy
 
 
 def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=False, context_unaware=False,
-                    length_cost=False, early_stopping=False, rsa=False, rsa_test=None, zero_shot_test_ds=None):
+                    length_cost=False, early_stopping=False, rsa=False, rsa_test=None, zero_shot_test_ds=None,
+                    sampled_context=False):
     """ loads all accuracies into a dictionary, val_steps should be set to the same as val_frequency during training
     """
     result_dict = {'train_acc': [], 'val_acc': [], 'test_acc': [],
@@ -20,7 +21,8 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                    'cu_zs_specific_val_message_length': [], 'cu_zs_generic_train_message_length': [],
                    'cu_zs_generic_train_acc': [], 'cu_zs_generic_val_acc': [], 'cu_zs_generic_test_acc': [],
                    'cu_zs_specific_train_message_length': [], 'cu_zs_generic_val_message_length': [],
-                   'rsa_test_loss': [], 'rsa_test_acc': []}
+                   'rsa_test_loss': [], 'rsa_test_acc': [], 'final_test_acc': [], 'final_test_loss': [],
+                   'rsa_test_gen_utt_loss': [], 'rsa_test_gen_utt_acc': []}
 
     for path_idx, path in enumerate(all_paths):
 
@@ -56,15 +58,23 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
         cu_zs_generic_val_message_lengths = []
         rsa_test_losses = []
         rsa_test_accs = []
+        final_test_accs = []
+        final_test_losses = []
+        rsa_test_gen_utt_losses = []
+        rsa_test_gen_utt_accs = []
 
         # prepare paths
-        standard_path = "standard"
+        if sampled_context:
+            standard_path = "standard/sampled_context"
+            context_unaware_path = "context_unaware/sampled_context"
+        else:
+            standard_path = "standard"
+            context_unaware_path = "context_unaware"
         context_aware_path = "context_aware"
-        context_unaware_path = "context_unaware"
         length_cost_path = "length_cost"
         zero_shot_path = "zero_shot"
         if rsa:
-            rsa_path = str("rsa/" + rsa_test)
+            rsa_file_extension = rsa_test
         file_name = "loss_and_metrics"
         file_name_zs_default = "loss_and_metrics"
         if zero_shot_test_ds is not None:
@@ -98,11 +108,18 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                     train_message_lengths.append(train_message_length)
                     val_message_lengths.append(val_message_length)
                 else:
-                    file_path = f"{path}/{standard_path}/{run_path}/{rsa_path}/{file_name}.{file_extension}"
+                    file_path = f"{path}/{standard_path}/{run_path}/{file_name}_{rsa_file_extension}.{file_extension}"
                     data = pickle.load(open(file_path, 'rb'))
                     # test acc
+                    final_test_accs.append(data['final_test_acc'])
+                    final_test_losses.append(data['final_test_loss'])
                     rsa_test_accs.append(data['rsa_test_acc'])
                     rsa_test_losses.append(data['rsa_test_loss'])
+                    try:
+                        rsa_test_gen_utt_accs.append(data['rsa_test_gen_utt_acc'])
+                        rsa_test_gen_utt_losses.append(data['rsa_test_gen_utt_loss'])
+                    except KeyError:
+                        pass
 
             # context-unaware
             elif context_unaware and not length_cost and not zero_shot:
@@ -138,11 +155,18 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                     cu_train_message_lengths.append(cu_train_message_length)
                     cu_val_message_lengths.append(cu_val_message_length)
                 else:
-                    file_path = f"{path}/{context_unaware_path}/{run_path}/{rsa_path}/{file_name}.{file_extension}"
+                    file_path = f"{path}/{context_unaware_path}/{run_path}/{file_name}_{rsa_file_extension}.{file_extension}"
                     data = pickle.load(open(file_path, 'rb'))
                     # test acc
+                    final_test_accs.append(data['final_test_acc'])
+                    final_test_losses.append(data['final_test_loss'])
                     rsa_test_accs.append(data['rsa_test_acc'])
                     rsa_test_losses.append(data['rsa_test_loss'])
+                    try:
+                        rsa_test_gen_utt_accs.append(data['rsa_test_gen_utt_acc'])
+                        rsa_test_gen_utt_losses.append(data['rsa_test_gen_utt_loss'])
+                    except KeyError:
+                        pass
 
             # length cost
             elif length_cost and not zero_shot:
@@ -168,13 +192,21 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                         train_message_lengths.append(train_message_length)
                         val_message_lengths.append(val_message_length)
                     else:
-                        file_path = f"{path}/{length_cost_path}/{standard_path}/{run_path}/{rsa_path}/{file_name}.{file_extension}"
+                        file_path = f"{path}/{length_cost_path}/{context_aware_path}/{run_path}/{file_name}_{rsa_file_extension}.{file_extension}"
                         data = pickle.load(open(file_path, 'rb'))
                         # test acc
+                        final_test_accs.append(data['final_test_acc'])
+                        final_test_losses.append(data['final_test_loss'])
                         rsa_test_accs.append(data['rsa_test_acc'])
                         rsa_test_losses.append(data['rsa_test_loss'])
+                        try:
+                            rsa_test_gen_utt_accs.append(data['rsa_test_gen_utt_acc'])
+                            rsa_test_gen_utt_losses.append(data['rsa_test_gen_utt_loss'])
+                        except KeyError:
+                            pass
 
                 else:
+
                     if rsa_test is None:
                         file_path = f"{path}/{length_cost_path}/{context_unaware_path}/{run_path}/{file_name}.{file_extension}"
                         cu_data = pickle.load(open(file_path, 'rb'))
@@ -207,11 +239,18 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                         cu_train_message_lengths.append(cu_train_message_length)
                         cu_val_message_lengths.append(cu_val_message_length)
                     else:
-                        file_path = f"{path}/{length_cost_path}/{context_unaware_path}/{run_path}/{rsa_path}/{file_name}.{file_extension}"
+                        file_path = f"{path}/{length_cost_path}/{context_unaware_path}/{run_path}/{file_name}_{rsa_file_extension}.{file_extension}"
                         data = pickle.load(open(file_path, 'rb'))
                         # test acc
+                        final_test_accs.append(data['final_test_acc'])
+                        final_test_losses.append(data['final_test_loss'])
                         rsa_test_accs.append(data['rsa_test_acc'])
                         rsa_test_losses.append(data['rsa_test_loss'])
+                        try:
+                            rsa_test_gen_utt_accs.append(data['rsa_test_gen_utt_acc'])
+                            rsa_test_gen_utt_losses.append(data['rsa_test_gen_utt_loss'])
+                        except KeyError:
+                            pass
 
             # zero_shot
             elif zero_shot:
@@ -343,6 +382,8 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                 result_dict['train_message_lengths'].append(train_message_lengths)
                 result_dict['val_message_lengths'].append(val_message_lengths)
             else:
+                result_dict['final_test_acc'].append(final_test_accs)
+                result_dict['final_test_loss'].append(final_test_losses)
                 result_dict['rsa_test_acc'].append(rsa_test_accs)
                 result_dict['rsa_test_loss'].append(rsa_test_losses)
         elif context_unaware:
@@ -353,8 +394,12 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                 result_dict['cu_train_message_lengths'].append(cu_train_message_lengths)
                 result_dict['cu_val_message_lengths'].append(cu_val_message_lengths)
             else:
+                result_dict['final_test_acc'].append(final_test_accs)
+                result_dict['final_test_loss'].append(final_test_losses)
                 result_dict['rsa_test_acc'].append(rsa_test_accs)
                 result_dict['rsa_test_loss'].append(rsa_test_losses)
+                result_dict['rsa_test_gen_utt_acc'].append(rsa_test_gen_utt_accs)
+                result_dict['rsa_test_gen_utt_loss'].append(rsa_test_gen_utt_losses)
         elif zero_shot:
             result_dict['zs_specific_train_acc'].append(zs_specific_train_accs)
             result_dict['zs_specific_val_acc'].append(zs_specific_val_accs)
@@ -384,9 +429,14 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
     return result_dict
 
 
-def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=False, rsa=False, rsa_test=None):
+def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=False, rsa=False, rsa_test=None,
+                   sampled_context=False):
     """ loads all entropy scores into a dictionary"""
 
+    if sampled_context:
+        path_sc = '/sampled_context'
+    else:
+        path_sc = ''
     if length_cost:
         if context_unaware:
             setting = 'length_cost/context_unaware'
@@ -394,14 +444,14 @@ def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=False
             setting = 'length_cost/context_aware'
     else:
         if context_unaware:
-            setting = 'context_unaware'
+               setting = 'context_unaware' + path_sc
         else:
-            setting = 'standard'
+            setting = 'standard' + path_sc
 
     if rsa:
-        rsa_path_addition = 'rsa/' + rsa_test + '/'
+        rsa_file_extension = '_rsa_' + rsa_test
     else:
-        rsa_path_addition = ""
+        rsa_file_extension = ''
 
     result_dict = {'NMI': [], 'effectiveness': [], 'consistency': [],
                    'NMI_hierarchical': [], 'effectiveness_hierarchical': [], 'consistency_hierarchical': [],
@@ -417,8 +467,8 @@ def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=False
         NMIs_conc_x_cont, effectiveness_conc_x_cont, consistency_conc_x_cont = [], [], []
 
         for run in range(n_runs):
-            standard_path = path + '/' + setting + '/' + str(run) + '/' + rsa_path_addition
-            data = pickle.load(open(standard_path + 'entropy_scores.pkl', 'rb'))
+            standard_path = path + '/' + setting + '/' + str(run) + '/'
+            data = pickle.load(open(standard_path + 'entropy_scores' + rsa_file_extension + '.pkl', 'rb'))
             NMIs.append(data['normalized_mutual_info'])
             effectiveness_scores.append(data['effectiveness'])
             consistency_scores.append(data['consistency'])

@@ -101,11 +101,16 @@ def get_params(params):
                              "scenarios).")
     parser.add_argument("--load_checkpoint", type=bool, default=False,
                         help="Skip training and load pretrained models from checkpoint.")
-    parser.add_argument("--load_interaction", type=bool, default=False,
-                        help="If given, load all interactions from previous runs in the folder. Else, take interaction"
-                             "from the current run.")
+    # parser.add_argument("--load_interaction", type=bool, default=False,
+    #                     help="If given, load all interactions from previous runs in the folder. Else, take interaction"
+    #                          "from the current run.")
+    parser.add_argument("--load_interaction", type=str, default=None,
+                        help="If given, load interaction from 'train', 'validation' or 'test' run.")
     parser.add_argument("--limit_utterances", type=int, default=0,
                         help="Limit loaded or generated utterances to given number for RSA. 0 means all.")
+    parser.add_argument("--limit_test_ds", type=int, default=0,
+                        help="Use for testing RSA speaker after training. Limits the test dataset to given number. "
+                             "0 means the whole test dataset is used.")
     parser.add_argument("--test_rsa", type=str, default=None,
                         help="Use for testing the RSA speaker after training. Can be 'train', 'validation' or 'test'.")
     parser.add_argument("--cost-factor", type=float, default=0.01,
@@ -161,6 +166,20 @@ def train(opts, datasets, verbose_callbacks=False):
         save_epoch = None
 
     train, val, test = datasets
+    # I want to be able to test just a few samples from a dataset to speed up RSA inference
+    test_ls, train_ls, val_ls = [], [], []
+    if opts.limit_test_ds != 0:
+        for i in range(opts.limit_test_ds):
+            train_ls.append(train[i])
+            val_ls.append(val[i])
+            test_ls.append(test[i])
+
+        test = test_ls
+
+    if opts.test_rsa:
+        print("Length of the test dataset: ", len(test))
+        if opts.test_rsa == 'validation':
+            print("Length of the validation dataset: ", len(val))
     # print("train", train)
     dimensions = train.dimensions
 
@@ -260,7 +279,12 @@ def train(opts, datasets, verbose_callbacks=False):
 
     # after training evaluate performance on the test data set
     if len(test):
-        trainer.validation_data = test
+        if opts.test_rsa == 'validation':
+            trainer.validation_data = val
+        elif opts.test_rsa == 'train':
+            trainer.validation_data = train
+        else:
+            trainer.validation_data = test
         eval_loss, interaction = trainer.eval()
         acc = torch.mean(interaction.aux['acc']).item()
         print("test accuracy: " + str(acc))
@@ -290,6 +314,9 @@ def train(opts, datasets, verbose_callbacks=False):
             if opts.load_interaction:
                 # Load given interaction
                 interaction = torch.load(opts.interaction_path)
+                print("# loading interaction from", opts.interaction_path)
+            else:
+                interaction = None
 
             # Get utterances from the (loaded or current) interaction
             utterances = get_utterances(vocab_size, max_len, [interaction], opts.limit_utterances)
@@ -317,13 +344,18 @@ def train(opts, datasets, verbose_callbacks=False):
                     if not os.path.exists(opts.save_path):
                         os.makedirs(opts.save_path)
                     rank = str(trainer.distributed_context.rank)
-                    InteractionSaver.dump_interactions(interaction, mode="rsa_" + opts.test_rsa, epoch=0, rank=rank, dump_dir=opts.save_path)
+                    InteractionSaver.dump_interactions(interaction, mode="rsa_" + opts.test_rsa + opts.load_interaction,
+                                                       epoch=0, rank=rank,
+                                                       dump_dir=opts.save_interactions_path)
 
                     # Save loss and metrics
-                    loss_and_metrics = pickle.load(open(opts.save_path + '/loss_and_metrics.pkl', 'rb'))
+                    loss_and_metrics = pickle.load(open(opts.save_path + '/loss_and_metrics_' +
+                                                        opts.save_test_interactions_as + '.pkl', 'rb'))
+
                     loss_and_metrics['rsa_test_loss'] = eval_loss
                     loss_and_metrics['rsa_test_acc'] = acc
-                    pickle.dump(loss_and_metrics, open(opts.save_path + '/loss_and_metrics.pkl', 'wb'))
+                    pickle.dump(loss_and_metrics, open(opts.save_path + '/loss_and_metrics_' +
+                                                       opts.save_test_interactions_as + '.pkl', 'wb'))
 
 
 def main(params):
@@ -427,25 +459,33 @@ def main(params):
                         data = pickle.load(input_file)
                         final_epoch = max(data['loss_train'].keys())
                     opts.n_epochs = final_epoch
-                opts.interaction_path = os.path.join(opts.game_path, str(run), 'interactions', opts.test_rsa, 'epoch_' +
-                                                     str(opts.n_epochs), 'interaction_gpu0')
+                    if not opts.load_interaction == 'validation' and not opts.load_interaction == 'train':
+                        n_epoch = 0
+                    else:
+                        n_epoch = final_epoch
+                    opts.interaction_path = os.path.join(opts.game_path, str(run), 'interactions', opts.load_interaction,
+                                                         'epoch_' +
+                                                         str(n_epoch), 'interaction_gpu0')
 
         # if test_rsa is given, validate and setup interactions
         if opts.test_rsa:
-            if opts.test_rsa == 'train' or opts.test_rsa == 'validation' or opts.test_rsa == 'test':
+            # if opts.test_rsa == 'train' or opts.test_rsa == 'validation' or opts.test_rsa == 'test':
+            if opts.test_rsa:
                 # create subfolder if necessary
-                opts.save_path = os.path.join(opts.game_path, str(run),
-                                              'rsa', opts.test_rsa)
+                opts.save_path = os.path.join(opts.game_path, str(run))
                 if not os.path.exists(opts.save_path) and opts.save:
                     os.makedirs(opts.save_path)
-            else:
-                raise ValueError("--test_rsa must be 'train', 'validation', or 'test'")
+            # else:
+            #     raise ValueError("--test_rsa must be 'train', 'validation', or 'test'")
 
-        if opts.save_test_interactions and opts.zero_shot:
+        if opts.save_test_interactions:
             # create subfolder if necessary
-            opts.save_interactions_path = os.path.join(opts.game_path, 'zero_shot',
-                                              opts.zero_shot_test, str(run), "interactions")
-            opts.save_path = os.path.join(opts.game_path, 'zero_shot', opts.zero_shot_test, str(run))
+            if opts.zero_shot:
+                opts.save_interactions_path = os.path.join(opts.game_path, 'zero_shot',
+                                                  opts.zero_shot_test, str(run), "interactions")
+                opts.save_path = os.path.join(opts.game_path, 'zero_shot', opts.zero_shot_test, str(run))
+            elif opts.test_rsa:
+                opts.save_interactions_path = os.path.join(opts.game_path, str(run), 'interactions')
             if not os.path.exists(opts.save_interactions_path) and opts.save:
                 os.makedirs(opts.save_interactions_path)
 
@@ -516,9 +556,14 @@ def main(params):
 
             # set interaction path
             if opts.load_interaction:
-                opts.interaction_path = os.path.join(opts.save_path, 'interactions', opts.test_rsa,
+                if opts.test_rsa:
+                    opts.n_epochs = 0
+                opts.interaction_path = os.path.join(opts.save_path, 'interactions', opts.load_interaction,
                                                      'epoch_' +
                                                      str(opts.n_epochs), 'interaction_gpu0')
+                if not os.path.exists(opts.interaction_path):
+                    raise ValueError(
+                        f"Interaction file {opts.interaction_path} not found.")
 
         if opts.zero_shot_test != None or not opts.zero_shot:
             train(opts, data_set, verbose_callbacks=False)
