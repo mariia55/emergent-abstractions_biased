@@ -12,5 +12,5 @@ submitit
 matplotlib
 pandas
 tqdm
-
+h5py
 torchmetrics
