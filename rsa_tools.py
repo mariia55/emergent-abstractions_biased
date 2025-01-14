@@ -3,7 +3,7 @@ import torch
 
 
 def get_utterances(vocab_size, max_length, interactions=None, limit_utterances=0):
-    if interactions:
+    if interactions != [None]:
         utterances = get_unique_utterances(interactions)
     else:
         print(f'Generating utterances with vocab size {vocab_size} and max length {max_length}')
@@ -19,6 +19,8 @@ def get_utterances(vocab_size, max_length, interactions=None, limit_utterances=0
         num_random_samples = min(limit_utterances, utterances.shape[0])
         random_indices = torch.randperm(utterances.shape[0])[:num_random_samples]
         utterances = utterances[random_indices]
+
+        print(f'Randomly sampled {limit_utterances} utterances. New shape: {utterances.shape}')
 
     return utterances
 
