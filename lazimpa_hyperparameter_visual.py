@@ -34,6 +34,8 @@ type_data = "pkl" # "old" or "interaction" "pkl"
 metrics_order = [0,2,3] # acc, original_loss, pressure 
 with_eos = True # whether estimation is + 1 (for eos) Important if pressure is +1
 train_or_test = 'train' #str
+with_prediction = False
+save = True
 
 # function to use
 # added / separate / something
@@ -140,83 +142,91 @@ for l in range(length):
     x,y = f(init_threshold, init_cost,l,init_l_threshold)
     lines.append(ax.plot(x,y, lw=2,label=f"{l}",alpha = 0.5))
 
-x,y = f(init_threshold, init_cost,prediction,init_l_threshold)
-lines.append(ax.plot(x,y,lw=2,label=f"Prediction: {round(prediction,2)}",c="red",alpha=0.5))
+if with_prediction:
+    x,y = f(init_threshold, init_cost,prediction,init_l_threshold)
+    lines.append(ax.plot(x,y,lw=2,label=f"Prediction: {round(prediction,2)}",c="red",alpha=0.5))
 x,y = np.array(acc_data), loss_data + pressure_data
-ax.scatter(x,y,lw=2,label=f"Data ",s=2,c="black") # actual pressure dat
+ax.scatter(x,y,lw=2,label=f"Total Loss",s=2,c="black") # actual pressure dat
 ax.set_xlabel('accuracy')
+ax.set_ylabel('loss')
 if type_data == "old":
     ax.set_xlim([0.6,1.0])
 else:
     #pass
     ax.set_xlim([0.9,1.0])
 ax.set_ylim([0.0,0.6])
-ax.scatter(acc_data,loss_data,alpha=0.5,label="Loss",s=2,c="purple") # scatter loss
+ax.scatter(acc_data,loss_data,alpha=0.5,label="Impatience Loss",s=2,c="purple") # scatter loss
 #ax.plot(acc_data,loss_data,label="Loss") # plot loss
 if with_eos:
     ax.legend(title="Message Length with eos",loc="best")
 else:
     ax.legend(title="Message Length without eos",loc="best")
 
-# adjust the main plot to make room for the sliders
-fig.subplots_adjust(left=0.25, bottom=0.25, right=0.75)
+ax.legend(title="Estimation Laziness Loss for l(m) = ",loc="best")
 
-# Make a horizontal slider to control the cost.
-axfreq = fig.add_axes([0.25, 0.1, 0.65, 0.03])
-freq_slider = Slider(
-    ax=axfreq,
-    label='cost',
-    valmin=c_min,
-    valmax=c_max,
-    valinit=init_cost,
-)
+if not save:
+    # adjust the main plot to make room for the sliders
+    fig.subplots_adjust(left=0.25, bottom=0.25, right=0.75)
 
-# Make a vertically oriented slider to control the threshold
-axamp = fig.add_axes([0.1, 0.25, 0.0225, 0.63])
-amp_slider = Slider(
-    ax=axamp,
-    label="threshold",
-    valmin=t_min,
-    valmax=t_max,
-    valinit=init_threshold,
-    orientation="vertical"
-)
+    # Make a horizontal slider to control the cost.
+    axfreq = fig.add_axes([0.25, 0.1, 0.65, 0.03])
+    freq_slider = Slider(
+        ax=axfreq,
+        label='cost',
+        valmin=c_min,
+        valmax=c_max,
+        valinit=init_cost,
+    )
 
-# Make a vertically oriented slider to control the threshold
-axl = fig.add_axes([0.9, 0.25, 0.0225, 0.63])
-l_slider = Slider(
-    ax=axl,
-    label="length_threshold",
-    valmin=l_min,
-    valmax=l_max,
-    valinit=init_l_threshold,
-    orientation="vertical"
-)
+    # Make a vertically oriented slider to control the threshold
+    axamp = fig.add_axes([0.1, 0.25, 0.0225, 0.63])
+    amp_slider = Slider(
+        ax=axamp,
+        label="threshold",
+        valmin=t_min,
+        valmax=t_max,
+        valinit=init_threshold,
+        orientation="vertical"
+    )
 
-
-# The function to be called anytime a slider's value changes
-def update(val):
-    for l in range(length):
-        _,y = f(amp_slider.val, freq_slider.val,l,l_slider.val)
-        lines[l][0].set_ydata(y)
-    _,y = f(amp_slider.val, freq_slider.val,prediction,l_slider.val)
-    lines[-1][0].set_ydata(y)
-    fig.canvas.draw_idle()
+    # Make a vertically oriented slider to control the threshold
+    axl = fig.add_axes([0.9, 0.25, 0.0225, 0.63])
+    l_slider = Slider(
+        ax=axl,
+        label="length_threshold",
+        valmin=l_min,
+        valmax=l_max,
+        valinit=init_l_threshold,
+        orientation="vertical"
+    )
 
 
-# register the update function with each slider
-freq_slider.on_changed(update)
-amp_slider.on_changed(update)
-l_slider.on_changed(update)
+    # The function to be called anytime a slider's value changes
+    def update(val):
+        for l in range(length):
+            _,y = f(amp_slider.val, freq_slider.val,l,l_slider.val)
+            lines[l][0].set_ydata(y)
+        _,y = f(amp_slider.val, freq_slider.val,prediction,l_slider.val)
+        lines[-1][0].set_ydata(y)
+        fig.canvas.draw_idle()
 
-# Create a `matplotlib.widgets.Button` to reset the sliders to initial values.
-resetax = fig.add_axes([0.8, 0.025, 0.1, 0.04])
-button = Button(resetax, 'Reset', hovercolor='0.975')
+
+    # register the update function with each slider
+    freq_slider.on_changed(update)
+    amp_slider.on_changed(update)
+    l_slider.on_changed(update)
+
+    # Create a `matplotlib.widgets.Button` to reset the sliders to initial values.
+    resetax = fig.add_axes([0.8, 0.025, 0.1, 0.04])
+    button = Button(resetax, 'Reset', hovercolor='0.975')
 
 
-def reset(event):
-    freq_slider.reset()
-    amp_slider.reset()
-button.on_clicked(reset)
+    def reset(event):
+        freq_slider.reset()
+        amp_slider.reset()
+    button.on_clicked(reset)
+
+if save: 
+    plt.savefig("Plots/loss_plot.pdf", format="pdf", bbox_inches="tight")
 
 plt.show()

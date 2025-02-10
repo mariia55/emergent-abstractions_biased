@@ -362,7 +362,7 @@ def flatten_and_clean(arr,max=None):
             flattened.extend(cleaned_values)
     return np.array(flattened)
 
-def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epochs=300,color = ['b', 'g'], optimal_color='r', mean_runs=True, smoothing = False, std=False,frequency='message',plot_frequency=False):
+def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epochs=300,color = ['b', 'r'], optimal_color='g', mean_runs=True, smoothing = False, std=False,frequency='message',plot_frequency=False):
     """ This function creates a plot showing the message length as a function of the frequency rank. 
 
     :param paths: list
@@ -480,7 +480,7 @@ def plot_frequency_x_message_length(paths,setting,n_runs,n_values,datasets,n_epo
     plt.tight_layout()
 
 def plot_frequency(paths,setting,n_runs,n_values,datasets,n_epochs=300,color = ['b', 'r'], mean_runs=True, std=False,frequency='message'):
-    """ This function creates a plot showing the message length as a function of the frequency rank. 
+    """ This function creates a plot showing the relative as a function of the frequency rank. 
 
     :param paths: list
     :param setting: list
@@ -559,7 +559,7 @@ def plot_frequency(paths,setting,n_runs,n_values,datasets,n_epochs=300,color = [
                     ax.plot(list(range(len(oft))), oft,color[si],ls='-.')
 
         ax.set_title(f"Dataset: {datasets[i]}", fontsize=16)
-        ax.set_xlabel('rank')
+        ax.set_xlabel('frequency rank')
         ax.tick_params(axis='x', which='both', labelbottom=True)
         ax.set_ylabel('relative frequency')
         ax.legend(fontsize=13,loc='lower right')
@@ -757,20 +757,23 @@ def plot_heatmap_concept_x_context_errors_variable_datasets(result_list,
 # retrieve info from interaction
 #**************************
 
-def load_interaction(path,setting,nr=0,n_epochs=300):
+def load_interaction(path,setting,nr=0,n_epochs=300,val=False):
     """ loads an interaction given the path, setting, nr and how many epochs where done (Path before setting)
     
     :param path: str
     :param setting: str
     :param nr: int
     :param n_epochs: int
+    : param val: bool (If true load validation data if false load train)
     """
     # select first run
     path_to_run = path + '/' + str(setting) +'/' + str(nr) + '/'
     path_to_interaction_train = (path_to_run + 'interactions/train/epoch_' + str(n_epochs) + '/interaction_gpu0')
     path_to_interaction_val = (path_to_run + 'interactions/validation/epoch_' + str(n_epochs) + '/interaction_gpu0')
-    interaction = torch.load(path_to_interaction_train)
-    print(path_to_interaction_train)
+    if val:
+        interaction = torch.load(path_to_interaction_val)
+    else:
+        interaction = torch.load(path_to_interaction_train)
     return interaction
 
 def retrieve_messages(interaction, as_list = True, remove_after_eos = False, eos_token = 0.0):
