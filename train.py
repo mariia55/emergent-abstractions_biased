@@ -161,7 +161,7 @@ def train(opts, datasets, verbose_callbacks=False):
             os.makedirs(opts.save_path)
         if not opts.save_test_interactions:
             pickle.dump(opts, open(opts.save_path + '/params.pkl', 'wb'))
-        save_epoch = opts.n_epochs
+        save_epoch = opts.save
     else:
         save_epoch = None
 
@@ -206,8 +206,8 @@ def train(opts, datasets, verbose_callbacks=False):
     else:
         if opts.shapes3d:
             # hard coded number of features for the feature representations at the moment
-            sender = Sender(opts.hidden_size, 100, opts.game_size, opts.context_unaware)
-            receiver = Receiver(100, opts.hidden_size)
+            sender = Sender(opts.hidden_size, 100, opts.game_size, opts.context_unaware, shapes3d=opts.shapes3d)
+            receiver = Receiver(100, opts.hidden_size, shapes3d=opts.shapes3d)
         else:
             sender = Sender(opts.hidden_size, sum(dimensions), opts.game_size, opts.context_unaware)
             receiver = Receiver(sum(dimensions), opts.hidden_size)
@@ -315,6 +315,8 @@ def train(opts, datasets, verbose_callbacks=False):
                 # Load given interaction
                 interaction = torch.load(opts.interaction_path)
                 print("# loading interaction from", opts.interaction_path)
+            # TODO: specify third case: either interactions are loaded, or the current interaction is used, or generate
+            # utterances
             else:
                 interaction = None
 
@@ -427,7 +429,7 @@ def main(params):
         # if not given, generate data set (new for each run for the small datasets)
         if not opts.load_dataset and not opts.zero_shot:
             if opts.shapes3d:
-                data_set = load_or_create_dataset('./dataset/feat_rep_concept_dataset', device=opts.device)
+                data_set = load_or_create_dataset('dataset/shapes3d_feat_rep', device=opts.device)
             else:
                 data_set = dataset.DataSet(opts.dimensions,
                                            game_size=opts.game_size,
@@ -485,6 +487,8 @@ def main(params):
                                                   opts.zero_shot_test, str(run), "interactions")
                 opts.save_path = os.path.join(opts.game_path, 'zero_shot', opts.zero_shot_test, str(run))
             elif opts.test_rsa:
+                opts.save_interactions_path = os.path.join(opts.game_path, str(run), 'interactions')
+            else:
                 opts.save_interactions_path = os.path.join(opts.game_path, str(run), 'interactions')
             if not os.path.exists(opts.save_interactions_path) and opts.save:
                 os.makedirs(opts.save_interactions_path)
@@ -557,10 +561,10 @@ def main(params):
             # set interaction path
             if opts.load_interaction:
                 if opts.test_rsa:
-                    opts.n_epochs = 0
+                    opts.save_epochs = 0
                 opts.interaction_path = os.path.join(opts.save_path, 'interactions', opts.load_interaction,
                                                      'epoch_' +
-                                                     str(opts.n_epochs), 'interaction_gpu0')
+                                                     str(opts.save_epochs), 'interaction_gpu0')
                 if not os.path.exists(opts.interaction_path):
                     raise ValueError(
                         f"Interaction file {opts.interaction_path} not found.")
