@@ -5,13 +5,14 @@ from torch.utils.data import Dataset
 from dataset import DataSet
 from load import load_data
 from vision_module import feat_rep_vision_module
-
+#from shapes_dataset import ShapesDataset
 
 class ShapesDataset(Dataset):
     """
     This class uses given image, label and feature representation arrays to make a pytorch dataset out of them.
     The feature representations are left empty until 'generate_dataset()' is used to fill them.
     """
+     
     def __init__(self, images=None, labels=None, feat_reps=None, transform=None):
         if images is None and labels is None:
             raise ValueError('No images or labels given')

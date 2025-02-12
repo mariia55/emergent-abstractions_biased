@@ -31,6 +31,9 @@ def get_params():
     parser.add_argument('--batch_size', type=int, default=32,
                         help="Give batch size for training")
     
+    parser.add_argument('--path', type=str, default="",
+                        help="Path where to save the results - needed for running on HPC3.")
+    
     args = parser.parse_args()
 
     return args
@@ -64,6 +67,7 @@ def train(args):
 
     print(f'Training on {train_size} samples and testing on {test_size} samples')
     
+    # train, val, test -> might cause error in train.py
     train_data, test_data = torch.utils.data.random_split(complete_data, [train_size, test_size])
 
     # init both dataloaders with corresponding datasets
