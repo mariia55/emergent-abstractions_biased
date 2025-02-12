@@ -3,6 +3,7 @@
 from egg.core.language_analysis import calc_entropy, _hashable_tensor, Disent
 from sklearn.metrics import normalized_mutual_info_score
 from language_analysis_local import MessageLengthHierarchical
+from collections import Counter
 import numpy as np
 import itertools
 import random
@@ -388,6 +389,7 @@ def message_length_per_hierarchy_level(interaction, n_attributes):
     ml_hierarchical = MessageLengthHierarchical.compute_message_length_hierarchical(message, torch.from_numpy(fixed))
     return (ml, ml_hierarchical)
 
+
 def message_length_per_context_condition(interaction, n_attributes):
     # Get relevant attributes
     sender_input = interaction.sender_input
@@ -409,9 +411,22 @@ def message_length_per_context_condition(interaction, n_attributes):
 
     message = interaction.message.argmax(dim=-1)
     ml = MessageLengthHierarchical.compute_message_length(message)
-    ml_hierarchical = MessageLengthHierarchical.compute_message_length_over_context(
+    ml_context, ml_fine_context, ml_coarse_context = MessageLengthHierarchical.compute_message_length_over_context(
         message, torch.from_numpy(fixed), torch.from_numpy(np.array(context_conds)))
-    return ml_hierarchical
+    return ml_context, ml_fine_context, ml_coarse_context
+
+
+def effective_vocab_size(interaction, vocab_size, is_gumbel=True):
+    """
+    determines effectively used symbols
+    returns the effective vocab size, the counts for each symbol in vocab, and the ratio of effective vocab size by
+    possible vocab size
+    """
+    messages = interaction.message.argmax(dim=-1) if is_gumbel else interaction.message
+    messages = [msg.tolist() for msg in messages]
+    all_symbols = [symbol for message in messages for symbol in message]
+    symbol_counts = Counter(all_symbols)
+    return len(symbol_counts), symbol_counts, len(symbol_counts)/vocab_size
 
 
 def symbol_frequency(interaction, n_attributes, n_values, vocab_size, is_gumbel=True):
@@ -657,3 +672,49 @@ def error_analysis(datasets, paths, setting, n_epochs, n_values, validation=True
             all_total_concepts, all_total_contexts, all_total_concept_x_context)
 
 
+def informativeness_score(interaction, distance='manhattan'):
+    """
+    Takes a distance function.
+    Calculates informativeness of a lexicon based on the measure proposed by Gualdoni et al. (2024).
+    """
+    if distance not in ['manhattan', 'euclidean']:
+        print("Distance must be either 'manhattan' or 'euclidean'.")
+        return
+
+    _, counts_sender_input = torch.unique(interaction.sender_input, return_counts=True, dim=0)
+    unique_messages, message_indices, message_counts = torch.unique(interaction.message, return_inverse=True,
+                                                                    return_counts=True, dim=0)
+    # TODO: find effective message length and use messages according to effective message length?
+    informativeness = []
+    # for each unique message:
+    for i, m in enumerate(unique_messages):
+        # find out all referents
+        referents = []
+        for j, idx in enumerate(message_indices):
+            if idx == i:
+                # subset :10 to only consider targets, not distractors
+                referents.append(interaction.sender_input[j][:10])
+        if len(referents) > 1:
+            # compute pairwise distances between referents
+            # (e.g. (_,2,1) is more similar to (_,1,1) than to (_,1,3) or to (_,_,3))
+            distances = []
+            tmp = []
+            for k, ref in enumerate(referents):
+                for j in range(len(referents)):
+                    if k != j:
+                        if distance == 'manhattan':
+                            dist = torch.sum(torch.abs(ref - referents[j]))
+                            distances.append(dist)
+                        elif distance == 'euclidean':
+                            dist = torch.norm(ref - referents[j])
+                            distances.append(dist)
+            distances = [d for d in distances if d != 0.0]
+            if len(distances) != 0:
+                tmp.append(sum(distances) / len(distances))
+            tmp = [t for t in tmp if t != 0.0]
+            # word informativeness is 1/averaged pairwise distances, *10^2 as in original paper for better visibility
+            if len(tmp) != 0:
+                informativeness.append(100 / (sum(tmp) / len(tmp)))
+    # informativeness of a lexicon is word informativeness per word averaged
+    lex_info = np.sum(informativeness) / len(informativeness)
+    return lex_info, len(unique_messages), len(counts_sender_input)

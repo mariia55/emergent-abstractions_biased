@@ -430,7 +430,7 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
 
 
 def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=False, rsa=False, rsa_test=None,
-                   sampled_context=False):
+                   sampled_context=False, test_interactions=False, test_mode=None):
     """ loads all entropy scores into a dictionary"""
 
     if sampled_context:
@@ -453,6 +453,11 @@ def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=False
     else:
         rsa_file_extension = ''
 
+    if test_interactions:
+        test_file_extension = '_' + test_mode
+    else:
+        test_file_extension = ''
+
     result_dict = {'NMI': [], 'effectiveness': [], 'consistency': [],
                    'NMI_hierarchical': [], 'effectiveness_hierarchical': [], 'consistency_hierarchical': [],
                    'NMI_context_dep': [], 'effectiveness_context_dep': [], 'consistency_context_dep': [],
@@ -468,7 +473,7 @@ def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=False
 
         for run in range(n_runs):
             standard_path = path + '/' + setting + '/' + str(run) + '/'
-            data = pickle.load(open(standard_path + 'entropy_scores' + rsa_file_extension + '.pkl', 'rb'))
+            data = pickle.load(open(standard_path + 'entropy_scores' + rsa_file_extension + test_file_extension + '.pkl', 'rb'))
             NMIs.append(data['normalized_mutual_info'])
             effectiveness_scores.append(data['effectiveness'])
             consistency_scores.append(data['consistency'])
