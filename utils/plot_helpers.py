@@ -48,6 +48,7 @@ def plot_heatmap(result_list,
 
         for p, pos in enumerate(matrix_indices):
             heatmap[pos] = values[p]
+            
 
         im = plt.imshow(heatmap, vmin=y_lim[0], vmax=y_lim[1])
         plt.title(titles[i], fontsize=fontsize)
@@ -359,8 +360,8 @@ def plot_training_trajectory(results_train,
             plt.plot(range(0, n_epochs, steps[1]), np.transpose(results_val[i]), color='red')
             plt.legend(['train', 'val'])
             leg = plt.legend(['train', 'val'], fontsize=12)
-            leg.legendHandles[0].set_color('blue')
-            leg.legendHandles[1].set_color('red')
+            leg.legend_handles[0].set_color('blue') # for older matplotlib version: leg.legendHandles
+            leg.legend_handles[1].set_color('red')
         plt.title(titles[i], fontsize=13)
         plt.xlabel('epoch', fontsize=12)
         if loss_plot:

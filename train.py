@@ -381,7 +381,7 @@ def main(params):
         opts.game_size = 4
     folder_name = (data_set_name + '_game_size_' + str(opts.game_size)
                    + '_vsf_' + str(opts.vocab_size_factor))
-    folder_name = os.path.join("results", folder_name)
+    folder_name = os.path.join("results/3dshapes", folder_name)
 
     # define game setting from args
     if opts.context_unaware:
