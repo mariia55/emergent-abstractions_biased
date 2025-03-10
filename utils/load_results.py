@@ -6,7 +6,7 @@ import copy
 
 def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=False, context_unaware=False,
                     length_cost=False, early_stopping=False, rsa=False, rsa_test=None, zero_shot_test_ds=None,
-                    sampled_context=False):
+                    sampled_context=False, shapes3d=False):
     """ loads all accuracies into a dictionary, val_steps should be set to the same as val_frequency during training
     """
     result_dict = {'train_acc': [], 'val_acc': [], 'test_acc': [],
