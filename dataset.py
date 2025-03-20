@@ -33,6 +33,9 @@ class DataSet(torch.utils.data.Dataset):
         self.sample_context = sample_context
         self.granularity = granularity
 
+        # if the flag for shapes3d is True the dataset will be created with the images and labels of shapes3d
+        self.is_shapes3d = is_shapes3d
+
         # check if granularity has one of the allowed values
         if granularity not in ["mixed", "fine", "coarse"]:
             raise ValueError("Granularity must be one of: 'mixed', 'fine', or 'coarse'.")
@@ -40,9 +43,6 @@ class DataSet(torch.utils.data.Dataset):
         # check that sample context is not used together with fine or coarse granularities
         if sample_context and granularity in ["fine", "coarse"]:
             raise ValueError("Sample context can only be applied in the mixed granularity (standard) condition.")
-
-        # if the flag for shapes3d is True the dataset will be created with the images and labels of shapes3d
-        self.is_shapes3d = is_shapes3d
 
         if self.is_shapes3d:
             # images can also be feature representations

@@ -122,6 +122,8 @@ def get_params(params):
                         help='Granularity of the context. Possible values are: mixed, coarse and fine')
     parser.add_argument('--shapes3d', type=bool, default=False,
                         help="Determines whether 3dshapes dataset will be used or not")
+    parser.add_argument('--n_epochs', type=int, default=10,
+                        help="How many epochs to train for")
 
     args = core.init(parser, params)
 
@@ -205,6 +207,7 @@ def train(opts, datasets, verbose_callbacks=False):
         ))
     else:
         if opts.shapes3d:
+            print("game_size: ", opts.game_size) 
             # hard coded number of features for the feature representations at the moment
             sender = Sender(opts.hidden_size, 100, opts.game_size, opts.context_unaware)
             receiver = Receiver(100, opts.hidden_size)

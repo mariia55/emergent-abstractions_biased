@@ -463,8 +463,13 @@ def symbol_frequency(interaction, n_attributes, n_values, vocab_size, is_gumbel=
             for position in range(len(obj)):
                 if not np.isnan(obj[position]):
                     att_val_frequency[level] += 1
-                    fav_symbol = favorite_symbol[str(position) + str(int(obj[position]))]
-                    symbol_frequency[level] += np.count_nonzero(message == fav_symbol)
+                    key = str(position) + str(int(obj[position]))
+                    if key in favorite_symbol:
+                        fav_symbol = favorite_symbol[key]
+                        symbol_frequency[level] += np.count_nonzero(message == fav_symbol)
+                    else:
+                        # Handle missing key
+                        print(f"Warning: Key {key} not found in favorite_symbol")
 
     return symbol_frequency / att_val_frequency, mutual_information
 
