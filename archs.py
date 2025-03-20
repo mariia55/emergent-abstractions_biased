@@ -33,6 +33,10 @@ class Sender(nn.Module):
         n_features = x.shape[2]
         n_targets = int(n_obj / 2)
 
+        # Ensure the input tensor has the correct shape
+        assert n_features == 100, f"Expected n_features to be 100, but got {n_features}"
+        #assert n_targets == 10, f"Expected n_targets to be 10, but got {n_targets}"
+
         # embed target objects:
         targets = x[:, :n_targets]
         targets_flat = targets.reshape(batch_size, n_targets * n_features)
