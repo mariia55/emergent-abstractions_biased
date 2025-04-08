@@ -102,7 +102,7 @@ def generate_dataset():
     print(f"Feature representations saved to {dataset_path + '_feat_rep'} and {dataset_path + '_feat_rep_no_images'}")
     return feat_rep_dataset_full, feat_rep_dataset_without_images
 
-def load_or_create_dataset(dataset_path, device='cpu'):
+def load_or_create_dataset(dataset_path, device='cpu', game_size = 4):
     """
     Loads the image representation dataset if it exists, otherwise creates it
     dataset_path: str, path to the dataset file
@@ -115,7 +115,7 @@ def load_or_create_dataset(dataset_path, device='cpu'):
     except:
         print("Feature representations not found, creating it instead...")
         complete_dataset, _ = generate_dataset()
-        data_set = DataSet(game_size=4,
+        data_set = DataSet(game_size=game_size,
                            is_shapes3d=True,
                            images=complete_dataset.feat_reps,
                            labels=complete_dataset.labels,
@@ -133,9 +133,9 @@ if __name__ == "__main__":
         complete_dataset, _ = generate_dataset()
 
     # generate concept datasets for the communication game
-    feat_rep_concept_dataset = DataSet(game_size=4, is_shapes3d=True, images=complete_dataset.feat_reps, labels=complete_dataset.labels, device='mps')
+    feat_rep_concept_dataset = DataSet(game_size=10, is_shapes3d=True, images=complete_dataset.feat_reps, labels=complete_dataset.labels, device='mps')
     torch.save(feat_rep_concept_dataset, './dataset/feat_rep_concept_dataset', pickle_protocol=4)
 
     # also for the zero_shot dataset
-    feat_rep_zero_concept_dataset = DataSet(game_size=4, zero_shot=True, is_shapes3d=True, images=complete_dataset.feat_reps, labels=complete_dataset.labels, device='mps')
+    feat_rep_zero_concept_dataset = DataSet(game_size=10, zero_shot=True, is_shapes3d=True, images=complete_dataset.feat_reps, labels=complete_dataset.labels, device='mps')
     torch.save(feat_rep_zero_concept_dataset, './dataset/feat_rep_zero_concept_dataset', pickle_protocol=4)

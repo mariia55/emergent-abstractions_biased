@@ -122,8 +122,7 @@ def get_params(params):
                         help='Granularity of the context. Possible values are: mixed, coarse and fine')
     parser.add_argument('--shapes3d', type=bool, default=False,
                         help="Determines whether 3dshapes dataset will be used or not")
-    parser.add_argument('--n_epochs', type=int, default=10,
-                        help="How many epochs to train for")
+
 
     args = core.init(parser, params)
 
@@ -381,7 +380,7 @@ def main(params):
     data_set_name = '(' + str(len(opts.dimensions)) + ',' + str(opts.dimensions[0]) + ')'
     if opts.shapes3d:
         data_set_name = 'shapes3d_feat_rep'
-        opts.game_size = 4 # 4 before
+        #opts.game_size = 4 # 4 before
     folder_name = (data_set_name + '_game_size_' + str(opts.game_size)
                    + '_vsf_' + str(opts.vocab_size_factor))
     folder_name = os.path.join("results/3dshapes", folder_name)
@@ -430,7 +429,10 @@ def main(params):
         # if not given, generate data set (new for each run for the small datasets)
         if not opts.load_dataset and not opts.zero_shot:
             if opts.shapes3d:
-                data_set = load_or_create_dataset('./dataset/feat_rep_concept_dataset', device=opts.device)
+                if opts.game_size == 4:
+                    data_set = load_or_create_dataset('./dataset/feat_rep_concept_dataset', device=opts.device, game_size=opts.game_size)
+                elif opts.game_size == 10:
+                    data_set = load_or_create_dataset('./dataset/feat_rep_concept_dataset_gs10', device=opts.device, game_size=opts.game_size)
             else:
                 data_set = dataset.DataSet(opts.dimensions,
                                            game_size=opts.game_size,
@@ -513,7 +515,7 @@ def main(params):
                     os.makedirs(opts.save_path)
                 if not opts.load_dataset:
                     if opts.shapes3d:
-                        data_set = load_or_create_dataset('./dataset/feat_rep_zero_concept_dataset')
+                        data_set = load_or_create_dataset('./dataset/feat_rep_zero_concept_dataset', device=opts.device, game_size=opts.game_size)
                     else:
                         data_set = dataset.DataSet(opts.dimensions,
                                                    game_size=opts.game_size,
@@ -538,7 +540,7 @@ def main(params):
                     if not os.path.exists(opts.save_path) and opts.save:
                         os.makedirs(opts.save_path)
                     if opts.shapes3d:
-                        data_set = load_or_create_dataset('./dataset/feat_rep_zero_concept_dataset')
+                        data_set = load_or_create_dataset('./dataset/feat_rep_zero_concept_dataset', device=opts.device, game_size=opts.game_size)
                     else:
                         data_set = dataset.DataSet(opts.dimensions,
                                                    game_size=opts.game_size,
