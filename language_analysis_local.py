@@ -127,14 +127,28 @@ class MessageLengthHierarchical(Callback):
 
         message_length = MessageLengthHierarchical.compute_message_length(messages)
         n_attributes = fixed_vectors.shape[1]
+        number_same = torch.sum(fixed_vectors, dim=1)
 
-        message_lengths = []
-        for n in range(0, n_attributes):
+        (message_lengths, message_lengths_fine, message_lengths_coarse,
+         message_length_step_fine, message_length_step_coarse) = [], [], [], [], []
+        for n in range(n_attributes):
             hierarchical_length = message_length[context_conds == n].float()
             message_lengths.append(hierarchical_length)
         message_length_step = [round(torch.mean(message_lengths[i]).item(), 3) for i in range(n_attributes)]
+        # fine context: all concepts (generic - specific) in only finest contexts (i.e., 0 shared attributes if 1
+        # attribute is fixed, 2 shared attributes if 3 attributes are fixed etc.)
+        for n in range(1, n_attributes + 1):
+            hierarchical_length = message_length[(number_same == n) & (context_conds == n-1)].float()
+            message_lengths_fine.append(hierarchical_length)
+        message_length_step_fine = [round(torch.mean(message_lengths_fine[i]).item(), 3) for i in range(n_attributes)]
+        # coarse context: all concepts (generic - specific) in only coarsest contexts (i.e., 0 shared attributes)
+        # this means that only one attribute needs to be communicated for successful communication
+        for n in range(1, n_attributes + 1):
+            hierarchical_length = message_length[(number_same == n) & (context_conds == 0)].float()
+            message_lengths_coarse.append(hierarchical_length)
+        message_length_step_coarse = [round(torch.mean(message_lengths_coarse[i]).item(), 3) for i in range(n_attributes)]
 
-        return message_length_step
+        return message_length_step, message_length_step_fine, message_length_step_coarse
 
     def print_difference_length_relevance(self, logs: Interaction, tag: str, epoch: int):
 
@@ -279,7 +293,7 @@ class TopographicSimilarityConceptLevel(Callback):
             messages: torch.Tensor,
             meaning_distance_fn: Union[str, Callable] = "hausdorff",
             message_distance_fn: Union[str, Callable] = "edit",
-    ) -> float:
+    ) -> dict:
         """
         This function taken is from EGG
         https://github.com/facebookresearch/EGG/blob/ace483e30c99a5bc480d84141bcc6f4416e5ec2b/egg/core/language_analysis.py#L164-L199

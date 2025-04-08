@@ -1,6 +1,9 @@
 import numpy as np
 import pathlib
-import h5py
+try:
+    import h5py
+except:
+    print("Module h5py not found - shapes3d training will not work. Ignore if you do not want to train shapes3d.")
 
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.model_selection import train_test_split

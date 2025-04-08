@@ -6,7 +6,11 @@ import copy
 
 def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=False, context_unaware=False,
                     length_cost=False, early_stopping=False, rsa=False, rsa_test=None, zero_shot_test_ds=None,
+<<<<<<< HEAD
                     sampled_context=False, shapes3d=False):
+=======
+                    sampled_context=False, hierarchical=False, shared_context=False):
+>>>>>>> bcfbc63a8593e73b29496059eb12ed6671ee1e51
     """ loads all accuracies into a dictionary, val_steps should be set to the same as val_frequency during training
     """
     result_dict = {'train_acc': [], 'val_acc': [], 'test_acc': [],
@@ -22,7 +26,11 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                    'cu_zs_generic_train_acc': [], 'cu_zs_generic_val_acc': [], 'cu_zs_generic_test_acc': [],
                    'cu_zs_specific_train_message_length': [], 'cu_zs_generic_val_message_length': [],
                    'rsa_test_loss': [], 'rsa_test_acc': [], 'final_test_acc': [], 'final_test_loss': [],
-                   'rsa_test_gen_utt_loss': [], 'rsa_test_gen_utt_acc': []}
+                   'rsa_test_gen_utt_loss': [], 'rsa_test_gen_utt_acc': [],
+                   'zs_specific_rsa_test_loss': [], 'zs_specific_rsa_test_acc': [],
+                   'zs_specific_final_test_acc': [], 'zs_specific_final_test_loss': [],
+                   'zs_generic_rsa_test_loss': [], 'zs_generic_rsa_test_acc': [],
+                   'zs_generic_final_test_acc': [], 'zs_generic_final_test_loss': []}
 
     for path_idx, path in enumerate(all_paths):
 
@@ -62,6 +70,15 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
         final_test_losses = []
         rsa_test_gen_utt_losses = []
         rsa_test_gen_utt_accs = []
+        zs_specific_rsa_test_losses = []
+        zs_specific_rsa_test_accs = []
+        zs_specific_final_test_accs = []
+        zs_specific_final_test_losses = []
+        zs_generic_rsa_test_losses = []
+        zs_generic_rsa_test_accs = []
+        zs_generic_final_test_accs = []
+        zs_generic_final_test_losses = []
+
 
         # prepare paths
         if sampled_context:
@@ -71,6 +88,12 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
             standard_path = "standard"
             context_unaware_path = "context_unaware"
         context_aware_path = "context_aware"
+        if hierarchical:
+            context_unaware_path = context_unaware_path + '/hierarchical'
+            context_aware_path = context_aware_path + '/hierarchical'
+        if shared_context:
+            context_unaware_path = context_unaware_path + '/shared_context'
+            context_aware_path = context_aware_path + '/shared_context'
         length_cost_path = "length_cost"
         zero_shot_path = "zero_shot"
         if rsa:
@@ -269,6 +292,14 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                                     zs_data = pickle.load(open(file_path, 'rb'))
                                     print("Metrics loaded from " + file_path + " for condition " + str(cond) +
                                           ". Tried to load file " + file_name_zs + " unsuccessfully.")
+                            if rsa:
+                                file_path = f"{path}/{standard_path}/{zero_shot_path}/{cond}/{run_path}/{file_name}_{rsa_file_extension}.{file_extension}"
+                                data = pickle.load(open(file_path, 'rb'))
+                                # test acc
+                                final_test_accs.append(data['final_test_acc'])
+                                final_test_losses.append(data['final_test_loss'])
+                                rsa_test_accs.append(data['rsa_test_acc'])
+                                rsa_test_losses.append(data['rsa_test_loss'])
                         else:
                             if zero_shot_test_ds is None:
                                 file_path = f"{path}/{length_cost_path}/{context_aware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name_zs_default}.{file_extension}"
@@ -282,6 +313,20 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                                     zs_data = pickle.load(open(file_path, 'rb'))
                                     print("Metrics loaded from " + file_path + " for condition " + str(cond) +
                                           ". Tried to load file " + file_name_zs + " unsuccessfully.")
+                            if rsa:
+                                file_path = f"{path}/{length_cost_path}/{context_aware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name}_{rsa_file_extension}.{file_extension}"
+                                data = pickle.load(open(file_path, 'rb'))
+                                # test acc and rsa acc
+                                if cond == 'specific':
+                                    zs_specific_final_test_accs.append(data['final_test_acc'])
+                                    zs_specific_final_test_losses.append(data['final_test_loss'])
+                                    zs_specific_rsa_test_accs.append(data['rsa_test_acc'])
+                                    zs_specific_rsa_test_losses.append(data['rsa_test_loss'])
+                                else:
+                                    zs_generic_final_test_accs.append(data['final_test_acc'])
+                                    zs_generic_final_test_losses.append(data['final_test_loss'])
+                                    zs_generic_rsa_test_accs.append(data['rsa_test_acc'])
+                                    zs_generic_rsa_test_losses.append(data['rsa_test_loss'])
 
                         if zero_shot_test_ds is None:
                             # accuracies
@@ -329,50 +374,74 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                                     cu_zs_data = pickle.load(open(file_path, 'rb'))
                                     print("Metrics loaded from " + file_path + " for condition " + str(cond) +
                                           ". Tried to load file " + file_name_zs + " unsuccessfully.")
+                            if rsa:
+                                file_path = f"{path}/{context_unaware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name}_{rsa_file_extension}.{file_extension}"
+                                data = pickle.load(open(file_path, 'rb'))
+                                # test acc and rsa acc
+                                if cond == 'specific':
+                                    zs_specific_final_test_accs.append(data['final_test_acc'])
+                                    zs_specific_final_test_losses.append(data['final_test_loss'])
+                                    zs_specific_rsa_test_accs.append(data['rsa_test_acc'])
+                                    zs_specific_rsa_test_losses.append(data['rsa_test_loss'])
+                                else:
+                                    zs_generic_final_test_accs.append(data['final_test_acc'])
+                                    zs_generic_final_test_losses.append(data['final_test_loss'])
+                                    zs_generic_rsa_test_accs.append(data['rsa_test_acc'])
+                                    zs_generic_rsa_test_losses.append(data['rsa_test_loss'])
                         else:
                             if zero_shot_test_ds is None:
-                                file_path = f"{path}/{length_cost_path}/{context_unaware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name_zs}.{file_extension}"
+                                file_path = f"{path}/{length_cost_path}/{context_unaware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name_zs_default}.{file_extension}"
                                 cu_zs_data = pickle.load(open(file_path, 'rb'))
                             else:
                                 try:
                                     file_path = f"{path}/{length_cost_path}/{context_unaware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name_zs}.{file_extension}"
                                     cu_zs_data = pickle.load(open(file_path, 'rb'))
                                 except FileNotFoundError:
-                                    file_path = f"{path}/{length_cost_path}/{context_unaware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name_zs}.{file_extension}"
+                                    file_path = f"{path}/{length_cost_path}/{context_unaware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name_zs_default}.{file_extension}"
                                     cu_zs_data = pickle.load(open(file_path, 'rb'))
                                     print("Metrics loaded from " + file_path + " for condition " + str(cond) +
                                           ". Tried to load file " + file_name_zs + " unsuccessfully.")
+                            if rsa:
+                                file_path = f"{path}/{length_cost_path}/{context_unaware_path}/{zero_shot_path}/{cond}/{run_path}/{file_name}_{rsa_file_extension}.{file_extension}"
+                                data = pickle.load(open(file_path, 'rb'))
+                                # test acc and rsa acc
+                                if cond == 'specific':
+                                    zs_specific_final_test_accs.append(data['final_test_acc'])
+                                    zs_specific_final_test_losses.append(data['final_test_loss'])
+                                    zs_specific_rsa_test_accs.append(data['rsa_test_acc'])
+                                    zs_specific_rsa_test_losses.append(data['rsa_test_loss'])
+                                else:
+                                    zs_generic_final_test_accs.append(data['final_test_acc'])
+                                    zs_generic_final_test_losses.append(data['final_test_loss'])
+                                    zs_generic_rsa_test_accs.append(data['rsa_test_acc'])
+                                    zs_generic_rsa_test_losses.append(data['rsa_test_loss'])
 
-                        if zero_shot_test_ds is None:
-                            # accuracies
-                            lists = sorted(cu_zs_data['metrics_train0'].items())
-                            _, cu_zs_train_acc = zip(*lists)
-                            lists = sorted(cu_zs_data['metrics_test0'].items())
-                            _, cu_zs_val_acc = zip(*lists)
+                        # if zero_shot_test_ds is None:
+                        # accuracies
+                        lists = sorted(cu_zs_data['metrics_train0'].items())
+                        _, cu_zs_train_acc = zip(*lists)
+                        lists = sorted(cu_zs_data['metrics_test0'].items())
+                        _, cu_zs_val_acc = zip(*lists)
 
-                            # message lengths
-                            lists = sorted(cu_zs_data['metrics_train1'].items())
-                            _, train_message_length = zip(*lists)
-                            lists = sorted(cu_zs_data['metrics_test1'].items())
-                            _, val_message_length = zip(*lists)
+                        # message lengths
+                        lists = sorted(cu_zs_data['metrics_train1'].items())
+                        _, train_message_length = zip(*lists)
+                        lists = sorted(cu_zs_data['metrics_test1'].items())
+                        _, val_message_length = zip(*lists)
 
-                            if cond == 'specific':
-                                cu_zs_specific_train_accs.append(cu_zs_train_acc)
-                                cu_zs_specific_val_accs.append(cu_zs_val_acc)
-                                cu_zs_specific_test_accs.append(cu_zs_data['final_test_acc'])
-                                cu_zs_specific_train_message_lengths.append(train_message_length)
-                                cu_zs_specific_val_message_lengths.append(val_message_length)
-                            else:
-                                cu_zs_generic_train_accs.append(cu_zs_train_acc)
-                                cu_zs_generic_val_accs.append(cu_zs_val_acc)
-                                cu_zs_generic_test_accs.append(cu_zs_data['final_test_acc'])
-                                cu_zs_generic_train_message_lengths.append(train_message_length)
-                                cu_zs_generic_val_message_lengths.append(val_message_length)
+                        if cond == 'specific':
+                            cu_zs_specific_train_accs.append(cu_zs_train_acc)
+                            cu_zs_specific_val_accs.append(cu_zs_val_acc)
+                            cu_zs_specific_test_accs.append(cu_zs_data['final_test_acc'])
+                            cu_zs_specific_train_message_lengths.append(train_message_length)
+                            cu_zs_specific_val_message_lengths.append(val_message_length)
                         else:
-                            if cond == 'specific':
-                                cu_zs_specific_test_accs.append(cu_zs_data['final_test_acc'])
-                            else:
-                                cu_zs_generic_test_accs.append(cu_zs_data['final_test_acc'])
+                            cu_zs_generic_train_accs.append(cu_zs_train_acc)
+                            cu_zs_generic_val_accs.append(cu_zs_val_acc)
+                            cu_zs_generic_test_accs.append(cu_zs_data['final_test_acc'])
+                            cu_zs_generic_train_message_lengths.append(train_message_length)
+                            cu_zs_generic_val_message_lengths.append(val_message_length)
+
 
         if not context_unaware and not zero_shot:
             if rsa_test is None:
@@ -386,7 +455,7 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                 result_dict['final_test_loss'].append(final_test_losses)
                 result_dict['rsa_test_acc'].append(rsa_test_accs)
                 result_dict['rsa_test_loss'].append(rsa_test_losses)
-        elif context_unaware:
+        elif context_unaware and not zero_shot:
             if rsa_test is None:
                 result_dict['cu_train_acc'].append(cu_train_accs)
                 result_dict['cu_val_acc'].append(cu_val_accs)
@@ -400,7 +469,7 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
                 result_dict['rsa_test_loss'].append(rsa_test_losses)
                 result_dict['rsa_test_gen_utt_acc'].append(rsa_test_gen_utt_accs)
                 result_dict['rsa_test_gen_utt_loss'].append(rsa_test_gen_utt_losses)
-        elif zero_shot:
+        elif not context_unaware and zero_shot:
             result_dict['zs_specific_train_acc'].append(zs_specific_train_accs)
             result_dict['zs_specific_val_acc'].append(zs_specific_val_accs)
             result_dict['zs_specific_test_acc'].append(zs_specific_test_accs)
@@ -411,17 +480,35 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
             result_dict['zs_generic_test_acc'].append(zs_generic_test_accs)
             result_dict['zs_generic_train_message_length'].append(zs_generic_train_message_lengths)
             result_dict['zs_generic_val_message_length'].append(zs_generic_val_message_lengths)
-            if context_unaware:
-                result_dict['cu_zs_specific_train_acc'].append(cu_zs_specific_train_accs)
-                result_dict['cu_zs_specific_val_acc'].append(cu_zs_specific_val_accs)
-                result_dict['cu_zs_specific_test_acc'].append(cu_zs_specific_test_accs)
-                result_dict['cu_zs_specific_train_message_length'].append(cu_zs_specific_train_message_lengths)
-                result_dict['cu_zs_specific_val_message_length'].append(cu_zs_specific_val_message_lengths)
-                result_dict['cu_zs_generic_train_acc'].append(cu_zs_generic_train_accs)
-                result_dict['cu_zs_generic_val_acc'].append(cu_zs_generic_val_accs)
-                result_dict['cu_zs_generic_test_acc'].append(cu_zs_generic_test_accs)
-                result_dict['cu_zs_generic_train_message_length'].append(cu_zs_generic_train_message_lengths)
-                result_dict['cu_zs_generic_val_message_length'].append(cu_zs_generic_val_message_lengths)
+            if rsa:
+                result_dict['zs_specific_final_test_acc'].append(zs_specific_final_test_accs)
+                result_dict['zs_specific_final_test_loss'].append(zs_specific_final_test_losses)
+                result_dict['zs_specific_rsa_test_acc'].append(zs_specific_rsa_test_accs)
+                result_dict['zs_specific_rsa_test_loss'].append(zs_specific_rsa_test_losses)
+                result_dict['zs_generic_final_test_acc'].append(zs_generic_final_test_accs)
+                result_dict['zs_generic_final_test_loss'].append(zs_generic_final_test_losses)
+                result_dict['zs_generic_rsa_test_acc'].append(zs_generic_rsa_test_accs)
+                result_dict['zs_generic_rsa_test_loss'].append(zs_generic_rsa_test_losses)
+        elif context_unaware and zero_shot:
+            result_dict['cu_zs_specific_train_acc'].append(cu_zs_specific_train_accs)
+            result_dict['cu_zs_specific_val_acc'].append(cu_zs_specific_val_accs)
+            result_dict['cu_zs_specific_test_acc'].append(cu_zs_specific_test_accs)
+            result_dict['cu_zs_specific_train_message_length'].append(cu_zs_specific_train_message_lengths)
+            result_dict['cu_zs_specific_val_message_length'].append(cu_zs_specific_val_message_lengths)
+            result_dict['cu_zs_generic_train_acc'].append(cu_zs_generic_train_accs)
+            result_dict['cu_zs_generic_val_acc'].append(cu_zs_generic_val_accs)
+            result_dict['cu_zs_generic_test_acc'].append(cu_zs_generic_test_accs)
+            result_dict['cu_zs_generic_train_message_length'].append(cu_zs_generic_train_message_lengths)
+            result_dict['cu_zs_generic_val_message_length'].append(cu_zs_generic_val_message_lengths)
+            if rsa:
+                result_dict['zs_specific_final_test_acc'].append(zs_specific_final_test_accs)
+                result_dict['zs_specific_final_test_loss'].append(zs_specific_final_test_losses)
+                result_dict['zs_specific_rsa_test_acc'].append(zs_specific_rsa_test_accs)
+                result_dict['zs_specific_rsa_test_loss'].append(zs_specific_rsa_test_losses)
+                result_dict['zs_generic_final_test_acc'].append(zs_generic_final_test_accs)
+                result_dict['zs_generic_final_test_loss'].append(zs_generic_final_test_losses)
+                result_dict['zs_generic_rsa_test_acc'].append(zs_generic_rsa_test_accs)
+                result_dict['zs_generic_rsa_test_loss'].append(zs_generic_rsa_test_losses)
 
     for key in result_dict.keys():
         result_dict[key] = np.array(result_dict[key])
@@ -429,8 +516,41 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
     return result_dict
 
 
+def load_accuracies_rsa_zero_shot(all_paths, result_dict=None, n_runs=5, setting='standard/zero_shot/', zs_test='specific',
+                                  granularity='fine'):
+    """loads accuracies for the specific zero-shot condition and a specified granularity of the dataset"""
+    add_test_acc = False
+    if not result_dict:
+        result_dict = {'rsa_test_acc': [], 'final_test_acc': []}
+        add_test_acc = True
+
+    for path_idx, path in enumerate(all_paths):
+        rsa_test_accs, final_test_accs = [], []
+
+        for run in range(n_runs):
+            path_to_run = path + '/' + setting + zs_test + '/' + str(run) + '/'
+            if zs_test == 'specific':
+                file_path = path_to_run + 'loss_and_metrics_test_' + granularity + '.pkl'
+            else:
+                file_path = path_to_run + 'loss_and_metrics_test.pkl'
+            # with open(os.path.join(path_to_run, 'params.pkl'), 'rb') as input_file:
+            with open(os.path.join(file_path), 'rb') as input_file:
+                data = pickle.load(input_file)
+                rsa_test_accs.append(data['rsa_test_acc'])
+                if add_test_acc:
+                    final_test_accs.append(data['final_test_acc'])
+        result_dict['rsa_test_acc'].append(rsa_test_accs)
+        if add_test_acc:
+            result_dict['final_test_acc'].append(final_test_accs)
+
+    for key in result_dict.keys():
+        result_dict[key] = np.array(result_dict[key])
+
+    return result_dict
+
 def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=False, rsa=False, rsa_test=None,
-                   sampled_context=False):
+                   sampled_context=False, test_interactions=False, test_mode=None, hierarchical=False,
+                   shared_context=False, verbose=False):
     """ loads all entropy scores into a dictionary"""
 
     if sampled_context:
@@ -447,11 +567,20 @@ def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=False
                setting = 'context_unaware' + path_sc
         else:
             setting = 'standard' + path_sc
+    if hierarchical:
+        setting = setting + '/hierarchical'
+    if shared_context:
+        setting = setting + '/shared_context'
 
     if rsa:
         rsa_file_extension = '_rsa_' + rsa_test
     else:
         rsa_file_extension = ''
+
+    if test_interactions:
+        test_file_extension = '_' + test_mode
+    else:
+        test_file_extension = ''
 
     result_dict = {'NMI': [], 'effectiveness': [], 'consistency': [],
                    'NMI_hierarchical': [], 'effectiveness_hierarchical': [], 'consistency_hierarchical': [],
@@ -468,7 +597,9 @@ def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=False
 
         for run in range(n_runs):
             standard_path = path + '/' + setting + '/' + str(run) + '/'
-            data = pickle.load(open(standard_path + 'entropy_scores' + rsa_file_extension + '.pkl', 'rb'))
+            data = pickle.load(open(standard_path + 'entropy_scores' + rsa_file_extension + test_file_extension + '.pkl', 'rb'))
+            if verbose:
+                print("Entropy scores loaded from:", standard_path + 'entropy_scores' + rsa_file_extension + test_file_extension + '.pkl')
             NMIs.append(data['normalized_mutual_info'])
             effectiveness_scores.append(data['effectiveness'])
             consistency_scores.append(data['consistency'])
@@ -502,7 +633,7 @@ def load_entropies(all_paths, n_runs=5, context_unaware=False, length_cost=False
 
 
 def load_entropies_zero_shot(all_paths, n_runs=5, context_unaware=False, length_cost=False, test_interactions=False,
-                             zero_shot_test_ds='test'):
+                             zero_shot_test_ds='test', rsa=False, rsa_test=None, verbose=False):
     """ loads all entropy scores into a dictionary"""
 
     if length_cost:
@@ -517,6 +648,11 @@ def load_entropies_zero_shot(all_paths, n_runs=5, context_unaware=False, length_
             setting = 'standard'
 
     setting = str(setting + '/' + 'zero_shot')
+
+    if rsa:
+        rsa_file_extension = '_rsa_' + rsa_test
+    else:
+        rsa_file_extension = ''
 
     result_dict_specific = {'NMI': [], 'effectiveness': [], 'consistency': [],
                             'NMI_hierarchical': [], 'effectiveness_hierarchical': [], 'consistency_hierarchical': [],
@@ -538,8 +674,16 @@ def load_entropies_zero_shot(all_paths, n_runs=5, context_unaware=False, length_
                 standard_path = path + '/' + setting + '/' + cond + '/' + str(run) + '/'
                 if not test_interactions:
                     data = pickle.load(open(standard_path + 'entropy_scores.pkl', 'rb'))
+                    if verbose:
+                        print("Entropy scores loaded from:", standard_path + 'entropy_scores.pkl')
                 else:
                     data = pickle.load(open(standard_path + 'entropy_scores_' + zero_shot_test_ds + '.pkl', 'rb'))
+                    if verbose:
+                        print("Entropy scores loaded from:", standard_path + 'entropy_scores_' + zero_shot_test_ds + '.pkl')
+                if rsa:
+                    data = pickle.load(open(standard_path + 'entropy_scores' + rsa_file_extension + '.pkl', 'rb'))
+                    if verbose:
+                        print("Entropy scores loaded from:", standard_path + 'entropy_scores' + rsa_file_extension + '.pkl')
                 NMIs.append(data['normalized_mutual_info'])
                 effectiveness_scores.append(data['effectiveness'])
                 consistency_scores.append(data['consistency'])
