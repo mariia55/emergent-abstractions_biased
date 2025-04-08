@@ -18,7 +18,8 @@ class DataSet(torch.utils.data.Dataset):
     """
 
     def __init__(self, properties_dim=[3, 3, 3], game_size=10, scaling_factor=10, device='cuda', testing=False,
-                 zero_shot=False, zero_shot_test=None, sample_context=False, granularity="mixed", is_shapes3d = False, images = [], labels = []):
+                 zero_shot=False, zero_shot_test=None, sample_context=False, granularity="mixed", is_shapes3d=False,
+                 images=[], labels=[], shared_context=False):
         """
         properties_dim: vector that defines how many attributes and features per attributes the dataset should contain,
         defaults to a 3x3x3 dataset
@@ -32,6 +33,7 @@ class DataSet(torch.utils.data.Dataset):
         self.device = device
         self.sample_context = sample_context
         self.granularity = granularity
+        self.shared_context = shared_context
 
         # check if granularity has one of the allowed values
         if granularity not in ["mixed", "fine", "coarse"]:
@@ -212,7 +214,7 @@ class DataSet(torch.utils.data.Dataset):
                     if test_cond == 'generic':
                         # test dataset only contains most generic concepts
                         if nr_possible_contexts == 1:
-                            context_condition = 0 # for generic concepts, only coarse context condition exists
+                            context_condition = 0  # for generic concepts, only coarse context condition exists
                             test.append(
                                 self.get_item(concept_idx, context_condition, self.encoding_func,
                                               include_concept))
@@ -255,10 +257,14 @@ class DataSet(torch.utils.data.Dataset):
         The sender_input_objects and the receiver_input_objects are different objects sampled from the same concept
         and context condition.
         """
-        # use get_sample() to get sampled target and distractor objects
-        # The concrete sampled objects can differ between sender and receiver.
-        sender_concept, sender_context = self.get_sample(concept_idx, context_condition)
-        receiver_concept, receiver_context = self.get_sample(concept_idx, context_condition)
+        if self.shared_context:
+            (sender_concept, sender_context,
+             receiver_concept, receiver_context) = self.get_shared_context(concept_idx, context_condition)
+        else:
+            # use get_sample() to get sampled target and distractor objects
+            # The concrete sampled objects can differ between sender and receiver.
+            sender_concept, sender_context = self.get_sample(concept_idx, context_condition)
+            receiver_concept, receiver_context = self.get_sample(concept_idx, context_condition)
         # TODO: change such that sender input also includes fixed vectors (i.e. full concepts) and fixed vectors are only
         # ignored in the sender architecture
         # NOTE: also do this for context conditions?
@@ -304,6 +310,7 @@ class DataSet(torch.utils.data.Dataset):
         """
         Returns a full sample consisting of a set of target objects (target concept)
         and a set of distractor objects (context) for a given concept condition.
+        To be used separately for sender and receiver.
         """
         all_target_objects, fixed = self.concepts[concept_idx]
         # sample target objects for given game size (if possible, get unique choices)
@@ -316,6 +323,37 @@ class DataSet(torch.utils.data.Dataset):
         context_sampled = self.sample_distractors(context, context_condition)
         # return target concept, context (distractor objects + context_condition) for each context
         return [target_objects, fixed], context_sampled
+
+    def get_shared_context(self, concept_idx, context_condition):
+        """
+        Returns a full sample consisting of a set of target objects (target concept)
+        and a set of distractor objects (context) for a given concept condition.
+        This can be used to create a shared context between sender and receiver.
+        """
+        all_target_objects, fixed = self.concepts[concept_idx]
+        for interlocutor in ['sender', 'receiver']:
+            # sample target objects for given game size (if possible, get unique choices)
+            try:
+                target_objects = random.sample(all_target_objects, self.game_size)
+            except ValueError:
+                target_objects = random.choices(all_target_objects, k=self.game_size)
+            # get all possible distractors for a given concept (for all possible context conditions)
+            if interlocutor == 'sender':
+                context, shared_attr_indices = self.get_distractors_shared(concept_idx, context_condition)
+            else:
+                context, _ = self.get_distractors_shared(concept_idx, context_condition, shared_attr_indices)
+
+            context_sampled = self.sample_distractors(context, context_condition)
+
+            if interlocutor == 'sender':
+                s_target_objects = target_objects
+                s_context_sampled = context_sampled
+            else:
+                r_target_objects = target_objects
+                r_context_sampled = context_sampled
+
+        # return target concept, context (distractor objects + context_condition) for each context
+        return [s_target_objects, fixed], s_context_sampled, [r_target_objects, fixed], r_context_sampled
 
     def get_distractors(self, concept_idx, context_condition):
         """
@@ -341,6 +379,48 @@ class DataSet(torch.utils.data.Dataset):
                 context.append(obj)
 
         return context
+
+    def get_distractors_shared(self, concept_idx, context_condition, shared_attr_indices=None):
+        """
+        Computes distractors for a shared context between sender and receiver. It also implements a change compared
+        to get_distractors(): Here, objects in the context do not only share a certain number of attributes, but also
+        the position of the attributes that are shared are fixed (and shared between sender and receiver).
+        """
+        all_target_objects, fixed = self.concepts[concept_idx]
+        context = []
+
+        # save fixed attribute indices in a list for later comparisons
+        fixed_attr_indices = []
+        for index, value in enumerate(fixed):
+            if value == 1:
+                fixed_attr_indices.append(index)
+
+        # if not given, compute (this is the case for the sender)
+        if not shared_attr_indices:
+            # generate a shared vector, i.e. a vector that indicates which of the attributes should be shared with the
+            # concept attributes according to the context condition
+            # e.g. if fixed==(1,1,1) and context_condition==2, then shared vector can be one of: (1,1,0), (1,0,1), (0,1,1)
+            # which attributes should be shared:
+            shared_attr_indices = random.sample(fixed_attr_indices, context_condition)
+
+        # consider all objects as possible distractors
+        poss_dist = self.all_objects
+
+        for obj in poss_dist:
+            # find out how many attributes are shared between the possible distractor object and the target concept
+            # (by only comparing fixed attributes because only these are relevant for defining the context)
+            shared = sum(1 for idx in fixed_attr_indices if obj[idx] == all_target_objects[0][idx])
+            # this still works for context condition 0:
+            if len(shared_attr_indices) == 0:
+                if shared == context_condition:
+                    context.append(obj)
+            else:
+                if shared == context_condition:  # this filters out already some of the objects to keep the loop as small as possible
+                    if np.all(
+                            np.array(obj)[shared_attr_indices] == np.array(all_target_objects[0])[shared_attr_indices]):
+                        context.append(obj)
+
+        return context, shared_attr_indices
 
     def sample_distractors(self, context, context_condition):
         """
@@ -449,7 +529,7 @@ class DataSet(torch.utils.data.Dataset):
 
         # dictionary to translate one-hot encoded labels for shapes3d dataset
         # only used for shapes3d dataset variant
-        attribute_dict =  {
+        attribute_dict = {
             0: (0.0, 0.75, 0.0),
             1: (0.0, 0.75, 1.0),
             2: (0.0, 0.75, 2.0),
@@ -515,11 +595,10 @@ class DataSet(torch.utils.data.Dataset):
             62: (0.8, 1.25, 2.0),
             63: (0.8, 1.25, 3.0)}
 
-        indeces = np.argmax(self.labels, axis = 1)
+        indeces = np.argmax(self.labels, axis=1)
         unhottified = []
 
         for index in indeces:
-
             unhottified.append(attribute_dict[index])
 
         return unhottified

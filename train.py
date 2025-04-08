@@ -122,6 +122,10 @@ def get_params(params):
                         help='Granularity of the context. Possible values are: mixed, coarse and fine')
     parser.add_argument('--shapes3d', type=bool, default=False,
                         help="Determines whether 3dshapes dataset will be used or not")
+    parser.add_argument('--hierarchical', type=bool, default=False,
+                        help='Use for generating hierarchical datasets.')
+    parser.add_argument('--shared_context', type=bool, default=False,
+                        help='Use for generating datasets with a shared context.')
 
     args = core.init(parser, params)
 
@@ -161,7 +165,7 @@ def train(opts, datasets, verbose_callbacks=False):
             os.makedirs(opts.save_path)
         if not opts.save_test_interactions:
             pickle.dump(opts, open(opts.save_path + '/params.pkl', 'wb'))
-        save_epoch = opts.save
+        save_epoch = opts.n_epochs
     else:
         save_epoch = None
 
@@ -170,8 +174,6 @@ def train(opts, datasets, verbose_callbacks=False):
     test_ls, train_ls, val_ls = [], [], []
     if opts.limit_test_ds != 0:
         for i in range(opts.limit_test_ds):
-            train_ls.append(train[i])
-            val_ls.append(val[i])
             test_ls.append(test[i])
 
         test = test_ls
@@ -336,9 +338,9 @@ def train(opts, datasets, verbose_callbacks=False):
             trainer.game = rsa_game
             start = time.time()
             with torch.no_grad():
-                eval_loss, interaction = trainer.eval()
+                eval_loss, interaction_rsa = trainer.eval()
                 print("RSA evaluation time: " + str(time.time() - start))
-                acc = torch.mean(interaction.aux['acc']).item()
+                acc = torch.mean(interaction_rsa.aux['acc']).item()
                 print("RSA test accuracy: " + str(acc))
 
                 if opts.save:
@@ -346,7 +348,8 @@ def train(opts, datasets, verbose_callbacks=False):
                     if not os.path.exists(opts.save_path):
                         os.makedirs(opts.save_path)
                     rank = str(trainer.distributed_context.rank)
-                    InteractionSaver.dump_interactions(interaction, mode="rsa_" + opts.test_rsa + opts.load_interaction,
+                    InteractionSaver.dump_interactions(interaction_rsa, mode="rsa_" + opts.test_rsa
+                                                                             + opts.load_interaction + opts.granularity,
                                                        epoch=0, rank=rank,
                                                        dump_dir=opts.save_interactions_path)
 
@@ -402,10 +405,14 @@ def main(params):
                 opts.game_setting = 'length_cost/context_aware'
             else:
                 opts.game_setting = 'length_cost/no_cost_context_aware'
+    if opts.hierarchical:
+        opts.game_setting = opts.game_setting + '/hierarchical'
+    if opts.shared_context:
+        opts.game_setting = opts.game_setting + '/shared_context'
 
     # create subfolders if necessary
     # The granularity subfolders are created only when the granularity is not 'mixed'
-    if opts.granularity != 'mixed' and not opts.zero_shot:
+    if opts.granularity != 'mixed' and not opts.zero_shot and not opts.test_rsa:
         granularity_subfolder = f"granularity_{opts.granularity}"
         opts.game_path = os.path.join(opts.path, folder_name, opts.game_setting, granularity_subfolder)
     elif opts.sample_context and not opts.zero_shot:
@@ -436,7 +443,9 @@ def main(params):
                                            scaling_factor=opts.scaling_factor,
                                            device=opts.device,
                                            sample_context=opts.sample_context,
-                                           granularity=opts.granularity)
+                                           granularity=opts.granularity,
+                                           hierarchical=opts.hierarchical,
+                                           shared_context=opts.shared_context)
 
             # save folder for opts rsa is already specified above
             if not opts.test_rsa and not opts.save_test_interactions:
@@ -468,6 +477,11 @@ def main(params):
                     opts.interaction_path = os.path.join(opts.game_path, str(run), 'interactions', opts.load_interaction,
                                                          'epoch_' +
                                                          str(n_epoch), 'interaction_gpu0')
+                else:
+                    opts.interaction_path = os.path.join(opts.game_path, str(run), 'interactions',
+                                                         opts.load_interaction,
+                                                         'epoch_' +
+                                                         str(opts.n_epochs), 'interaction_gpu0')
 
         # if test_rsa is given, validate and setup interactions
         if opts.test_rsa:
@@ -498,17 +512,15 @@ def main(params):
             # either the zero-shot test condition is given (with pre-generated dataset)
             if opts.zero_shot_test is not None:
                 if not opts.save_test_interactions:
+                    opts.zs_game_path = os.path.join(opts.game_path, 'zero_shot', opts.zero_shot_test)
                     # create subfolder if necessary
                     if opts.granularity != 'mixed':
                         granularity_subfolder = f"granularity_{opts.granularity}"
-                        opts.save_path = os.path.join(opts.game_path, 'zero_shot',
-                                                      opts.zero_shot_test, granularity_subfolder, str(run))
+                        opts.save_path = os.path.join(opts.zs_game_path, granularity_subfolder, str(run))
                     elif opts.sample_context:
-                        opts.save_path = os.path.join(opts.game_path, 'zero_shot',
-                                                         opts.zero_shot_test, "sampled_context", str(run))
+                        opts.save_path = os.path.join(opts.zs_game_path, "sampled_context", str(run))
                     elif opts.granularity == 'mixed' and not opts.sample_context:
-                        opts.save_path = os.path.join(opts.game_path, 'zero_shot',
-                                                      opts.zero_shot_test, str(run))
+                        opts.save_path = os.path.join(opts.zs_game_path, str(run))
 
                 if not os.path.exists(opts.save_path) and opts.save:
                     os.makedirs(opts.save_path)
@@ -560,11 +572,45 @@ def main(params):
 
             # set interaction path
             if opts.load_interaction:
-                if opts.test_rsa:
-                    opts.save_epochs = 0
-                opts.interaction_path = os.path.join(opts.save_path, 'interactions', opts.load_interaction,
-                                                     'epoch_' +
-                                                     str(opts.save_epochs), 'interaction_gpu0')
+                if opts.early_stopping:
+                    if opts.zero_shot:
+                        opts.zs_game_path = os.path.join(opts.game_path, 'zero_shot', opts.zero_shot_test)
+                        path_to_run = os.path.join(opts.zs_game_path, str(run))
+                    else:
+                        path_to_run = os.path.join(opts.game_path, str(run))
+                    with open(os.path.join(path_to_run, 'loss_and_metrics.pkl'), 'rb') as input_file:
+                        data = pickle.load(input_file)
+                        final_epoch = max(data['loss_train'].keys())
+                    opts.n_epochs = final_epoch
+                    if not opts.load_interaction == 'validation' and not opts.load_interaction == 'train':
+                        n_epoch = 0
+                    else:
+                        n_epoch = final_epoch
+                    if opts.zero_shot:
+                        opts.interaction_path = os.path.join(opts.zs_game_path, str(run), 'interactions',
+                                                             opts.load_interaction,
+                                                             'epoch_' +
+                                                             str(n_epoch), 'interaction_gpu0')
+                    else:
+                        opts.interaction_path = os.path.join(opts.game_path, str(run), 'interactions',
+                                                             opts.load_interaction,
+                                                             'epoch_' +
+                                                             str(n_epoch), 'interaction_gpu0')
+                else:
+                    if opts.zero_shot:
+                        opts.zs_game_path = os.path.join(opts.game_path, 'zero_shot', opts.zero_shot_test)
+                        opts.interaction_path = os.path.join(opts.zs_game_path, str(run), 'interactions',
+                                                             opts.load_interaction,
+                                                             'epoch_' +
+                                                             str(opts.n_epochs), 'interaction_gpu0')
+                    else:
+                        opts.interaction_path = os.path.join(opts.game_path, str(run), 'interactions',
+                                                             opts.load_interaction,
+                                                             'epoch_' +
+                                                             str(opts.n_epochs), 'interaction_gpu0')
+                #opts.interaction_path = os.path.join(opts.save_path, 'interactions', opts.load_interaction,
+                #                                     'epoch_' +
+                #                                     str(opts.save_epochs), 'interaction_gpu0')
                 if not os.path.exists(opts.interaction_path):
                     raise ValueError(
                         f"Interaction file {opts.interaction_path} not found.")

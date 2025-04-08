@@ -344,8 +344,7 @@ class TopographicSimilarityConceptLevel(Callback):
             message_dist = distance.pdist(messages, message_distance_fn_callable)
 
         # topsim = negative spearman correlation of these two spaces
-        rho, pval = spearmanr(meaning_dist, message_dist, nan_policy="raise").correlation
-        topsim = {'rho': rho, 'pval': pval}
+        topsim = spearmanr(meaning_dist, message_dist, nan_policy="raise").correlation
 
         return topsim
 
