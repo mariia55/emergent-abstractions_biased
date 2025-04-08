@@ -122,8 +122,6 @@ def get_params(params):
                         help='Granularity of the context. Possible values are: mixed, coarse and fine')
     parser.add_argument('--shapes3d', type=bool, default=False,
                         help="Determines whether 3dshapes dataset will be used or not")
-    parser.add_argument('--hierarchical', type=bool, default=False,
-                        help='Use for generating hierarchical datasets.')
     parser.add_argument('--shared_context', type=bool, default=False,
                         help='Use for generating datasets with a shared context.')
 
@@ -405,8 +403,6 @@ def main(params):
                 opts.game_setting = 'length_cost/context_aware'
             else:
                 opts.game_setting = 'length_cost/no_cost_context_aware'
-    if opts.hierarchical:
-        opts.game_setting = opts.game_setting + '/hierarchical'
     if opts.shared_context:
         opts.game_setting = opts.game_setting + '/shared_context'
 
@@ -444,7 +440,6 @@ def main(params):
                                            device=opts.device,
                                            sample_context=opts.sample_context,
                                            granularity=opts.granularity,
-                                           hierarchical=opts.hierarchical,
                                            shared_context=opts.shared_context)
 
             # save folder for opts rsa is already specified above
