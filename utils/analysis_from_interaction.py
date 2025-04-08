@@ -8,6 +8,7 @@ import numpy as np
 import itertools
 import random
 import torch
+import torch.nn.functional as F
 
 
 def k_hot_to_attributes(khots, dimsize):
@@ -111,6 +112,20 @@ def retrieve_context_condition(targets, fixed, distractors):
         # print("target", t_obj, "fixed", fixed[i], "distractors", distractors[i][0], "shared", shared)
         context_conds.append(shared)
     return context_conds
+
+
+def trim_tensor(tensor):
+    # Find the index of the first zero
+    zero_indices = (tensor == 0).nonzero(as_tuple=True)[0]
+    # Trim the tensor up to the index before the zero
+    if len(zero_indices) > 0:
+        # Take the first zero index and trim the tensor
+        first_zero_index = zero_indices[0].item()
+        trimmed_tensor = tensor[:first_zero_index]
+    else:
+        # If there is no zero, return the full tensor
+        trimmed_tensor = tensor
+    return trimmed_tensor
 
 
 def bosdis(interaction, n_dims, n_values, vocab_size):
@@ -217,7 +232,8 @@ def posdis(interaction, n_dims, n_values, vocab_size):
     return posdis_concept_x_context
 
 
-def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
+def information_scores(interaction, n_dims, n_values, normalizer="arithmetic", is_gumbel=True, trim_eos=False,
+                       max_mess_len=None):
     """calculate entropy scores: mutual information (MI), effectiveness and consistency. 
     
     :param interaction: interaction (EGG class)
@@ -226,6 +242,7 @@ def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
     :param normalizer: normalizer can be either "arithmetic" -H(M) + H(C)- or "joint" -H(M,C)-
     :return: NMI, NMI per level, effectiveness, effectiveness per level, consistency, consistency per level
     """
+
     # Get relevant attributes
     sender_input = interaction.sender_input
     n_objects = sender_input.shape[1]
@@ -239,6 +256,8 @@ def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
     # add one such that zero becomes an empty attribute for the calculation (_)
     objects = objects + 1
     concepts = torch.from_numpy(objects * (np.array(fixed)))
+    #concepts = sender_input.reshape(-1, np.prod(sender_input.shape[1:]))
+    #print(type(concepts), concepts.shape)
 
     # get distractor objects to re-construct context conditions
     distractor_objects = sender_input[:, n_targets:]
@@ -247,7 +266,14 @@ def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
     context_conds = retrieve_context_condition(objects, fixed, distractor_objects)
 
     # get messages from interaction
-    messages = interaction.message.argmax(dim=-1)
+    messages = interaction.message.argmax(dim=-1) if is_gumbel is True else interaction.message.argmax(dim=2)
+    if trim_eos:
+        messages = [trim_tensor(message) for message in messages]
+        # Pad tensors to make them uniform length
+        padded_tensors = [F.pad(t, pad=(0, max_mess_len - t.size(0))) for t in messages]
+        # Stack into a single tensor
+        messages = torch.stack(padded_tensors)
+    # print(type(messages[0]), messages.shape)
 
     # Entropies:
     # H(m), H(c), H(m,c)
@@ -260,11 +286,25 @@ def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
     # specific concept, one attribute fixed means generic concept)
     # n_relevant_idx stores the indices of the concepts on a specific level of abstraction
     n_relevant_idx = [np.where(np.sum(np.array(fixed), axis=1) == i)[0] for i in range(1, n_dims + 1)]
+    # print("first message", messages[n_relevant_idx[0]])
+    # print("ent first level", calc_entropy(messages[n_relevant_idx[0]]))
+    # print("second level message", messages[n_relevant_idx[1]])
+    # print("ent second level", calc_entropy(messages[n_relevant_idx[1]]))
+    # for n_relevant in n_relevant_idx:
+    #     print(calc_entropy(messages[n_relevant]))
+    #
+    # print("first concept", concepts[n_relevant_idx[0]][0])
+    # print("ent first level", calc_entropy(concepts[n_relevant_idx[0]]))
+    # print("ent second level", calc_entropy(concepts[n_relevant_idx[1]]))
+
     # H(m), H(c), H(m,c) for each level of abstraction
     m_entropy_hierarchical = np.array([calc_entropy(messages[n_relevant]) for n_relevant in n_relevant_idx])
+    # print("m_entr_hier", m_entropy_hierarchical)
     c_entropy_hierarchical = np.array([calc_entropy(concepts[n_relevant]) for n_relevant in n_relevant_idx])
+    # print("c_entr_hier", c_entropy_hierarchical)
     joint_entropy_hierarchical = np.array([joint_entropy(messages[n_relevant], concepts[n_relevant])
                                            for n_relevant in n_relevant_idx])
+    # print("j_entr_hier", joint_entropy_hierarchical)
 
     # Context-dependent Entropies:
     context_cond_idx = [np.where(np.array(context_conds) == i)[0] for i in range(0, n_dims)]
@@ -308,8 +348,12 @@ def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
 
     # normalized mutual information: H(m) - H(m|c) / normalizer, H(m|c)=H(m,c)-H(c)
     normalized_MI = (m_entropy + c_entropy - joint_mc_entropy) / normalizer
+    # print("normalizer", normalizer_hierarchical)
+    # print("entropies", (m_entropy_hierarchical + c_entropy_hierarchical - joint_entropy_hierarchical))
+    # print("entropies 2", (m_entropy_hierarchical - (c_entropy_hierarchical - joint_entropy_hierarchical)))
     normalized_MI_hierarchical = ((m_entropy_hierarchical + c_entropy_hierarchical - joint_entropy_hierarchical)
                                   / normalizer_hierarchical)
+    # print("MI hier", normalized_MI_hierarchical)
     normalized_MI_context_dep = ((m_entropy_context_dep + c_entropy_context_dep - joint_entropy_context_dep)
                                  / normalizer_context_dep)
     normalized_MI_conc_x_cont = (
@@ -328,9 +372,9 @@ def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
     # normalized version of h(m|c), i.e. h(m|c)/h(m)
     normalized_consistency = (joint_mc_entropy - c_entropy) / m_entropy
     normalized_consistency_hierarchical = (joint_entropy_hierarchical - c_entropy_hierarchical) / m_entropy_hierarchical
+    # print("cons hier", normalized_consistency_hierarchical)
     normalized_consistency_context_dep = (joint_entropy_context_dep - c_entropy_context_dep) / m_entropy_context_dep
-    normalized_consistency_conc_x_cont = (
-                                                 joint_entropy_concept_x_context - c_entropy_concept_x_context) / m_entropy_concept_x_context
+    normalized_consistency_conc_x_cont = (joint_entropy_concept_x_context - c_entropy_concept_x_context) / m_entropy_concept_x_context
 
     score_dict = {'normalized_mutual_info': normalized_MI,
                   'normalized_mutual_info_hierarchical': normalized_MI_hierarchical,
@@ -348,11 +392,180 @@ def information_scores(interaction, n_dims, n_values, normalizer="arithmetic"):
     return score_dict
 
 
-def cooccurrence_per_hierarchy_level(interaction, n_attributes, n_values, vs_factor):
+def information_scores_new(interaction, n_dims, n_values, normalizer="arithmetic", is_gumbel=True, trim_eos=False,
+                       max_mess_len=None):
+    """calculate entropy scores: mutual information (MI), effectiveness and consistency.
+
+    :param interaction: interaction (EGG class)
+    :param n_dims: number of input dimensions, e.g. D(3,4) --> 3 dimensions
+    :param n_values: size of each dimension, e.g. D(3,4) --> 4 values
+    :param normalizer: normalizer can be either "arithmetic" -H(M) + H(C)- or "joint" -H(M,C)-
+    :return: NMI, NMI per level, effectiveness, effectiveness per level, consistency, consistency per level
+    """
+
+    # Get relevant attributes
+    sender_input = interaction.sender_input
+    n_objects = sender_input.shape[1]
+    n_targets = int(n_objects / 2)
+
+    # get target objects and fixed vectors to re-construct concepts
+    target_objects = sender_input[:, :n_targets]
+    target_objects = k_hot_to_attributes(target_objects, n_values)
+    # concepts are defined by a list of target objects (here one sampled target object) and a fixed vector
+    (objects, fixed) = retrieve_concepts_sampling(target_objects)
+    # add one such that zero becomes an empty attribute for the calculation (_)
+    objects = objects + 1
+    concepts = torch.from_numpy(objects * (np.array(fixed)))
+
+    # get distractor objects to re-construct context conditions
+    distractor_objects = sender_input[:, n_targets:]
+    distractor_objects = k_hot_to_attributes(distractor_objects, n_values)
+    distractor_objects = distractor_objects + 1
+    context_conds = retrieve_context_condition(objects, fixed, distractor_objects)
+
+    # get messages from interaction
+    messages = interaction.message.argmax(dim=-1) if is_gumbel is True else interaction.message.argmax(dim=2)
+    if trim_eos:
+        messages = [trim_tensor(message) for message in messages]
+        # Pad tensors to make them uniform length
+        padded_tensors = [F.pad(t, pad=(0, max_mess_len - t.size(0))) for t in messages]
+        # Stack into a single tensor
+        messages = torch.stack(padded_tensors)
+
+    # Entropies:
+    # H(m), H(c), H(m,c)
+    m_entropy = calc_entropy(messages)
+    c_entropy = calc_entropy(concepts)
+    joint_mc_entropy = joint_entropy(messages, concepts)
+
+    # Concept-dependent Entropies:
+    # sum of fixed vectors gives the specificity of the concept (all attributes fixed means
+    # specific concept, one attribute fixed means generic concept)
+    # n_relevant_idx stores the indices of the concepts on a specific level of abstraction
+    n_relevant_idx = [np.where(np.sum(np.array(fixed), axis=1) == i)[0] for i in range(1, n_dims + 1)]
+    # print("first message", messages[n_relevant_idx[0]])
+    # print("ent first level", calc_entropy(messages[n_relevant_idx[0]]))
+    # print("second level message", messages[n_relevant_idx[1]])
+    # print("ent second level", calc_entropy(messages[n_relevant_idx[1]]))
+    # for n_relevant in n_relevant_idx:
+    #     print(calc_entropy(messages[n_relevant]))
+    #
+    # print("first concept", concepts[n_relevant_idx[0]])
+    # print("ent first level", calc_entropy(concepts[n_relevant_idx[0]]))
+    # print("ent second level", calc_entropy(concepts[n_relevant_idx[1]]))
+
+    # H(m), H(c), H(m,c) for each level of abstraction
+    m_entropy_hierarchical = np.array([calc_entropy(messages[n_relevant]) for n_relevant in n_relevant_idx])
+    # print("m_entr_hier", m_entropy_hierarchical)
+    c_entropy_hierarchical = np.array([calc_entropy(concepts[n_relevant]) for n_relevant in n_relevant_idx])
+    # print("c_entr_hier", c_entropy_hierarchical)
+    joint_entropy_hierarchical = np.array([joint_entropy(messages[n_relevant], concepts[n_relevant])
+                                           for n_relevant in n_relevant_idx])
+    # print("j_entr_hier", joint_entropy_hierarchical)
+
+    # Context-dependent Entropies:
+    context_cond_idx = [np.where(np.array(context_conds) == i)[0] for i in range(0, n_dims)]
+    # H(m), H(c), H(m,c) for each context condition
+    m_entropy_context_dep = np.array([calc_entropy(messages[context_cond]) for context_cond in context_cond_idx])
+    c_entropy_context_dep = np.array([calc_entropy(concepts[context_cond]) for context_cond in context_cond_idx])
+    joint_entropy_context_dep = np.array([joint_entropy(messages[context_cond], concepts[context_cond])
+                                          for context_cond in context_cond_idx])
+
+    # Concept-context dependent Entropies:
+    # go through concept conditions
+    conceptxcontext_idx = []
+    for i in range(len(n_relevant_idx)):
+        # go through context conditions
+        for j in range(len(context_cond_idx)):
+            # only keep shared entries for each concept-context condition
+            shared_elements = [elem for elem in n_relevant_idx[i] if elem in context_cond_idx[j]]
+            conceptxcontext_idx.append(shared_elements)
+
+    # H(m), H(c), H(m,c) for each concept and context condition
+    m_entropy_concept_x_context = np.array(
+        [calc_entropy(messages[concept_x_context]) for concept_x_context in conceptxcontext_idx])
+    c_entropy_concept_x_context = np.array(
+        [calc_entropy(concepts[concept_x_context]) for concept_x_context in conceptxcontext_idx])
+    joint_entropy_concept_x_context = np.array([joint_entropy(messages[concept_x_context], concepts[concept_x_context])
+                                                for concept_x_context in conceptxcontext_idx])
+
+    # Normalized scores: NMI, consistency, effectiveness
+    if normalizer == "arithmetic":
+        normalizer = 0.5 * (m_entropy + c_entropy)
+        normalizer_hierarchical = 0.5 * (m_entropy_hierarchical + c_entropy_hierarchical)
+        normalizer_context_dep = 0.5 * (m_entropy_context_dep + c_entropy_context_dep)
+        normalizer_conc_x_cont = 0.5 * (m_entropy_concept_x_context + c_entropy_concept_x_context)
+    elif normalizer == "joint":
+        normalizer = joint_mc_entropy
+        normalizer_hierarchical = joint_entropy_hierarchical
+        normalizer_context_dep = joint_entropy_context_dep
+        normalizer_conc_x_cont = joint_entropy_concept_x_context
+    else:
+        raise AttributeError("Unknown normalizer")
+
+    # normalized mutual information: H(m) - H(m|c) / normalizer, H(m|c)=H(m,c)-H(c)
+    normalized_MI = (m_entropy - (c_entropy - joint_mc_entropy)) / normalizer
+    # print("NMI 1", (m_entropy + c_entropy - joint_mc_entropy) / normalizer)
+    # print("NMI 2", (m_entropy - (c_entropy - joint_mc_entropy)) / normalizer)
+    # print("normalizer", normalizer_hierarchical)
+    # print("entropies", (m_entropy_hierarchical + c_entropy_hierarchical - joint_entropy_hierarchical))
+    # print("entropies 2", (m_entropy_hierarchical - (c_entropy_hierarchical - joint_entropy_hierarchical)))
+    normalized_MI_hierarchical = ((m_entropy_hierarchical - (c_entropy_hierarchical - joint_entropy_hierarchical))
+                                  / normalizer_hierarchical)
+    # print("MI hier", normalized_MI_hierarchical)
+    normalized_MI_context_dep = ((m_entropy_context_dep - (c_entropy_context_dep - joint_entropy_context_dep))
+                                 / normalizer_context_dep)
+    normalized_MI_conc_x_cont = (
+            (m_entropy_concept_x_context - (c_entropy_concept_x_context - joint_entropy_concept_x_context))
+            / normalizer_conc_x_cont)
+
+    # normalized version of h(c|m), i.e. h(c|m)/h(c)
+    normalized_effectiveness = (joint_mc_entropy - m_entropy) / c_entropy
+    normalized_effectiveness_hierarchical = ((joint_entropy_hierarchical - m_entropy_hierarchical)
+                                             / c_entropy_hierarchical)
+    normalized_effectiveness_context_dep = ((joint_entropy_context_dep - m_entropy_context_dep)
+                                            / c_entropy_context_dep)
+    normalized_effectiveness_conc_x_cont = ((joint_entropy_concept_x_context - m_entropy_concept_x_context)
+                                            / c_entropy_concept_x_context)
+
+    # normalized version of h(m|c), i.e. h(m|c)/h(m)
+    normalized_consistency = (joint_mc_entropy - c_entropy) / m_entropy
+    normalized_consistency_hierarchical = (joint_entropy_hierarchical - c_entropy_hierarchical) / m_entropy_hierarchical
+    # print("cons hier", normalized_consistency_hierarchical)
+    normalized_consistency_context_dep = (joint_entropy_context_dep - c_entropy_context_dep) / m_entropy_context_dep
+    normalized_consistency_conc_x_cont = (
+                                                     joint_entropy_concept_x_context - c_entropy_concept_x_context) / m_entropy_concept_x_context
+
+    score_dict = {'normalized_mutual_info': normalized_MI,
+                  'normalized_mutual_info_hierarchical': normalized_MI_hierarchical,
+                  'normalized_mutual_info_context_dep': normalized_MI_context_dep,
+                  'normalized_mutual_info_concept_x_context': normalized_MI_conc_x_cont,
+                  'effectiveness': 1 - normalized_effectiveness,
+                  'effectiveness_hierarchical': 1 - normalized_effectiveness_hierarchical,
+                  'effectiveness_context_dep': 1 - normalized_effectiveness_context_dep,
+                  'effectiveness_concept_x_context': 1 - normalized_effectiveness_conc_x_cont,
+                  'consistency': 1 - normalized_consistency,
+                  'consistency_hierarchical': 1 - normalized_consistency_hierarchical,
+                  'consistency_context_dep': 1 - normalized_consistency_context_dep,
+                  'consistency_concept_x_context': 1 - normalized_consistency_conc_x_cont
+                  }
+    return score_dict
+
+
+def cooccurrence_per_hierarchy_level(interaction, n_attributes, n_values, vs_factor, is_gumbel=True, trim_eos=False):
     vocab_size = (n_values + 1) * vs_factor + 1
 
-    messages = interaction.message.argmax(dim=-1)
-    messages = messages[:, :-1].numpy()
+    messages = interaction.message.argmax(dim=-1) if is_gumbel else interaction.message.argmax(dim=2)
+    if trim_eos:
+        # trim message to first EOS symbol
+        messages = [trim_tensor(message) for message in messages]
+        # Pad tensors to make them uniform length
+        padded_tensors = [F.pad(t, pad=(0, max_mess_len - t.size(0))) for t in messages]
+        # Stack into a single tensor
+        messages = torch.stack(padded_tensors)
+    else:
+        messages = messages[:, :-1].numpy()
+
     sender_input = interaction.sender_input.numpy()
     relevance_vectors = sender_input[:, -n_attributes:]
 
@@ -371,7 +584,7 @@ def cooccurrence_per_hierarchy_level(interaction, n_attributes, n_values, vs_fac
     return cooccurrence
 
 
-def message_length_per_hierarchy_level(interaction, n_attributes):
+def message_length_per_hierarchy_level(interaction, n_attributes, is_gumbel=True):
     # Get relevant attributes
     sender_input = interaction.sender_input
     n_objects = sender_input.shape[1]
@@ -384,9 +597,9 @@ def message_length_per_hierarchy_level(interaction, n_attributes):
     # concepts are defined by a list of target objects (here one sampled target object) and a fixed vector
     (objects, fixed) = retrieve_concepts_sampling(target_objects)
 
-    message = interaction.message.argmax(dim=-1)
-    ml = MessageLengthHierarchical.compute_message_length(message)
-    ml_hierarchical = MessageLengthHierarchical.compute_message_length_hierarchical(message, torch.from_numpy(fixed))
+    messages = interaction.message.argmax(dim=-1) if is_gumbel else interaction.message.argmax(dim=2)
+    ml = MessageLengthHierarchical.compute_message_length(messages)
+    ml_hierarchical = MessageLengthHierarchical.compute_message_length_hierarchical(messages, torch.from_numpy(fixed))
     return (ml, ml_hierarchical)
 
 
@@ -422,16 +635,24 @@ def effective_vocab_size(interaction, vocab_size, is_gumbel=True):
     returns the effective vocab size, the counts for each symbol in vocab, and the ratio of effective vocab size by
     possible vocab size
     """
-    messages = interaction.message.argmax(dim=-1) if is_gumbel else interaction.message
+    messages = interaction.message.argmax(dim=-1) if is_gumbel else interaction.message.argmax(dim=2)
     messages = [msg.tolist() for msg in messages]
     all_symbols = [symbol for message in messages for symbol in message]
     symbol_counts = Counter(all_symbols)
     return len(symbol_counts), symbol_counts, len(symbol_counts)/vocab_size
 
 
-def symbol_frequency(interaction, n_attributes, n_values, vocab_size, is_gumbel=True):
-    messages = interaction.message.argmax(dim=-1) if is_gumbel else interaction.message
-    messages = messages[:, :-1] # excluding EOS symbol 0
+def symbol_frequency(interaction, n_attributes, n_values, vocab_size, is_gumbel=True, trim_eos=False):
+    messages = interaction.message.argmax(dim=-1) if is_gumbel else interaction.message.argmax(dim=2)
+    if trim_eos:
+        # trim message to first EOS symbol
+        messages = [trim_tensor(message) for message in messages]
+        # Pad tensors to make them uniform length
+        padded_tensors = [F.pad(t, pad=(0, max_mess_len - t.size(0))) for t in messages]
+        # Stack into a single tensor
+        messages = torch.stack(padded_tensors)
+    else:
+        messages = messages[:, :-1] # excluding EOS symbol 0
     sender_input = interaction.sender_input
     n_objects = sender_input.shape[1]
     n_targets = int(n_objects / 2)
@@ -452,12 +673,12 @@ def symbol_frequency(interaction, n_attributes, n_values, vocab_size, is_gumbel=
         for val in range(n_values):
             object_labels = (objects[:, att] == val).astype(int)
             max_MI = 0
-            for symbol in range(vocab_size):
+            for i, symbol in enumerate(range(vocab_size)):
                 symbol_indices = np.argwhere(messages == symbol)[0]
                 symbol_labels = np.zeros(len(messages))
                 symbol_labels[symbol_indices] = 1
                 MI = normalized_mutual_info_score(symbol_labels, object_labels)
-                if MI > max_MI:
+                if MI >= max_MI:
                     max_MI = MI
                     max_symbol = symbol
             favorite_symbol[str(att) + str(val)] = max_symbol
@@ -483,9 +704,21 @@ def symbol_frequency(interaction, n_attributes, n_values, vocab_size, is_gumbel=
 
     return symbol_frequency / att_val_frequency, mutual_information
 
-def symbol_frequency_fav(interaction, n_attributes, n_values, vocab_size, is_gumbel=True):
-    messages = interaction.message.argmax(dim=-1) if is_gumbel else interaction.message
-    messages = messages[:, :-1] # without EOS
+def symbol_frequency_fav(interaction, n_attributes, n_values, vocab_size, is_gumbel=True, trim_eos=False,
+                       max_mess_len=None):
+    """
+
+    """
+    messages = interaction.message.argmax(dim=-1) if is_gumbel else interaction.message.argmax(dim=2)
+    if trim_eos:
+        # trim message to first EOS symbol
+        messages = [trim_tensor(message) for message in messages]
+        # Pad tensors to make them uniform length
+        padded_tensors = [F.pad(t, pad=(0, max_mess_len - t.size(0))) for t in messages]
+        # Stack into a single tensor
+        messages = torch.stack(padded_tensors)
+    else:
+        messages = messages[:, :-1]  # without EOS
     sender_input = interaction.sender_input
     n_objects = sender_input.shape[1]
     n_targets = int(n_objects / 2)
@@ -506,12 +739,12 @@ def symbol_frequency_fav(interaction, n_attributes, n_values, vocab_size, is_gum
         for val in range(n_values):
             object_labels = (objects[:, att] == val).astype(int)
             max_MI = 0
-            for symbol in range(vocab_size):
+            for symbol in range(1, vocab_size):
                 symbol_indices = np.argwhere(messages == symbol)[0]
                 symbol_labels = np.zeros(len(messages))
                 symbol_labels[symbol_indices] = 1
                 MI = normalized_mutual_info_score(symbol_labels, object_labels)
-                if MI > max_MI:
+                if MI >= max_MI:
                     max_MI = MI
                     max_symbol = symbol
             favorite_symbol[str(att) + str(val)] = max_symbol
