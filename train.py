@@ -383,6 +383,8 @@ def main(params):
     data_set_name = '(' + str(len(opts.dimensions)) + ',' + str(opts.dimensions[0]) + ')'
     if opts.shapes3d:
         data_set_name = 'shapes3d_feat_rep'
+        if opts.zero_shot:
+            data_set_name = 'shapes3d_feat_rep_zero_shot'
         #opts.game_size = 4 # 4 before
     folder_name = (data_set_name + '_game_size_' + str(opts.game_size)
                    + '_vsf_' + str(opts.vocab_size_factor))
@@ -434,14 +436,10 @@ def main(params):
         # if not given, generate data set (new for each run for the small datasets)
         if not opts.load_dataset and not opts.zero_shot:
             if opts.shapes3d:
-<<<<<<< HEAD
                 if opts.game_size == 4:
                     data_set = load_or_create_dataset('./dataset/feat_rep_concept_dataset', device=opts.device, game_size=opts.game_size)
                 elif opts.game_size == 10:
                     data_set = load_or_create_dataset('./dataset/feat_rep_concept_dataset_gs10', device=opts.device, game_size=opts.game_size)
-=======
-                data_set = load_or_create_dataset('dataset/shapes3d_feat_rep', device=opts.device)
->>>>>>> bcfbc63a8593e73b29496059eb12ed6671ee1e51
             else:
                 data_set = dataset.DataSet(opts.dimensions,
                                            game_size=opts.game_size,

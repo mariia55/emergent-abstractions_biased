@@ -408,18 +408,17 @@ def plot_training_trajectory(results_train,
                              loss_plot=False,
                              message_length_plot=False,
                              shapes3d = False,
-                             titles=('D(3,4)', 'D(3,8)', 'D(3,16)', 'D(4,4)', 'D(4,8)', 'D(5,4)')):
+                             titles=('D(3,4)', 'D(3,8)', 'D(3,16)', 'D(4,4)', 'D(4,8)', 'D(5,4)'),
+                             legend1 = "train",
+                             legend2 = "val"):
     """ Plot the training trajectories for training and validation data"""
     plt.figure(figsize=figsize)
 
     for i, plot_idx in enumerate(plot_indices):
         plt.subplot(plot_shape[0], plot_shape[1], plot_idx)
+        marker = '-'
         if shapes3d:
-            marker = 'o'
-            plt.title("shapes3d (game size 4)", fontsize=13)
-        else:
-            marker = '-'
-            plt.title(titles[i], fontsize=13)
+            plt.title("shapes3d", fontsize=13)
             
         if message_length_plot:
             for j in range(len(message_length_train[i])):
@@ -433,8 +432,8 @@ def plot_training_trajectory(results_train,
             plt.plot(range(0, n_epochs, steps[0]), np.transpose(results_train[i]), marker, color='blue')
         if not train_only:
             plt.plot(range(0, n_epochs, steps[1]), np.transpose(results_val[i]), marker, color='red')
-            plt.legend(['train', 'val'])
-            leg = plt.legend(['train', 'val'], fontsize=12)
+            plt.legend([legend1, legend2])
+            leg = plt.legend([legend1, legend2], fontsize=12)
             leg.legend_handles[0].set_color('blue') # for older matplotlib version: leg.legendHandles
             leg.legend_handles[1].set_color('red')
 
@@ -450,6 +449,70 @@ def plot_training_trajectory(results_train,
         if xlim:
             plt.xlim(xlim)
 
+
+    if loss_plot:
+        plt.suptitle('loss', x=0.53, fontsize=15)
+    elif message_length_plot:
+        plt.suptitle('message length', x=0.53, fontsize=15)
+    else:
+        plt.suptitle('accuracy', x=0.53, fontsize=15)
+    plt.tight_layout()
+
+
+def plot_training_trajectory_epoch_change(results_train,
+                             results_val,
+                             message_length_train=None,
+                             message_length_val=None,
+                             steps=(1, 5),
+                             figsize=(10, 7),
+                             ylim=None,
+                             xlim=None,
+                             plot_indices=(1, 2, 3, 4, 5, 7),
+                             plot_shape=(3, 3),
+                             n_epochs=300,
+                             train_only=False,
+                             loss_plot=False,
+                             message_length_plot=False,
+                             shapes3d = False,
+                             titles=('D(3,4)', 'D(3,8)', 'D(3,16)', 'D(4,4)', 'D(4,8)', 'D(5,4)'),
+                             legend1 = "train",
+                             legend2 = "val"):
+    """ Plot the training trajectories for training and validation data"""
+    plt.figure(figsize=figsize)
+
+    for i, plot_idx in enumerate(plot_indices):
+        plt.subplot(plot_shape[0], plot_shape[1], plot_idx)
+        marker = '-'
+        if shapes3d:
+            plt.title("shapes3d", fontsize=13)
+
+        # --- Handle variable-length epochs for train ---
+        train_runs = results_train[i] if isinstance(results_train[i], (list, np.ndarray)) else [results_train[i]]
+        for run in train_runs:
+            epochs = len(run)
+            plt.plot(range(0, epochs, steps[0]), run, marker, color='blue', alpha=0.5)
+        # --- Handle variable-length epochs for val ---
+        if not train_only:
+            val_runs = results_val[i] if isinstance(results_val[i], (list, np.ndarray)) else [results_val[i]]
+            for run in val_runs:
+                epochs = len(run)
+                plt.plot(range(0, epochs, steps[1]), run, marker, color='red', alpha=0.5)
+            plt.legend([legend1, legend2])
+            leg = plt.legend([legend1, legend2], fontsize=12)
+            leg.legend_handles[0].set_color('blue')
+            leg.legend_handles[1].set_color('red')
+
+        plt.xlabel('epoch', fontsize=12)
+        if loss_plot:
+            plt.ylabel('loss', fontsize=12)
+        elif message_length_plot:
+            plt.ylabel('message length', fontsize=12)
+        else:
+            plt.ylabel('accuracy', fontsize=12)
+        if ylim:
+            plt.ylim(ylim)
+        if xlim:
+            plt.xlim(xlim)
 
     if loss_plot:
         plt.suptitle('loss', x=0.53, fontsize=15)
