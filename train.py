@@ -383,9 +383,8 @@ def main(params):
     data_set_name = '(' + str(len(opts.dimensions)) + ',' + str(opts.dimensions[0]) + ')'
     if opts.shapes3d:
         data_set_name = 'shapes3d_feat_rep'
-        if opts.zero_shot:
-            data_set_name = 'shapes3d_feat_rep_zero_shot'
         #opts.game_size = 4 # 4 before
+        
     folder_name = (data_set_name + '_game_size_' + str(opts.game_size)
                    + '_vsf_' + str(opts.vocab_size_factor))
     folder_name = os.path.join("results/3dshapes", folder_name)
