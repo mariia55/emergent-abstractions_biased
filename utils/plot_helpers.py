@@ -417,8 +417,11 @@ def plot_training_trajectory(results_train,
     for i, plot_idx in enumerate(plot_indices):
         plt.subplot(plot_shape[0], plot_shape[1], plot_idx)
         marker = '-'
+        x_range = range(0, n_epochs, steps[0])
         if shapes3d:
-            plt.title("shapes3d", fontsize=13)
+            plt.title("shapes3d: " + titles[i], fontsize=13)
+        else:
+            plt.title(titles[i], fontsize=13)
             
         if message_length_plot:
             for j in range(len(message_length_train[i])):
@@ -427,11 +430,30 @@ def plot_training_trajectory(results_train,
                 else:
                     if len(message_length_train[i][j]) > n_epochs:
                         n_epochs = len(message_length_train[i][j])
-            plt.plot(range(0, n_epochs, steps[0]), np.transpose(message_length_train[i]), marker, color='green')
+            
+            # plot message_length_train[i]
+            for j in message_length_train[i]:
+                # so that the x_range fits with the epochs if they are different in each run
+                if len(j) != n_epochs:
+                    x_range = range(0, len(j), steps[0])
+                plt.plot(x_range, np.transpose(j), marker, color='green')
         else:
-            plt.plot(range(0, n_epochs, steps[0]), np.transpose(results_train[i]), marker, color='blue')
+            # plot results_train[i]
+            for j in results_train[i]:
+                # so that the x_range fits with the epochs if they are different in each run
+                if len(j) != n_epochs:
+                    x_range = range(0, len(j), steps[0])
+                plt.plot(x_range, np.transpose(j), marker, color='blue')
+
         if not train_only:
-            plt.plot(range(0, n_epochs, steps[1]), np.transpose(results_val[i]), marker, color='red')
+            # plot results_train[i]
+            for j in results_val[i]:
+                # so that the x_range fits with the epochs if they are different in each run
+                if len(j) != n_epochs:
+                    x_range = range(0, len(j), steps[0])
+                plt.plot(x_range, np.transpose(j), marker, color='red')
+                
+            #plt.plot(range(0, n_epochs, steps[1]), np.transpose(results_val[i]), marker, color='red')
             plt.legend([legend1, legend2])
             leg = plt.legend([legend1, legend2], fontsize=12)
             leg.legend_handles[0].set_color('blue') # for older matplotlib version: leg.legendHandles
