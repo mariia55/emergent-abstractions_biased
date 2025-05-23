@@ -134,8 +134,8 @@ if __name__ == "__main__":
 
     # generate concept datasets for the communication game
     feat_rep_concept_dataset = DataSet(game_size=10, is_shapes3d=True, images=complete_dataset.feat_reps, labels=complete_dataset.labels, device='mps')
-    torch.save(feat_rep_concept_dataset, './dataset/feat_rep_concept_dataset', pickle_protocol=4)
+    torch.save(feat_rep_concept_dataset, './dataset/feat_rep_concept_dataset.pt', pickle_protocol=4)
 
     # also for the zero_shot dataset
     feat_rep_zero_concept_dataset = DataSet(game_size=10, zero_shot=True, is_shapes3d=True, images=complete_dataset.feat_reps, labels=complete_dataset.labels, device='mps')
-    torch.save(feat_rep_zero_concept_dataset, './dataset/feat_rep_zero_concept_dataset', pickle_protocol=4)
+    torch.save(feat_rep_zero_concept_dataset, './dataset/feat_rep_zero_concept_dataset.pt', pickle_protocol=4)
