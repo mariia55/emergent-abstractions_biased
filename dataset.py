@@ -285,15 +285,16 @@ class DataSet(torch.utils.data.Dataset):
 
         ##########################
         # DEBUG PRINT: Print concept and corresponding feature representations/labels
-        print("Concept index:", concept_idx)
-        print("Sender targets (concept tuples):", sender_targets)
-        for obj in sender_targets:
-            # Find all indices in the dataset that match this concept tuple
-            all_objects = self.reverse_one_hot()
-            indices = [i for i, o in enumerate(all_objects) if tuple(o) == tuple(obj)]
-            for idx in indices:
-                print(f"  Feature representation (first 5 dims) for {obj}: {self.images[idx][:5]}")
-                print(f"  Label for {obj}: {self.labels[idx]}")
+        if random.random() < 0.001:
+            print("Concept index:", concept_idx)
+            print("Sender targets (concept tuples):", sender_targets)
+            for obj in sender_targets:
+                # Find all indices in the dataset that match this concept tuple
+                all_objects = self.reverse_one_hot()
+                indices = [i for i, o in enumerate(all_objects) if tuple(o) == tuple(obj)]
+                for idx in indices:
+                    print(f"  Feature representation (first 5 dims) for {obj}: {self.images[idx][:5]}")
+                    print(f"  Label for {obj}: {self.labels[idx]}")
         ##########################
 
         # append context objects
