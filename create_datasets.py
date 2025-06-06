@@ -102,7 +102,7 @@ def generate_dataset():
     print(f"Feature representations saved to {dataset_path + '_feat_rep'} and {dataset_path + '_feat_rep_no_images'}")
     return feat_rep_dataset_full, feat_rep_dataset_without_images
 
-def load_or_create_dataset(dataset_path, device='cpu', game_size = 4):
+def load_or_create_dataset(dataset_path, device='cpu', game_size = 4, zero_shot=False, zero_shot_test=None):
     """
     Loads the image representation dataset if it exists, otherwise creates it
     dataset_path: str, path to the dataset file
@@ -113,13 +113,22 @@ def load_or_create_dataset(dataset_path, device='cpu', game_size = 4):
     try:
         data_set = torch.load(dataset_path)
     except:
-        print("Feature representations not found, creating it instead...")
         complete_dataset, _ = generate_dataset()
-        data_set = DataSet(game_size=game_size,
+        print("Feature representations not found, creating it instead...")
+        if zero_shot==True:
+            data_set = DataSet(game_size=game_size,
                            is_shapes3d=True,
                            images=complete_dataset.feat_reps,
                            labels=complete_dataset.labels,
+                           zero_shot=zero_shot, 
+                           zero_shot_test=zero_shot_test,
                            device=device)
+        else:
+            data_set = DataSet(game_size=game_size,
+                            is_shapes3d=True,
+                            images=complete_dataset.feat_reps,
+                            labels=complete_dataset.labels,
+                            device=device)
         torch.save(data_set, dataset_path, pickle_protocol=4)
 
     return data_set

@@ -383,7 +383,6 @@ def main(params):
     data_set_name = '(' + str(len(opts.dimensions)) + ',' + str(opts.dimensions[0]) + ')'
     if opts.shapes3d:
         data_set_name = 'shapes3d_feat_rep'
-        #opts.game_size = 4 # 4 before
         
     folder_name = (data_set_name + '_game_size_' + str(opts.game_size)
                    + '_vsf_' + str(opts.vocab_size_factor))
@@ -435,10 +434,10 @@ def main(params):
         # if not given, generate data set (new for each run for the small datasets)
         if not opts.load_dataset and not opts.zero_shot:
             if opts.shapes3d:
-                if opts.game_size == 4:
-                    data_set = load_or_create_dataset('./dataset/feat_rep_concept_dataset', device=opts.device, game_size=opts.game_size)
-                elif opts.game_size == 10:
-                    data_set = load_or_create_dataset('./dataset/feat_rep_concept_dataset_gs10', device=opts.device, game_size=opts.game_size)
+                #if opts.game_size == 4:
+                data_set = load_or_create_dataset('./dataset/feat_rep_concept_dataset', device=opts.device, game_size=opts.game_size)
+                #elif opts.game_size == 10:
+                 #   data_set = load_or_create_dataset('./dataset/feat_rep_concept_dataset_gs10', device=opts.device, game_size=opts.game_size)
             else:
                 data_set = dataset.DataSet(opts.dimensions,
                                            game_size=opts.game_size,
@@ -527,7 +526,7 @@ def main(params):
                     os.makedirs(opts.save_path)
                 if not opts.load_dataset:
                     if opts.shapes3d:
-                        data_set = load_or_create_dataset('./dataset/feat_rep_zero_concept_dataset_' + opts.zero_shot_test, device=opts.device, game_size=opts.game_size)
+                        data_set = load_or_create_dataset('./dataset/feat_rep_zero_concept_dataset_' + opts.zero_shot_test, device=opts.device, game_size=opts.game_size, zero_shot=opts.zero_shot, zero_shot_test=opts.zero_shot_test)
                         '''feat_rep_dataset_path = 'dataset/complete_dataset' + '_feat_rep'
                         complete_dataset = torch.load(feat_rep_dataset_path)
                         data_set = dataset.DataSet(opts.dimensions,
@@ -565,7 +564,7 @@ def main(params):
                     if not os.path.exists(opts.save_path) and opts.save:
                         os.makedirs(opts.save_path)
                     if opts.shapes3d:
-                        data_set = load_or_create_dataset('./dataset/feat_rep_zero_concept_dataset_' + cond, device=opts.device, game_size=opts.game_size)
+                        data_set = load_or_create_dataset('./dataset/feat_rep_zero_concept_dataset_' + cond, device=opts.device, game_size=opts.game_size, zero_shot=opts.zero_shot, zero_shot_test=opts.zero_shot_test)
                         '''feat_rep_dataset_path = 'dataset/complete_dataset' + '_feat_rep'
                         complete_dataset = torch.load(feat_rep_dataset_path)
                         data_set = dataset.DataSet(opts.dimensions,
