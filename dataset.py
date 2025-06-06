@@ -179,15 +179,18 @@ class DataSet(torch.utils.data.Dataset):
                         if test_cond == 'generic':
                             # test dataset only contains most generic concepts
                             if nr_possible_contexts == 1:
+                                
                                 assert context_condition == 0, (f'generic concepts only in coarse contexts but is '
                                                                 f'{context_condition}')
                                 test.append(
                                     self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
+                                print(f"Concept {concept_idx} assigned to TEST (generic zero-shot)")
                             else:
                                 train_and_val.append(
                                     self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
+                                print(f"Concept {concept_idx} assigned to TRAIN/VAL (generic zero-shot)")
 
                         # 2) 'specific'
                         elif test_cond == 'specific':
@@ -196,10 +199,12 @@ class DataSet(torch.utils.data.Dataset):
                                 test.append(
                                     self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
+                                print(f"Concept {concept_idx} assigned to TEST (specific zero-shot)")
                             else:
                                 train_and_val.append(
                                     self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
+                                print(f"Concept {concept_idx} assigned to TRAIN/VAL (specific zero-shot)")
 
                 # fine contexts only:
                 elif self.granularity == "fine":
@@ -277,6 +282,20 @@ class DataSet(torch.utils.data.Dataset):
         receiver_targets = receiver_concept[0]
         sender_input = [obj for obj in sender_targets]
         receiver_input = [obj for obj in receiver_targets]
+
+        ##########################
+        # DEBUG PRINT: Print concept and corresponding feature representations/labels
+        print("Concept index:", concept_idx)
+        print("Sender targets (concept tuples):", sender_targets)
+        for obj in sender_targets:
+            # Find all indices in the dataset that match this concept tuple
+            all_objects = self.reverse_one_hot()
+            indices = [i for i, o in enumerate(all_objects) if tuple(o) == tuple(obj)]
+            for idx in indices:
+                print(f"  Feature representation (first 5 dims) for {obj}: {self.images[idx][:5]}")
+                print(f"  Label for {obj}: {self.labels[idx]}")
+        ##########################
+
         # append context objects
         # get context of relevant context condition
         for distractor_objects, context_cond in sender_context:
