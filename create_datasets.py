@@ -129,7 +129,7 @@ def load_or_create_dataset(dataset_path, device='cpu', game_size = 4, zero_shot=
                             images=complete_dataset.feat_reps,
                             labels=complete_dataset.labels,
                             device=device)
-        torch.save(data_set, dataset_path, pickle_protocol=4)
+        torch.save(data_set, dataset_path + '.pt',pickle_protocol=4)
 
     return data_set
 
