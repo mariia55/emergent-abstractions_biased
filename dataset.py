@@ -179,20 +179,20 @@ class DataSet(torch.utils.data.Dataset):
                         if test_cond == 'generic':
                             # test dataset only contains most generic concepts
                             if nr_possible_contexts == 1:
-                                
                                 assert context_condition == 0, (f'generic concepts only in coarse contexts but is '
                                                                 f'{context_condition}')
                                 test.append(
                                     self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
                                 print(f"Concept {concept_idx} assigned to TEST (generic zero-shot)")
-                                print(f"    Context condition is {context_condition}")
+                                print(f"    Concept fixed is {self.concepts[concept_idx][1]}")
+                                print(f"    Only most generic contexts (should be 0): ", context_condition)
                             else:
                                 train_and_val.append(
                                     self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
                                 print(f"Concept {concept_idx} assigned to TRAIN/VAL (generic zero-shot)")
-                                print(f"    Context condition is {context_condition}")
+                                print(f"    Concept fixed is {self.concepts[concept_idx][1]}")
 
                         # 2) 'specific'
                         elif test_cond == 'specific':
@@ -202,13 +202,14 @@ class DataSet(torch.utils.data.Dataset):
                                     self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
                                 print(f"Concept {concept_idx} assigned to TEST (specific zero-shot)")
-                                print(f"    Context condition is {context_condition}")
+                                print(f"    Concept fixed is {self.concepts[concept_idx][1]}")
+                                print(f"    Only most specific contexts (all attr. fixed [3,3,3] - should be 2): ", context_condition)
                             else:
                                 train_and_val.append(
                                     self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
                                 print(f"Concept {concept_idx} assigned to TRAIN/VAL (specific zero-shot)")
-                                print(f"    Context condition is {context_condition}")
+                                print(f"    Concept fixed is {self.concepts[concept_idx][1]}")
 
                 # fine contexts only:
                 elif self.granularity == "fine":
@@ -290,23 +291,20 @@ class DataSet(torch.utils.data.Dataset):
         ##########################
         # DEBUG PRINT: Print concept and corresponding feature representations/labels
         
-        if random.random() == 0.0:
-            counter=0
+        if random.random() < 0.01: # Print for ~1% of samples
             concept = self.concepts[concept_idx]
             print("Concept index:", concept_idx)
             print(f"  Fixed vector: {concept[1]}")
             print(f"  Example object(s): {concept[0][:3]}")  # print first 3 objects for brevity
             print("Sender targets (concept tuples):", sender_targets)
-            for obj in sender_targets:
-                counter += 1
+            for obj in sender_targets[:3]: # again only 3 for brevity
                 # Find all indices in the dataset that match this concept tuple
                 all_objects = self.reverse_one_hot()
                 indices = [i for i, o in enumerate(all_objects) if tuple(o) == tuple(obj)]
                 for idx in indices:
                     print(f"  Feature representation (first 5 dims) for {obj}: {self.images[idx][:5]}")
                     print(f"  Label for {obj}: {self.labels[idx]}")
-                if counter==3:
-                    break
+                    assert tuple(all_objects[idx]) == tuple(obj), "Mismatch between object and label!"
                 
         ##########################
 
