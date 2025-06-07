@@ -186,11 +186,13 @@ class DataSet(torch.utils.data.Dataset):
                                     self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
                                 print(f"Concept {concept_idx} assigned to TEST (generic zero-shot)")
+                                print(f"    Context condition is {context_condition}")
                             else:
                                 train_and_val.append(
                                     self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
                                 print(f"Concept {concept_idx} assigned to TRAIN/VAL (generic zero-shot)")
+                                print(f"    Context condition is {context_condition}")
 
                         # 2) 'specific'
                         elif test_cond == 'specific':
@@ -200,11 +202,13 @@ class DataSet(torch.utils.data.Dataset):
                                     self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
                                 print(f"Concept {concept_idx} assigned to TEST (specific zero-shot)")
+                                print(f"    Context condition is {context_condition}")
                             else:
                                 train_and_val.append(
                                     self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
                                 print(f"Concept {concept_idx} assigned to TRAIN/VAL (specific zero-shot)")
+                                print(f"    Context condition is {context_condition}")
 
                 # fine contexts only:
                 elif self.granularity == "fine":
@@ -285,17 +289,25 @@ class DataSet(torch.utils.data.Dataset):
 
         ##########################
         # DEBUG PRINT: Print concept and corresponding feature representations/labels
+        
         if random.random() == 0.0:
+            counter=0
+            concept = self.concepts[concept_idx]
             print("Concept index:", concept_idx)
+            print(f"  Fixed vector: {concept[1]}")
+            print(f"  Example object(s): {concept[0][:3]}")  # print first 3 objects for brevity
             print("Sender targets (concept tuples):", sender_targets)
             for obj in sender_targets:
-                if random.random() == 0.0:
-                    # Find all indices in the dataset that match this concept tuple
-                    all_objects = self.reverse_one_hot()
-                    indices = [i for i, o in enumerate(all_objects) if tuple(o) == tuple(obj)]
-                    for idx in indices:
-                        print(f"  Feature representation (first 5 dims) for {obj}: {self.images[idx][:5]}")
-                        print(f"  Label for {obj}: {self.labels[idx]}")
+                counter += 1
+                # Find all indices in the dataset that match this concept tuple
+                all_objects = self.reverse_one_hot()
+                indices = [i for i, o in enumerate(all_objects) if tuple(o) == tuple(obj)]
+                for idx in indices:
+                    print(f"  Feature representation (first 5 dims) for {obj}: {self.images[idx][:5]}")
+                    print(f"  Label for {obj}: {self.labels[idx]}")
+                if counter==3:
+                    break
+                
         ##########################
 
         # append context objects
