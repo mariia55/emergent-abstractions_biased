@@ -292,7 +292,6 @@ class DataSet(torch.utils.data.Dataset):
         # DEBUG PRINT: Print concept and corresponding feature representations/labels
         
         if random.random() < 0.01: # Print for ~1% of samples
-            counter = 0
             concept = self.concepts[concept_idx]
             print("Concept index:", concept_idx)
             print(f"  Fixed vector: {concept[1]}")
@@ -303,12 +302,7 @@ class DataSet(torch.utils.data.Dataset):
                 all_objects = self.reverse_one_hot()
                 indices = [i for i, o in enumerate(all_objects) if tuple(o) == tuple(obj)]
                 for idx in indices:
-                    counter += 1
-                    print(f"    Feature representation (first 5 dims) for {obj}: {self.images[idx][:5]}")
-                    print(f"    Label for {obj}: {self.labels[idx]}")
                     assert tuple(all_objects[idx]) == tuple(obj), "Mismatch between object and label!"
-                    if counter == 3:
-                        break
                 
         ##########################
 
