@@ -273,7 +273,7 @@ def load_accuracies(all_paths, n_runs=5, n_epochs=300, val_steps=10, zero_shot=F
 
             # zero_shot
             elif zero_shot:
-                for cond in ['specific']:#, 'generic']:
+                for cond in ['specific', 'generic']:
                     if not context_unaware:
                         if not length_cost:
                             if zero_shot_test_ds is None:
@@ -657,7 +657,7 @@ def load_entropies_zero_shot(all_paths, n_runs=5, context_unaware=False, length_
                             'consistency_concept_x_context': []}
     result_dict_generic = copy.deepcopy(result_dict_specific)
 
-    for cond in ['specific']:#, 'generic']:
+    for cond in ['specific', 'generic']:
 
         for path_idx, path in enumerate(all_paths):
 
