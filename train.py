@@ -527,19 +527,7 @@ def main(params):
                 if not opts.load_dataset:
                     if opts.shapes3d:
                         data_set = load_or_create_dataset('./dataset/feat_rep_zero_concept_dataset_' + opts.zero_shot_test, device=opts.device, game_size=opts.game_size, zero_shot=opts.zero_shot, zero_shot_test=opts.zero_shot_test)
-                        '''feat_rep_dataset_path = 'dataset/complete_dataset' + '_feat_rep'
-                        complete_dataset = torch.load(feat_rep_dataset_path)
-                        data_set = dataset.DataSet(opts.dimensions,
-                                                   game_size=opts.game_size,
-                                                   scaling_factor=opts.scaling_factor,
-                                                   device=opts.device,
-                                                   zero_shot=True,
-                                                   is_shapes3d = opts.shapes3d,
-                                                   images=complete_dataset.feat_reps,
-                                                   labels=complete_dataset.labels,
-                                                   zero_shot_test=opts.zero_shot_test,
-                                                   sample_context=opts.sample_context,
-                                                   granularity=opts.granularity)'''
+
                     else:
                         data_set = dataset.DataSet(opts.dimensions,
                                                    game_size=opts.game_size,
@@ -565,19 +553,7 @@ def main(params):
                         os.makedirs(opts.save_path)
                     if opts.shapes3d:
                         data_set = load_or_create_dataset('./dataset/feat_rep_zero_concept_dataset_' + cond, device=opts.device, game_size=opts.game_size, zero_shot=opts.zero_shot, zero_shot_test=opts.zero_shot_test)
-                        '''feat_rep_dataset_path = 'dataset/complete_dataset' + '_feat_rep'
-                        complete_dataset = torch.load(feat_rep_dataset_path)
-                        data_set = dataset.DataSet(opts.dimensions,
-                                                   game_size=opts.game_size,
-                                                   scaling_factor=opts.scaling_factor,
-                                                   device=opts.device,
-                                                   zero_shot=True,
-                                                   is_shapes3d = opts.shapes3d,
-                                                   images=complete_dataset.feat_reps,
-                                                   labels=complete_dataset.labels,
-                                                   zero_shot_test=cond,
-                                                   sample_context=opts.sample_context,
-                                                   granularity=opts.granularity)'''
+
                     else:
                         data_set = dataset.DataSet(opts.dimensions,
                                                    game_size=opts.game_size,
