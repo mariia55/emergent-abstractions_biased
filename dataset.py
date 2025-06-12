@@ -184,15 +184,14 @@ class DataSet(torch.utils.data.Dataset):
                                 test.append(
                                     self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
-                                print(f"Concept {concept_idx} assigned to TEST (generic zero-shot)")
-                                print(f"    Concept fixed is {self.concepts[concept_idx][1]}")
-                                print(f"    Only most generic contexts (should be 0): ", context_condition)
+                                #print(f"Concept {concept_idx} assigned to TEST (generic zero-shot)")
+                                #print(f"    Concept fixed is {self.concepts[concept_idx][1]}")
                             else:
                                 train_and_val.append(
                                     self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
-                                print(f"Concept {concept_idx} assigned to TRAIN/VAL (generic zero-shot)")
-                                print(f"    Concept fixed is {self.concepts[concept_idx][1]}")
+                                #print(f"Concept {concept_idx} assigned to TRAIN/VAL (generic zero-shot)")
+                                #print(f"    Concept fixed is {self.concepts[concept_idx][1]}")
 
                         # 2) 'specific'
                         elif test_cond == 'specific':
@@ -201,15 +200,14 @@ class DataSet(torch.utils.data.Dataset):
                                 test.append(
                                     self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
-                                print(f"Concept {concept_idx} assigned to TEST (specific zero-shot)")
-                                print(f"    Concept fixed is {self.concepts[concept_idx][1]}")
-                                print(f"    Only most specific contexts (all attr. fixed [3,3,3] - should be 2): ", context_condition)
+                                #print(f"Concept {concept_idx} assigned to TEST (specific zero-shot)")
+                                #print(f"    Concept fixed is {self.concepts[concept_idx][1]}")
                             else:
                                 train_and_val.append(
                                     self.get_item(concept_idx, context_condition, self.encoding_func,
                                                   include_concept))
-                                print(f"Concept {concept_idx} assigned to TRAIN/VAL (specific zero-shot)")
-                                print(f"    Concept fixed is {self.concepts[concept_idx][1]}")
+                                #print(f"Concept {concept_idx} assigned to TRAIN/VAL (specific zero-shot)")
+                                #print(f"    Concept fixed is {self.concepts[concept_idx][1]}")
 
                 # fine contexts only:
                 elif self.granularity == "fine":
@@ -290,7 +288,7 @@ class DataSet(torch.utils.data.Dataset):
 
         ##########################
         # DEBUG PRINT: Print concept and corresponding feature representations/labels
-        
+        '''
         if random.random() < 0.01: # Print for ~1% of samples
             concept = self.concepts[concept_idx]
             print("Concept index:", concept_idx)
@@ -303,7 +301,7 @@ class DataSet(torch.utils.data.Dataset):
                 indices = [i for i, o in enumerate(all_objects) if tuple(o) == tuple(obj)]
                 for idx in indices:
                     assert tuple(all_objects[idx]) == tuple(obj), "Mismatch between object and label!"
-                
+        '''
         ##########################
 
         # append context objects
