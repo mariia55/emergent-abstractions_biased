@@ -27,6 +27,8 @@ parser.add_argument('--granularity', type=str, default='mixed',
                     help='Granularity of the context. Possible values: mixed, coarse and fine')
 parser.add_argument('--shared_context', type=bool, default=False,
                     help="If true, context is generated with specific shared attributes instead of all possible.")
+parser.add_argument('--split_by_attribute', type=bool, default=False,
+                        help= 'Use for generating dataset with highly discriminative attribute.')
 
 args = parser.parse_args()
 
@@ -49,7 +51,8 @@ if not args.zero_shot:
                        device='cpu',
                        sample_context=args.sample_context,
                        granularity=args.granularity,
-                       shared_context=args.shared_context)
+                       shared_context=args.shared_context
+                       split_by_attribute=args.split_by_attribute)
 
     if data_set.granularity == 'mixed' or data_set.granularity == None:
         path = ('data/dim(' + str(len(args.dimensions)) + ',' + str(args.dimensions[0]) + ')' + sample + '_sf' +
