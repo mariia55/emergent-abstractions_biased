@@ -26,7 +26,7 @@ class DataSet(torch.utils.data.Dataset):
         properties_dim: vector that defines how many attributes and features per attributes the dataset should contain,
         defaults to a 3x3x3 dataset
         game_size: integer that defines how many targets and distractors a game consists of
-        split_by attribute: new parameter to create a dataset with one highly disriminative attribute
+        split_by_attribute: new parameter to create a dataset with one highly disriminative attribute
         """
         super().__init__()
 
@@ -63,15 +63,31 @@ class DataSet(torch.utils.data.Dataset):
             self.encoding_func = self._many_hot_encoding
         # get all concepts
         self.concepts = self.get_all_concepts()
+                     
+        """ 
+        for split_by_attribute:
+        randomly choose one attribute which will be highly important 
+        for discriminating between targets and distractors in the
+        subset A.
+        """      
+        self.discriminative_attribute = random.choice(range(len(self.properties_dim)))
 
         # generate dataset
-        if not testing and not zero_shot:
+        if not testing and not zero_shot and not split_by_attribute:
             self.dataset = self.get_datasets(split_ratio=SPLIT)
-        if zero_shot:
+        elif zero_shot:
             # check if zero_shot_test has one of the allowed values
             if zero_shot_test not in ["specific", "generic", None]:
                 raise ValueError("zero_shot_test is", zero_shot_test, "but must be either 'specific' or 'generic'.")
+            if split_by_attribute:
+                raise ValueError("zero_shot is incompatible with split_by_attribute.")
             self.dataset = self.get_zero_shot_datasets(split_ratio=SPLIT_ZERO_SHOT, test_cond=zero_shot_test)
+        elif split_by_attribute:
+            if not shared_context:
+                raise ValueError("split_by_attribute requires shared_context to be true.")
+            if granularity != "mixed":
+                raise ValueError("split_by_attribute requires mixed granularity.")
+            self.dataset = self.get_split_by_attribute(percentage_a)
 
     def __len__(self):
         """Returns the total amount of samples in dataset."""
