@@ -10,6 +10,7 @@ import numpy as np
 
 SPLIT = (0.6, 0.2, 0.2)
 SPLIT_ZERO_SHOT = (0.75, 0.25)
+percentage_a = 0.8 #adding a variable to manipulate the proporion of subset A in the training+validation dataset
 
 
 class DataSet(torch.utils.data.Dataset):
