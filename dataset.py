@@ -274,7 +274,7 @@ class DataSet(torch.utils.data.Dataset):
         Subset A: Concept-context pairs, where the randomly chosen attribute X is highly important
         for discrimination between targets and distractors.
         This chosen attribute X is fixed, context is "fine", and the chosen attribute is NOT shared with distractors.
-        Subset B: All other concept_context pairs.
+        Subset B: All other concept-context pairs.
         Then the function splits these two subsets for training, validation, and testing.
         """
       
@@ -319,16 +319,22 @@ class DataSet(torch.utils.data.Dataset):
 
         print(f"Subset A size: {len(subset_a)}")
         print(f"Subset B size: {len(subset_b)}")
-        # Splitting logic  
+        
+        # Splitting logic
+        # The whole subset A and part of subset B are used for training and validation.
+        # percentage_a dictates what proportion of the train+val dataset the subset A is.
+        # For example, if percentage_a is 0.8, it means, that subset A is 80% of the whole
+        # train+val dataset, and the other 20% must be from subset B.
       
-        # Calculate number of samples from subset B that will be used for train/val
+        # Calculate number of samples from subset B that will be used for train+val
         number_b_for_train_val = int(len(subset_a)/percentage_a) - len(subset_a)
-        # Randomly sample from subset B
+        # Randomly sample the needed amount of concept-context pairs from subset B
         random.shuffle(subset_b)
         b_train_val = subset_b[:number_b_for_train_val]
-        test = subset_b[number_b_for_train_val:] # Remaining subset B for test
+        # Remaining part of subset B is used for testing
+        test = subset_b[number_b_for_train_val:]
 
-        # Combine train/val samples from A and B
+        # Combine train+val samples from subsets A and B
         train_and_val = subset_a + b_train_val
         random.shuffle(train_and_val) # Shuffle the combined pool
 
@@ -514,6 +520,8 @@ class DataSet(torch.utils.data.Dataset):
             # e.g. if fixed==(1,1,1) and context_condition==2, then shared vector can be one of: (1,1,0), (1,0,1), (0,1,1)
             # For split_by_attribute, if the highly discriminative attribute is fixed and context_condition is the finest possible,
             # the discriminative attribute cannot be shared with the distractors.
+            # ?techinically, I think I don't have to check if discr. attr. is fixed and if context is fine, since it
+            # ?is checked in the main function, but I left it here for now too just in case.
             if split_by_attribute_subset_a and self.discriminative_attribute in fixed_attr_indices and context_condition == sum(fixed) -1:
                  # Exclude the discriminative attribute from the pool of attributes to be shared
                  attributes_to_be_shared = [attr for attr in fixed_attr_indices if attr != self.discriminative_attribute]
