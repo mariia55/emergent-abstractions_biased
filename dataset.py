@@ -10,7 +10,8 @@ import numpy as np
 
 SPLIT = (0.6, 0.2, 0.2)
 SPLIT_ZERO_SHOT = (0.75, 0.25)
-percentage_a = 0.8 #adding a variable to manipulate the proporion of subset A in the training+validation dataset
+percentage_a = 0.8 #for split_by_attribute: add a variable to manipulate the proporion of subset A in the train+val dataset
+#default: subset A is 80% of the train+val dataset
 
 
 class DataSet(torch.utils.data.Dataset):
@@ -20,11 +21,12 @@ class DataSet(torch.utils.data.Dataset):
 
     def __init__(self, properties_dim=[3, 3, 3], game_size=10, scaling_factor=10, device='cuda', testing=False,
                  zero_shot=False, zero_shot_test=None, sample_context=False, granularity="mixed", is_shapes3d=False,
-                 images=[], labels=[], shared_context=False):
+                 images=[], labels=[], shared_context=False, split_by_attribute=False): 
         """
         properties_dim: vector that defines how many attributes and features per attributes the dataset should contain,
         defaults to a 3x3x3 dataset
         game_size: integer that defines how many targets and distractors a game consists of
+        split_by attribute: new parameter to create a dataset with one highly disriminative attribute
         """
         super().__init__()
 
@@ -35,6 +37,7 @@ class DataSet(torch.utils.data.Dataset):
         self.sample_context = sample_context
         self.granularity = granularity
         self.shared_context = shared_context
+        self.split_by_attribute = split_by_attribute
 
         # check if granularity has one of the allowed values
         if granularity not in ["mixed", "fine", "coarse"]:
