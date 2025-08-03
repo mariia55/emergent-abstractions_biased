@@ -5,6 +5,7 @@ import os
 
 SPLIT = (0.6, 0.2, 0.2)
 SPLIT_ZERO_SHOT = (0.75, 0.25)
+percentage_a = 0.8
 
 parser = argparse.ArgumentParser()
 
