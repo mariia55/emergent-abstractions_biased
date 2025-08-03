@@ -51,7 +51,7 @@ if not args.zero_shot:
                        device='cpu',
                        sample_context=args.sample_context,
                        granularity=args.granularity,
-                       shared_context=args.shared_context
+                       shared_context=args.shared_context,
                        split_by_attribute=args.split_by_attribute)
 
     if data_set.granularity == 'mixed' or data_set.granularity == None:
