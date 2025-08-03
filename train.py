@@ -26,6 +26,7 @@ import time
 
 SPLIT = (0.6, 0.2, 0.2)
 SPLIT_ZERO_SHOT = (0.75, 0.25)
+percentage_a = 0.8 #add the variable for split_by_attribute
 
 
 def get_params(params):
