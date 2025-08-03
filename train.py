@@ -125,6 +125,8 @@ def get_params(params):
                         help="Determines whether 3dshapes dataset will be used or not")
     parser.add_argument('--shared_context', type=bool, default=False,
                         help='Use for generating datasets with a shared context.')
+    parser.add_argument('--split_by_attribute', type=bool, default=False,
+                        help= 'Use for generating dataset with highly discriminative attribute.')
 
     args = core.init(parser, params)
 
