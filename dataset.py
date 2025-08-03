@@ -400,7 +400,7 @@ class DataSet(torch.utils.data.Dataset):
 
         return context
 
-    def get_distractors_shared(self, concept_idx, context_condition, shared_attr_indices=None):
+    def get_distractors_shared(self, concept_idx, context_condition, shared_attr_indices=None, split_by_attribute_subset_a=False):
         """
         Computes distractors for a shared context between sender and receiver. It also implements a change compared
         to get_distractors(): Here, objects in the context do not only share a certain number of attributes, but also
@@ -420,8 +420,14 @@ class DataSet(torch.utils.data.Dataset):
             # generate a shared vector, i.e. a vector that indicates which of the attributes should be shared with the
             # concept attributes according to the context condition
             # e.g. if fixed==(1,1,1) and context_condition==2, then shared vector can be one of: (1,1,0), (1,0,1), (0,1,1)
-            # which attributes should be shared:
-            shared_attr_indices = random.sample(fixed_attr_indices, context_condition)
+            # For split_by_attribute, if the highly discriminative attribute is fixed and context_condition is the finest possible,
+            # the discriminative attribute cannot be shared with the distractors.
+            if split_by_attribute_subset_a and self.discriminative_attribute in fixed_attr_indices and context_condition == sum(fixed) -1:
+                 # Exclude the discriminative attribute from the pool of attributes to be shared
+                 attributes_to_be_shared = [attr for attr in fixed_attr_indices if attr != self.discriminative_attribute]
+                 shared_attr_indices = random.sample(attributes_to_be_shared, context_condition)
+            else:
+                 shared_attr_indices = random.sample(fixed_attr_indices, context_condition)
 
         # consider all objects as possible distractors
         poss_dist = self.all_objects
