@@ -423,8 +423,7 @@ def main(params):
 
     # if name of precreated data set is given, load dataset
     if opts.load_dataset:
-        # data_set = torch.load(opts.path + 'data/' + opts.load_dataset)
-        data_set = torch.load(opts.path + opts.load_dataset)
+        data_set = torch.load(opts.path + 'data/' + opts.load_dataset)
         print('data loaded from: ' + 'data/' + opts.load_dataset)
         if not opts.zero_shot:
             # create subfolder if necessary
