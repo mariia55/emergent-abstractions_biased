@@ -406,8 +406,10 @@ def main(params):
                 opts.game_setting = 'length_cost/context_aware'
             else:
                 opts.game_setting = 'length_cost/no_cost_context_aware'
-    if opts.shared_context:
+    if opts.shared_context and not opts.split_by_attribute:
         opts.game_setting = opts.game_setting + '/shared_context'
+    if opts.split_by_attribute:
+        opts.game_setting = opts.game_setting + '/split_by_attribute'
 
     # create subfolders if necessary
     # The granularity subfolders are created only when the granularity is not 'mixed'
