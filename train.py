@@ -425,7 +425,7 @@ def main(params):
 
     # if name of precreated data set is given, load dataset
     if opts.load_dataset:
-        data_set = torch.load(opts.path + 'data/' + opts.load_dataset, weights_only=False)
+        data_set = torch.load(opts.path + 'data/' + opts.load_dataset)
         print('data loaded from: ' + 'data/' + opts.load_dataset)
         if not opts.zero_shot:
             # create subfolder if necessary
@@ -445,7 +445,8 @@ def main(params):
                                            device=opts.device,
                                            sample_context=opts.sample_context,
                                            granularity=opts.granularity,
-                                           shared_context=opts.shared_context)
+                                           shared_context=opts.shared_context,
+                                           split_by_attribute=opts.split_by_attribute)
 
             # save folder for opts rsa is already specified above
             if not opts.test_rsa and not opts.save_test_interactions:
