@@ -305,10 +305,10 @@ class DataSet(torch.utils.data.Dataset):
                           # Check if the discriminative attribute is NOT in the shared attributes for subset A
                           if self.discriminative_attribute not in shared_attr_indices:
                               subset_a.append(self.get_item(concept_idx, context_condition, self.encoding_func, include_concept=False))
-                          else:
-                              subset_b.append(self.get_item(concept_idx, context_condition, self.encoding_func, include_concept=False))
+                          #else:
+                              #subset_b.append(self.get_item(concept_idx, context_condition, self.encoding_func, include_concept=False))
                        else:
-                          # For other context conditions or when the discriminative attribute IS shared for the finest context, add to subset B
+                          # For other context conditions, add to subset B
                           subset_b.append(self.get_item(concept_idx, context_condition, self.encoding_func, include_concept=False))
                 else:
                     # If the discriminative attribute is not fixed, add to subset B. COULD BE REMOVED CAUSE NOT REALLY NEEDED
@@ -348,20 +348,13 @@ class DataSet(torch.utils.data.Dataset):
         train_samples = int(len(train_and_val) * adjusted_train_ratio)
         val_samples = len(train_and_val) - train_samples # Take the rest for validation
         train, val = torch.utils.data.random_split(train_and_val, [train_samples, val_samples])
-
-
         # Save information about train dataset
-        if hasattr(train, 'dimensions'):
-             pass # dimensions already set
-        else:
-             train.dimensions = self.properties_dim
-
+        train.dimensions = self.properties_dim
 
         print("\nFinal Dataset Sizes:")
         print(f"Train dataset size: {len(train)}")
         print(f"Validation dataset size: {len(val)}")
         print(f"Test dataset size: {len(test)}")
-
 
         return train, val, test
 
