@@ -186,7 +186,7 @@ def train(opts, datasets, verbose_callbacks=False):
     # print("train", train)
     dimensions = train.dimensions
 
-    train = torch.utils.data.DataLoader(train, batch_size=opts.batch_size, shuffle=True)
+    train = torch.utils.data.DataLoader(train, batch_size=opts.batch_size, shuffle=True, drop_last=True)
     val = torch.utils.data.DataLoader(val, batch_size=opts.batch_size, shuffle=False, drop_last=True)
     test = torch.utils.data.DataLoader(test, batch_size=opts.batch_size, shuffle=False)
 
