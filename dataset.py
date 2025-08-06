@@ -338,15 +338,8 @@ class DataSet(torch.utils.data.Dataset):
         train_and_val = subset_a + b_train_val
         random.shuffle(train_and_val) # Shuffle the combined pool
 
-        # Apply original SPLIT ratios to the combined train/val pool
-        # Adjust ratios to sum to 1 for torch.utils.data.random_split
-        train_ratio, val_ratio, _ = SPLIT
-        total_train_val_ratio = train_ratio + val_ratio # This is 0.8 from SPLIT (0.6 + 0.2)
-        adjusted_train_ratio = train_ratio / total_train_val_ratio # 0.6 / 0.8 = 0.75
-        adjusted_val_ratio = val_ratio / total_train_val_ratio   # 0.2 / 0.8 = 0.25
-
-        train_samples = int(len(train_and_val) * adjusted_train_ratio)
-        val_samples = len(train_and_val) - train_samples # Take the rest for validation
+        train_samples = int(len(train_and_val) * 0.75) # train is 75% of train and val
+        val_samples = len(train_and_val) - train_samples # take the rest for validation (25% of train and val)
         train, val = torch.utils.data.random_split(train_and_val, [train_samples, val_samples])
         # Save information about train dataset
         train.dimensions = self.properties_dim
