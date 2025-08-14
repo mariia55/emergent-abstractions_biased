@@ -10,8 +10,6 @@ import numpy as np
 
 SPLIT = (0.6, 0.2, 0.2)
 SPLIT_ZERO_SHOT = (0.75, 0.25)
-# percentage_a = 0.8 #for split_by_attribute: add a variable to manipulate the proporion of subset A in the train+val dataset
-# default: subset A is 80% of the train+val dataset
 
 
 class DataSet(torch.utils.data.Dataset):
