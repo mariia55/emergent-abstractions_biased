@@ -26,7 +26,7 @@ import time
 
 SPLIT = (0.6, 0.2, 0.2)
 SPLIT_ZERO_SHOT = (0.75, 0.25)
-percentage_a = 0.8 #add the variable for split_by_attribute
+# percentage_a = 0.8 #add the variable for split_by_attribute
 
 
 def get_params(params):
@@ -127,6 +127,8 @@ def get_params(params):
                         help='Use for generating datasets with a shared context.')
     parser.add_argument('--split_by_attribute', type=bool, default=False,
                         help= 'Use for generating dataset with highly discriminative attribute.')
+    parser.add_argument("--percentage_a", type=float, default=0.8,
+                        help="Used for split_by_attribute, proportion of subset A ih the train+val set")
 
     args = core.init(parser, params)
 
@@ -446,7 +448,8 @@ def main(params):
                                            sample_context=opts.sample_context,
                                            granularity=opts.granularity,
                                            shared_context=opts.shared_context,
-                                           split_by_attribute=opts.split_by_attribute)
+                                           split_by_attribute=opts.split_by_attribute,
+                                           percentage_a=opts.percentage_a)
 
             # save folder for opts rsa is already specified above
             if not opts.test_rsa and not opts.save_test_interactions:
