@@ -339,7 +339,7 @@ def plot_training_trajectory(results_train,
                              train_only=False,
                              loss_plot=False,
                              message_length_plot=False,
-                             titles=('D(3,4)', 'D(3,8)', 'D(3,16)', 'D(4,4)', 'D(4,8)', 'D(5,4)')):
+                             titles=('D(3,3)','D(3,4)', 'D(3,8)', 'D(3,16)', 'D(4,4)', 'D(4,8)', 'D(5,4)')):
     """ Plot the training trajectories for training and validation data"""
     plt.figure(figsize=figsize)
 
