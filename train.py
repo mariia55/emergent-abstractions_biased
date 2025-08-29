@@ -1,6 +1,10 @@
 # code based on https://github.com/XeniaOhmer/hierarchical_reference_game/blob/master/train.py
 # and https://github.com/jayelm/emergent-generalization/blob/master/code/train.py
+import sys
+sys.path.insert(0, r"C:\Users\metel\OneDrive\Desktop\EGG-final\EGG")  # path to your local clone
 
+import egg
+print("Using EGG from:", egg.__file__)
 import argparse
 import torch
 # print(torch.__version__)
@@ -506,7 +510,7 @@ def main(params):
             elif opts.test_rsa:
                 opts.save_interactions_path = os.path.join(opts.game_path, str(run), 'interactions')
             else:
-                opts.save_interactions_path = os.path.join(opts.game_path, str(run), 'interactions')
+                opts.save_interactions_path = os.path.join(opts.save_path, 'interactions')
             if not os.path.exists(opts.save_interactions_path) and opts.save:
                 os.makedirs(opts.save_interactions_path)
 
